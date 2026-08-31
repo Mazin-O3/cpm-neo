@@ -168,8 +168,9 @@ static char *fmt_uint(char *end, uint32_t val, int base, int upper)
 typedef struct
 {
     char *buf;
-    int pos;
-    int limit;
+    int pos;     /* characters currently buffered (flush pointer) */
+    int limit;   /* buffer capacity */
+    int total;   /* characters produced so far */
     int bounded; /* 1 = stop at limit-1; 0 = flush to stdout at limit */
 } Writer;
 
@@ -184,20 +185,22 @@ static void w_flush(Writer *w)
 
 static void w_putc(Writer *w, char c)
 {
-    if (w->buf)
+    w->total++;
+
+    if (w->bounded)
     {
-        if (w->bounded)
-        {
-            if (w->pos < w->limit - 1)
-                w->buf[w->pos] = c;
-            w->pos++;
-        }
-        else
-        {
-            if (w->pos >= w->limit)
-                w_flush(w);
-            w->buf[w->pos++] = c;
-        }
+        /* count-only when buf is NULL (snprintf(NULL, 0, ...)) */
+        if (w->buf && w->pos < w->limit - 1)
+            w->buf[w->pos] = c;
+
+        w->pos++;
+    }
+    else if (w->buf)
+    {
+        if (w->pos >= w->limit)
+            w_flush(w);
+            
+        w->buf[w->pos++] = c;
     }
     else
     {
@@ -349,7 +352,7 @@ static int do_vprintf(Writer *w, const char *fmt, va_list ap)
         }
     }
 
-    if (w->buf)
+    if (w->buf && w->limit > 0)
     {
         if (w->bounded)
         {
@@ -362,13 +365,13 @@ static int do_vprintf(Writer *w, const char *fmt, va_list ap)
         }
     }
 
-    return w->pos;
+    return w->total;
 }
 
 int vprintf(const char *fmt, va_list ap)
 {
     char buf[64];
-    Writer w = {.buf = buf, .pos = 0, .limit = 64, .bounded = 0};
+    Writer w = {.buf = buf, .pos = 0, .limit = 64, .total = 0, .bounded = 0};
     int n = do_vprintf(&w, fmt, ap);
     w_flush(&w);
     return n;
@@ -376,9 +379,7 @@ int vprintf(const char *fmt, va_list ap)
 
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list ap)
 {
-    if (size == 0)
-        return 0;
-    Writer w = {.buf = buf, .pos = 0, .limit = (int)size, .bounded = 1};
+    Writer w = {.buf = buf, .pos = 0, .limit = (int)size, .total = 0, .bounded = 1};
     return do_vprintf(&w, fmt, ap);
 }
 
@@ -404,6 +405,7 @@ int anykey(const char *msg, int *row, int screen_rows)
 {
     if (++(*row) < screen_rows - 1)
         return 0;
+        
     *row = 0;
     printf(msg);
     int c = getchar();

@@ -152,12 +152,14 @@ static uint32_t get_file_size(const char *path)
     return size;
 }
 
-/* Read the OS platform id (ID) stamped by build_disk.sh into buf.  Returns
- * 0 on success, -1 if the stamp is missing or unreadable. */
-static int read_platform_id(const SysgenPaths *paths, char *buf, size_t n)
+/* Read a build tag (file named 'name' in the build dir, stamped by
+ * build_disk.sh) into buf.  Returns 0 on success, -1 if the tag is missing
+ * or unreadable. */
+static int read_build_tag(const SysgenPaths *paths, const char *name,
+                          char *buf, size_t n)
 {
     char path[SYSGEN_FULL_PATH_MAX];
-    snprintf(path, sizeof(path), "%s/.platform_id", paths->build_dir);
+    snprintf(path, sizeof(path), "%s/%s", paths->build_dir, name);
 
     FILE *f = fopen(path, "r");
 
@@ -175,6 +177,35 @@ static int read_platform_id(const SysgenPaths *paths, char *buf, size_t n)
     buf[strcspn(buf, "\r\n")] = '\0';
 
     return rc;
+}
+
+/* Extract the ISA variant, i.e. the -march=... value, from an ARCH_CFLAGS
+ * string like "-march=rv32im -mabi=ilp32".  Writes the token into out.
+ * Returns 0 on success, -1 if no -march= is present. */
+static int isa_variant_from_flags(const char *flags, char *out, size_t n)
+{
+    const char *p = flags;
+
+    while ((p = strstr(p, "-march=")) != NULL)
+    {
+        p += (int)strlen("-march=");
+
+        const char *end = strchr(p, ' ');
+
+        if (!end)
+            end = p + strlen(p);
+
+        size_t len = (size_t)(end - p);
+
+        if (len > 0 && len < n)
+        {
+            memcpy(out, p, len);
+            out[len] = '\0';
+            return 0;
+        }
+    }
+
+    return -1;
 }
 
 /* ========================================================================= *
@@ -294,7 +325,8 @@ static int disk_size_over_cap(long size_kb, uint32_t ksz, uint32_t ccpsz)
     return 1;
 }
 
-static void report_build(uint32_t size_kb, uint32_t boot_size, uint32_t kern_size,
+static void report_build(const SysgenPaths *paths, uint32_t size_kb,
+                         uint32_t boot_size, uint32_t kern_size,
                          uint32_t ccp_size, uint32_t kern_load, uint32_t tpa_base,
                          uint32_t reserved, const char *out_disk_path)
 {
@@ -305,8 +337,27 @@ static void report_build(uint32_t size_kb, uint32_t boot_size, uint32_t kern_siz
     printf("  CP/M Neo Disk Build Report\n");
     printf("=============================================================\n");
     printf("  Output file      : %s\n", out_disk_path);
+
     hr(tmp, sizeof(tmp), size_kb * 1024);
     printf("  Image size       : %s\n", tmp);
+
+    char arch[64];
+    char flags[256];
+
+    if (read_build_tag(paths, ".arch", arch, sizeof(arch)) == 0)
+    {
+        if (read_build_tag(paths, ".archflags", flags, sizeof(flags)) != 0 ||
+            isa_variant_from_flags(flags, tmp, sizeof(tmp)) != 0)
+            tmp[0] = '\0';
+
+        printf("  Architecture     : %s", arch);
+
+        if (tmp[0] != '\0')
+            printf(" (%s)", tmp);
+
+        printf("\n");
+    }
+
     printf("-------------------------------------------------------------\n");
 
     printf("  Bootloader size  : %u B\n", boot_size);
@@ -322,6 +373,7 @@ static void report_build(uint32_t size_kb, uint32_t boot_size, uint32_t kern_siz
            read16(vmap + VMAP_BLOCK_BASE));
 
     printf("-------------------------------------------------------------\n");
+
     uint16_t block_base = read16(vmap + VMAP_BLOCK_BASE);
     uint16_t disk_usable_kb = 0;
 
@@ -435,7 +487,7 @@ static bool validate_build_env(const SysgenPaths *paths)
     char path_buf[SYSGEN_FULL_PATH_MAX];
 
     snprintf(path_buf, sizeof(path_buf), "%s/core/kernel/bdos.c", paths->root_dir);
-    
+
     if (!file_exists(path_buf))
     {
         err("Cannot locate CP/M Neo root directory at '%s'", paths->root_dir);
@@ -482,7 +534,7 @@ int cmd_new(int argc, char **argv)
     char os_platform_buf[16];
     const char *os_platform = cfg.platform;
 
-    if (read_platform_id(paths, os_platform_buf, sizeof(os_platform_buf)) == 0)
+    if (read_build_tag(paths, ".platform_id", os_platform_buf, sizeof(os_platform_buf)) == 0)
         os_platform = os_platform_buf;
 
     int ret = 1;
@@ -490,6 +542,7 @@ int cmd_new(int argc, char **argv)
     uint32_t ksz = 0, esz = 0, ccpsz = 0, bsz = 0;
     uint32_t kern_load = 0, tpa_base = 0;
 
+    /* Bootloader */
     snprintf(path_buf, sizeof(path_buf), "%s/bootloader.bin", paths->build_dir);
     bsz = get_file_size(path_buf);
 
@@ -499,16 +552,18 @@ int cmd_new(int argc, char **argv)
         goto cleanup;
     }
 
+    /* Kernel image */
     snprintf(path_buf, sizeof(path_buf), "%s/core/int/kernel.bin", paths->build_dir);
-   
+
     if (read_file(path_buf, &kern, &ksz) != 0)
     {
         err("%s missing", path_buf);
         goto cleanup;
     }
 
+    /* Kernel ELF (for link-time symbols) */
     snprintf(path_buf, sizeof(path_buf), "%s/core/int/kernel.elf", paths->build_dir);
-  
+
     if (read_file(path_buf, &elf, &esz) != 0)
     {
         err("%s missing", path_buf);
@@ -526,18 +581,20 @@ int cmd_new(int argc, char **argv)
         err("cannot find __tpa_base");
         goto cleanup;
     }
-   
+
     free(elf);
     elf = NULL;
 
+    /* CCP image (optional) */
     snprintf(path_buf, sizeof(path_buf), "%s/core/int/ccp.bin", paths->build_dir);
-   
+
     if (read_file(path_buf, &ccp, &ccpsz) != 0)
     {
         ccp = NULL;
         ccpsz = 0;
     }
 
+    /* Size the disk image */
     int min_kb = mkdisk_min_size_kb(ksz, ccpsz);
 
     if (cfg.disk_size_kb == 0)
@@ -595,8 +652,8 @@ int cmd_new(int argc, char **argv)
     if (save_disk(out_disk_path) != 0)
         goto cleanup;
 
-    report_build((uint32_t)cfg.disk_size_kb, bsz, ksz, ccpsz, kern_load, tpa_base,
-                 (uint32_t)reserved, out_disk_path);
+    report_build(paths, (uint32_t)cfg.disk_size_kb, bsz, ksz, ccpsz, kern_load,
+                 tpa_base, (uint32_t)reserved, out_disk_path);
     ret = 0;
 
 cleanup:

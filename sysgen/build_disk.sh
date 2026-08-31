@@ -261,3 +261,5 @@ $OBJCOPY -O binary "$INT/ccp.elf" "$INT/ccp.bin"
 
 printf '%s' "$PLATFORM_DIR" > "$BUILD/.platform_dir"
 printf '%s' "$ID" > "$BUILD/.platform_id"
+printf '%s' "$ARCH" > "$BUILD/.arch"
+printf '%s' "$ARCH_CFLAGS" > "$BUILD/.archflags"

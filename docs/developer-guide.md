@@ -134,6 +134,12 @@ ARCH_CFLAGS="-march=rv32im -mabi=ilp32"
 LD_EMULATION="elf32lriscv"
 ```
 
+`arch/<isa>/config.sh` is the per-build ISA override point. Every component
+(bootloader, kernel, CCP, SDK library, and each app — all of which source this
+file) is compiled with `ARCH_CFLAGS`. To target another ISA, edit
+`ARCH_CFLAGS` here before running `sysgen new`; the build report reflects the
+flags actually used.
+
 ### Bootloader conventions
 
 `boot.S` calls the platform BIOS (`bios_read`, `bios_conout`) to load the

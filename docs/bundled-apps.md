@@ -16,8 +16,6 @@
 | **ED** | Line-oriented text editor | `ED <file>` |
 | **BASIC** | Tiny BASIC interpreter | `BASIC [prog.bas]` |
 
-The [Vemu emulator](https://mazin-o3.github.io/vemu/) also bundles the [PICO editor and ASM assembler](https://github.com/Mazin-O3/vemu/blob/main/docs/apps.md).
-
 ## BASIC
 
 A small interactive MS-BASIC-inspired interpreter for writing and running BASIC programs.

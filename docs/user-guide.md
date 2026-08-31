@@ -23,7 +23,7 @@ $ make -C sysgen
 
 ## Create a disk image
 
-Create a 2 MB Vemu image with 64 KB of RAM (`RAM_SIZE=0x10000` in the platform's `config.sh`):
+Create a 2 MB disk image with 64 KB of RAM (`RAM_SIZE=0x10000` in the platform's `config.sh`):
 
 ```sh
 $ ./sysgen/build/sysgen new \
@@ -42,6 +42,10 @@ $ ./sysgen/build/sysgen new \
 ```text
 $ sysgen/build/disk.img
 ```
+
+The build report identifies the target architecture and ISA variant used, taken
+from the platform's `config.sh` (`ARCH`) and the arch's `config.sh`
+(`-march`), e.g. `Architecture : riscv32 (rv32im)`.
 
 The image contains four formatted volumes, A:–D:. The maximum useful disk size is the size of a single volume.
 
