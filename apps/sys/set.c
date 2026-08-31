@@ -32,7 +32,7 @@ static void print_vol_size(int8_t vol_id)
     VolStat ds;
 
     if (vstat(vol_id, &ds) == EOK)
-        printf("%c: %uk\n", 'A' + vol_id, ds.total_blocks);
+        printf("%c: %uK\n", 'A' + vol_id, ds.total_blocks);
 }
 
 static CmdErr set_mount(int8_t vol_id)

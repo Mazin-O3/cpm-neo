@@ -81,8 +81,15 @@ A platform is a self-contained `platform/<name>/` directory:
 
 Each platform implements the functions declared in `core/kernel/bios.h`
 (console: `bios_conout`, `bios_conin`, `bios_constat`, `bios_consize`,
-`bios_init`; storage: `bios_read`, `bios_write`; time: `bios_time`) directly in
-`bios.c`.
+`bios_init`; storage: `bios_read`, `bios_write`, `bios_sync`; time:
+`bios_time`) directly in `bios.c`.
+
+Storage semantics follow a write-back contract:
+`bios_write` only *accepts* a sector (the platform may cache it); `bios_sync` is
+the persistence barrier that commits all previously accepted writes to durable
+storage and must return success only once they are durable. `bios_read` must
+observe all prior successful writes (read-after-write). The disk layer and
+`SYNC` command drive this chain via `bd_sync` → `disk_sync` → `bios_sync`.
 
 A platform that supports several storage devices can select one at build time
 inside the storage functions:

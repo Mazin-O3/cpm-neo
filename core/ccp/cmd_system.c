@@ -237,3 +237,25 @@ CmdErr cmd_echo(FsContext *ctx, int argc, char **argv)
 
     return cmderr_ok();
 }
+
+/*
+ * SYNC — enforce durability of all pending writes. Falls through to the
+ * kernel sync chain (sys_sync -> bd_sync -> disk_sync -> bios_sync), which
+ * commits the disk-layer cache and requests a platform persistence barrier.
+ */
+CmdErr cmd_sync(FsContext *ctx, int argc, char **argv)
+{
+    (void)ctx;
+    (void)argv;
+
+    if (argc > 1)
+        return cmderr_syntax(NULL);
+
+    int rc = sync();
+
+    if (rc != EOK)
+        return cmderr_bdos(VOL_INVALID, rc);
+
+    printf("OK\n");
+    return cmderr_ok();
+}

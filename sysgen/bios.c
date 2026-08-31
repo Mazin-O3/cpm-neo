@@ -55,6 +55,13 @@ int bios_write(uint16_t lba, const uint8_t *buf)
     return 0;
 }
 
+int bios_sync(void)
+{
+    /* The in-memory host disk image is already committed; the caller is
+     * responsible for writing it out to a file. No barrier work needed. */
+    return 0;
+}
+
 void bios_consize(uint8_t *cw, uint8_t *ch)
 {
     (void)cw;

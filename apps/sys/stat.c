@@ -61,7 +61,7 @@ static void stat_file(int8_t vol_id, FileInfo *di)
     pad_field(base, sn.base, sn.base_len, NAME83_BASE); /* left-justified in 8 */
     pad_field(ext, sn.ext, sn.ext_len, sn.ext_len);     /* NUL-copy only      */
 
-    printf(" %4u%6uk%5u %s %-2s         %c:%s.%s\n", secs, kb, di->extents, cls, acc, 'A' + vol_id,
+    printf(" %4u%6uK%5u %s %-2s         %c:%s.%s\n", secs, kb, di->extents, cls, acc, 'A' + vol_id,
            base, ext);
 }
 
@@ -72,29 +72,44 @@ static CmdErr stat_dsk(void)
     if (sys_info(&si) != EOK)
         return cmderr_bdos(0, EIO);
 
-    printf(" Vol  Mode  Used  Total\n");
-
-    VolStat vs;
+    VolStat vs[VOL_MAX];
+    uint8_t vol_stat_ok[VOL_MAX] = {0};
 
     uint16_t disk_usable_k = 0;
 
     for (int v = 0; v < VOL_MAX; v++)
     {
-        if (!si.vol_mounted[v] || vstat(v, &vs) != EOK)
-        {
-            printf("%3c:%6s%6s%7s\n", 'A' + v, "-", "-", "-");
+        if (!si.vol_mounted[v])
             continue;
-        }
 
-        const char *mode = vs.read_only ? "RO" : "RW";
-        uint16_t vol_used_k = vs.total_blocks - vs.free_blocks;
-        disk_usable_k += vs.total_blocks;
+        if (vstat(v, &vs[v]) != EOK)
+            continue;
 
-        printf("  %c:  %4s %4uK  %4uK\n", 'A' + v, mode, vol_used_k, vs.total_blocks);
+        vol_stat_ok[v] = 1;
+        disk_usable_k += vs[v].total_blocks;
     }
 
-    printf("\nDisk: %uk (%uk Usable, %uk Unalloc)\n", si.disk_size_kb, disk_usable_k,
-           si.disk_unalloc_kb);
+    printf("\n");
+    printf("%-16s : %uK\n", "Total", si.disk_size_kb);
+    printf("%-16s : %uK\n", "Usable", disk_usable_k);
+    printf("%-16s : %uK\n", "Unallocated", si.disk_unalloc_kb);
+
+    printf("--------------------------\n");
+    
+    printf("Volume  Mode  Used  Total\n");
+
+    for (int v = 0; v < VOL_MAX; v++)
+    {
+        if (!si.vol_mounted[v] || !vol_stat_ok[v])
+            continue;
+
+        const char *mode = vs[v].read_only ? "RO" : "RW";
+        uint16_t vol_used_k = vs[v].total_blocks - vs[v].free_blocks;
+
+        printf("%c:      %s%7uK%6uK\n", 'A' + v, mode, vol_used_k, vs[v].total_blocks);
+    }
+
+    printf("\n");
 
     return cmderr_ok();
 }

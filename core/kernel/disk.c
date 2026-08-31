@@ -33,6 +33,13 @@ typedef struct
     uint16_t num_blocks;
     uint16_t block_base;
     uint8_t initialized;
+
+    /* Single-sector write-back correctness cache. Exists to guarantee
+     * read-after-write (read-your-own-writes) regardless of the platform's
+     * storage behavior. */
+    uint8_t wb_buf[DISK_SECTOR_SIZE];
+    uint16_t wb_lba; /* physical LBA, post-translation */
+    uint8_t wb_valid;
 } DiskState;
 
 static DiskState g_disk;
@@ -261,6 +268,8 @@ int disk_init(void)
 {
     uint8_t buf[DISK_SECTOR_SIZE];
 
+    g_disk.wb_valid = 0;
+
     if (bios_read(VMAP_LBA, buf) != 0)
         return -1;
 
@@ -285,6 +294,20 @@ int disk_init(void)
     return 0;
 }
 
+/* Flush the write-back cache to the platform. On write failure the cache
+ * stays dirty so a later disk_sync() can retry. */
+static int wb_flush(void)
+{
+    if (!g_disk.wb_valid)
+        return EOK;
+
+    if (bios_write(g_disk.wb_lba, g_disk.wb_buf) != 0)
+        return EIO;
+
+    g_disk.wb_valid = 0;
+    return EOK;
+}
+
 int disk_vread(int8_t vol_id, uint32_t lba, uint8_t *buf)
 {
     uint32_t phys;
@@ -294,6 +317,13 @@ int disk_vread(int8_t vol_id, uint32_t lba, uint8_t *buf)
 
     if (vol_translate(vol_id, lba, &phys) != 0)
         return -1;
+
+    /* Serve the cached sector so a read observes the caller's own write. */
+    if (g_disk.wb_valid && g_disk.wb_lba == phys)
+    {
+        memcpy(buf, g_disk.wb_buf, DISK_SECTOR_SIZE);
+        return 0;
+    }
 
     return bios_read(phys, buf) ? -1 : 0;
 }
@@ -308,7 +338,30 @@ int disk_vwrite(int8_t vol_id, uint32_t lba, const uint8_t *buf)
     if (vol_translate(vol_id, lba, &phys) != 0)
         return -1;
 
-    return bios_write(phys, buf) ? -1 : 0;
+    if (g_disk.wb_valid && g_disk.wb_lba != phys)
+    {
+        if (wb_flush() != EOK)
+            return -1;
+    }
+
+    memcpy(g_disk.wb_buf, buf, DISK_SECTOR_SIZE);
+    g_disk.wb_lba = (uint16_t)phys;
+    g_disk.wb_valid = 1;
+
+    return 0;
+}
+
+/* Flush the write-back cache, then enforce durability at the platform. The
+ * cache must be flushed BEFORE bios_sync() so data reaches the platform's
+ * persistence layer before the barrier is requested. */
+int disk_sync(void)
+{
+    int rc = wb_flush();
+
+    if (rc != EOK)
+        return rc;
+
+    return bios_sync() ? EIO : EOK;
 }
 
 int disk_vmount(int8_t vol_id)

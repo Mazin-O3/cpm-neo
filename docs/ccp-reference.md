@@ -3,7 +3,8 @@
 ← [README](../README.md)
 
 CP/M Neo provides an enhanced Console Command Processor (CCP). The resident
-commands are `DIR`, `DIRS`, `ERA`, `REN`, `TYPE`, `USER`, `ECHO`, and `CLS`.
+commands are `DIR`, `DIRS`, `ERA`, `REN`, `TYPE`, `USER`, `ECHO`, `CLS`, and
+`SYNC`.
 Other commands are transient `.COM` programs installed by `sysgen`.
 
 The CCP implementation lives in `core/ccp/`.
@@ -285,6 +286,18 @@ a newline.
 ECHO Hello World
 Hello World
 ```
+
+### SYNC: Flush disk writes to persistent storage
+
+```text
+SYNC
+```
+
+Commits all pending disk writes to durable storage. Walks the sync chain
+(`sys_sync` → `bd_sync` → `disk_sync` → `bios_sync`), which flushes the disk
+layer's write-back cache and then invokes the platform's persistence barrier.
+The flush also happens automatically on program exit, so `SYNC` is only needed
+to force durability before a power loss or a platform eject.
 
 ### HELP: Show help
 

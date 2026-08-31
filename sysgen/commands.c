@@ -396,7 +396,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
         printf("  %c: %s, Usable: %s\n", 'A' + v, mode, tmp);
     }
 
-    printf("\n  Total usable: %uk\n", disk_usable_kb);
+    printf("\n  Total usable: %uK\n", disk_usable_kb);
     printf("=============================================================\n\n");
 }
 
@@ -1469,7 +1469,7 @@ int cmd_stat(int argc, char **argv)
 
         VolStat st;
         bd_vstat((int8_t)v, &st);
-        printf("  %c: %uk total, %uk free, %s\n", 'A' + v, st.total_blocks, st.free_blocks,
+        printf("  %c: %uK total, %uK free, %s\n", 'A' + v, st.total_blocks, st.free_blocks,
                st.read_only ? "RO" : "RW");
     }
 

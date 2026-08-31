@@ -30,6 +30,7 @@ static const CmdEntry g_cmds[] = {{.name = "DIR", .fn = cmd_dir},
                                   {.name = "USER", .fn = cmd_user},
                                   {.name = "ECHO", .fn = cmd_echo},
                                   {.name = "CLS", .fn = cmd_cls},
+                                  {.name = "SYNC", .fn = cmd_sync},
                                   {0}};
 
 int ccp_setuser(FsContext *ctx, uint8_t ua)

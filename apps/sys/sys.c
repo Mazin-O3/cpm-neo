@@ -12,9 +12,11 @@ static CmdErr cmd_sys(FsContext *ctx, int argc, char **argv)
 
     if (sys_info(&si) != EOK)
         return cmderr_bdos(ctx->vol_id, EIO);
+    
+    const char *sep = "------------------------------------";
 
     printf("\nCP/M Neo v%u.%u\n", si.os_version >> 8, si.os_version & 0xFF);
-    printf("------------------------------------\n");
+    printf("%s\n", sep);
     printf("%-16s : ", "Platform");
 
     for (int i = 0; si.platform[i]; i++)
@@ -37,10 +39,10 @@ static CmdErr cmd_sys(FsContext *ctx, int argc, char **argv)
     }
 
     printf("]\n");
-    printf("------------------------------------\n");
+    printf("%s\n", sep);
     printf("%-16s : v%u.%u\n", "Kernel", si.kern_version >> 8, si.kern_version & 0xFF);
     printf("%-16s : v%u.%u\n", "CCP", si.ccp_version >> 8, si.ccp_version & 0xFF);
-    printf("------------------------------------\n\n");
+    printf("%s\n\n", sep);
 
     return cmderr_ok();
 }

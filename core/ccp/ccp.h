@@ -27,5 +27,6 @@ CmdErr cmd_user(FsContext *ctx, int argc, char **argv);
 
 CmdErr cmd_cls(FsContext *ctx, int argc, char **argv);
 CmdErr cmd_echo(FsContext *ctx, int argc, char **argv);
+CmdErr cmd_sync(FsContext *ctx, int argc, char **argv);
 
 #endif /* CCP_H */

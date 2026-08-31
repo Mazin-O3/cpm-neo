@@ -29,6 +29,11 @@ int bios_read(uint16_t lba, uint8_t *buf);
 /* Write one logical block from buf to the disk. Returns 0 on success. */
 int bios_write(uint16_t lba, const uint8_t *buf);
 
+/* Persistence barrier. Makes all previously accepted bios_write() calls
+ * committed according to the platform's storage persistence contract.
+ * A successful return is the durability guarantee. Returns 0 on success. */
+int bios_sync(void);
+
 /* Platform-specific time value.*/
 uint32_t bios_time(void);
 

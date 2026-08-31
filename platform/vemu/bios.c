@@ -105,3 +105,11 @@ int bios_write(uint16_t lba, const uint8_t *buf)
     MMIO_W16(DISK_SECTOR, lba | DISK_CFG_WRITE);
     return 0;
 }
+
+int bios_sync(void)
+{
+    /* VEMU sector writes reach the emulated disk immediately and are
+     * persisted by the host shell (dirty-flag -> IndexedDB). There is no
+     * deferred platform cache, so no barrier work is required here. */
+    return 0;
+}

@@ -34,6 +34,10 @@ uint16_t disk_free_blocks(void);                 /* unallocated blocks in the gr
 int      disk_vread(int8_t vol_id, uint32_t lba, uint8_t *buf);
 int      disk_vwrite(int8_t vol_id, uint32_t lba, const uint8_t *buf);
 
+/* Flush the disk-layer write-back cache and enforce physical persistence
+ * via the BIOS barrier. Returns 0 on success, nonzero on error. */
+int      disk_sync(void);
+
 /* Volume lifecycle: mount allocates default runs, unmount frees all.
  * Returns EOK or error. */
 int      disk_vmount(int8_t vol_id);             /* mount at default blocks */

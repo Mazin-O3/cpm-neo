@@ -3,8 +3,8 @@
  *
  * Extent-based filesystem on top of the logical disk layer.
  * Files are split into 8 KB extents (BD_BLOCKS_PER_EXTENT blocks); each
- * extent maps up to 8 data blocks.  A single write-back sector cache
- * (g_bd.wb_buf) coalesces writes for performance on the small target.
+ * extent maps up to 8 data blocks.  Sector write caching lives in the disk
+ * layer; BDOS deals only with filesystem semantics.
  *
  * All public bd_* functions accept a vol_id that must already be mounted
  * (bd_bind or bd_mount) — callers never touch raw sectors.  The CHECK_VOL
@@ -88,10 +88,6 @@ typedef struct
     Volume vol[VOL_MAX];
     FCB fcb[BD_MAX_FCBS];
     uint8_t sec_buf[DISK_SECTOR_SIZE];
-    uint8_t wb_buf[DISK_SECTOR_SIZE];
-    uint16_t wb_lba;
-    uint8_t wb_vol;
-    uint8_t wb_valid; /* 1 if wb_buf holds dirty data */
 } BDState;
 
 typedef struct
@@ -220,31 +216,7 @@ static Volume *vol_checked(int8_t vol_id)
 
 static int vol_read(Volume *v, uint16_t lba, uint8_t *buf)
 {
-    if (g_bd.wb_valid && g_bd.wb_vol == v->id && g_bd.wb_lba == lba)
-    {
-        memcpy(buf, g_bd.wb_buf, DISK_SECTOR_SIZE);
-        return EOK;
-    }
-
     return disk_vread(v->id, lba, buf) ? EIO : EOK;
-}
-
-/*
- * Must be called before any operation that reads a different sector
- * from the same volume, or before bd_sync/bd_close.  On write failure
- * the cache stays dirty so a later flush can retry.
- */
-static int vol_flush(void)
-{
-    if (g_bd.wb_valid)
-    {
-        if (disk_vwrite(g_bd.wb_vol, g_bd.wb_lba, g_bd.wb_buf) != EOK)
-            return EIO;
-
-        g_bd.wb_valid = 0;
-    }
-
-    return EOK;
 }
 
 static int vol_write(Volume *v, uint16_t lba, const uint8_t *buf)
@@ -252,20 +224,7 @@ static int vol_write(Volume *v, uint16_t lba, const uint8_t *buf)
     if (v->read_only)
         return EVOLRO;
 
-    if (g_bd.wb_valid && !(g_bd.wb_vol == v->id && g_bd.wb_lba == lba))
-    {
-        int rc = vol_flush();
-
-        if (rc != EOK)
-            return rc;
-    }
-
-    memcpy(g_bd.wb_buf, buf, DISK_SECTOR_SIZE);
-    g_bd.wb_lba = lba;
-    g_bd.wb_vol = v->id;
-    g_bd.wb_valid = 1;
-
-    return EOK;
+    return disk_vwrite(v->id, lba, buf) ? EIO : EOK;
 }
 
 static int bd_write_header(Volume *v)
@@ -726,9 +685,6 @@ int bd_bind(int8_t vol_id)
     if (!v)
         return ENOVOL;
 
-    if (vol_flush() != EOK)
-        return EIO;
-
     for (int i = 0; i < BD_MAX_FCBS; i++)
     {
         if (g_bd.fcb[i].ctx.vol_id == vol_id)
@@ -854,9 +810,6 @@ int bd_extend(int8_t vol_id, uint16_t n)
     if (v->read_only)
         return EVOLRO;
 
-    if (vol_flush() != EOK)
-        return EIO;
-
     uint16_t old_secs = v->total_sectors;
     uint16_t old_blocks = v->total_blocks;
 
@@ -927,9 +880,6 @@ int bd_shrink(int8_t vol_id, uint16_t n)
             return EPERM;
     }
 
-    if (vol_flush() != EOK)
-        return EIO;
-
     uint16_t old_secs = v->total_sectors;
     uint16_t old_blocks = v->total_blocks;
 
@@ -974,9 +924,6 @@ int bd_unbind(int8_t vol_id)
     if (!v->mounted)
         return EINVAL;
 
-    if (vol_flush() != EOK)
-        return EIO;
-
     for (int i = 0; i < BD_MAX_FCBS; i++)
     {
         if (g_bd.fcb[i].ctx.vol_id == vol_id)
@@ -1012,12 +959,13 @@ int bd_unbind(int8_t vol_id)
 }
 
 /*
- * Flush the write-back cache and refresh free-block hints for
- * idle volumes (those with no open writable files).
+ * Complete pending filesystem synchronization and enforce physical
+ * persistence, then refresh free-block hints for idle volumes (those with
+ * no open writable files).
  */
 int bd_sync(void)
 {
-    int rc = vol_flush();
+    int rc = disk_sync();
 
     if (rc != EOK)
         return rc;
@@ -1301,7 +1249,11 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
     return (int)bw;
 }
 
-/* Close a file descriptor, flushing any dirty data. */
+/*
+ * Close a file descriptor, finalizing pending filesystem state.  Directory
+ * entries are written through vol_write to the disk-layer cache; durability
+ * is enforced centrally by bd_sync(), not at close time.
+ */
 int bd_close(int fd)
 {
     FCB *f = fcb_get(fd);
@@ -1317,12 +1269,7 @@ int bd_close(int fd)
         if (!v || !v->mounted)
             rc = ENOVOL;
         else
-        {
             rc = fcb_flush(f, v);
-
-            if (rc == EOK)
-                rc = vol_flush();
-        }
     }
 
     memset(f, 0, sizeof(FCB));
@@ -1561,9 +1508,6 @@ int bd_delete(const char *name83, FsContext ctx)
         entry[0] = BD_ENTRY_DELETED;
 
         if (vol_write(v, v->root_start_lba + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf) != EOK)
-            return EIO;
-
-        if (vol_flush() != EOK)
             return EIO;
 
         for (int b = 0; b < BD_BLOCKS_PER_EXTENT; b++)
