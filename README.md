@@ -14,10 +14,16 @@
 [![GitHub contributors](https://img.shields.io/github/contributors/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo)
 [![License](https://img.shields.io/github/license/Mazin-O3/cpm-neo?style=flat-square&color=yellow)](LICENSE)
 
-
 <img src="docs/images/cpm-neo-main.png" alt="cpm-neo main" width="100%">
 
 </div>
+
+## Port Status
+
+| Architecture | Platform | Storage | Status |
+| :--- | :--- | :--- | :--- |
+| **RISC-V** | VEMU | Emulated Disk | ✅ Done |
+| **RISC-V** | TinyMCU | — | ⏳ WIP |
 
 ## Quick Start
 
