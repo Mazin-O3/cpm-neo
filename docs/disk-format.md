@@ -31,12 +31,12 @@ the free pool.
 | 0x006 | u32 | Kernel RAM load address | `S0_KERN_LOAD` | varies |
 | 0x00A | u32 | Kernel byte count | `S0_KERN_SIZE` | varies |
 | 0x00E | u16 | Kernel sectors | `S0_KERN_SECTORS` | varies |
-| 0x010 | u16 | Kernel start LBA | `S0_KERN_LBA` | `2` |
+| 0x010 | u16 | Kernel start sector | `S0_KERN_SEC` | `2` |
 | 0x012 | u16 | OS version | `S0_OS_VER` | `0x0100` |
 | 0x014 | u16 | Kernel version | `S0_KERN_VER` | `0x0100` |
 | 0x016 | u16 | CCP version | `S0_CCP_VER` | `0x0100` |
 | 0x018 | u16 | Reserved sectors | `S0_KERN_SECS` | `K + S` |
-| 0x01A | u16 | CCP start LBA | `S0_CCP_LBA` | `2 + K` |
+| 0x01A | u16 | CCP start sector | `S0_CCP_SEC` | `2 + K` |
 | 0x01C | u16 | CCP sector count | `S0_CCP_SIZE` | `S` |
 | 0x01E | u8[8] | Platform name | `S0_PLATFORM` | varies |
 | 0x1FE | u16 | Boot signature | `S0_SIG` | `0xAA55` |
@@ -49,7 +49,7 @@ single sector when volume layout or volume attributes change.
 | Offset | Size | Field | Constant | Value |
 |---|---:|---|---|---|
 | 0x000 | u16 | Total blocks | `VMAP_NUM_BLOCKS` | varies |
-| 0x002 | u16 | Block-0 LBA | `VMAP_BASE_LBA` | `K + S + 2` |
+| 0x002 | u16 | Block-0 sector | `VMAP_BASE_SEC` | `K + S + 2` |
 | 0x004 | u16 | Magic | `VMAP_MAGIC_OFF` / `VMAP_MAGIC` | `0x4350` |
 | 0x006 | 4×18 B | Volume records | `VMAP_VOLREC` | see below |
 | 0x1FE | u16 | Signature | `VMAP_SIG` | `0xAA55` |
@@ -57,7 +57,7 @@ single sector when volume layout or volume attributes change.
 Block `i` occupies:
 
 ```text
-[base_lba + i * BD_BLOCK_SECS, base_lba + (i + 1) * BD_BLOCK_SECS)
+[base_sec + i * BD_BLOCK_SECS, base_sec + (i + 1) * BD_BLOCK_SECS)
 ```
 
 A single volume can be grown at runtime (`bd_resize` / `SET RZ +N`) to consume
@@ -88,7 +88,7 @@ Byte      17   attr
 order.
 
 A volume's logical sector space is the concatenation of its runs. Logical
-LBA 0 is the first sector of the first run.
+sector 0 is the first sector of the first run.
 
 The kernel enforces:
 
@@ -100,24 +100,24 @@ The kernel enforces:
 
 ## Volume header
 
-The volume header occupies logical LBA 0.
+The volume header occupies logical sector 0.
 
 | Offset | Size | Field | Constant | Value |
 |---|---:|---|---|---|
 | 0x000 | u16 | Magic | `VHDR_MAGIC_OFF` | `0x4350` (`DISK_MAGIC`) |
 | 0x002 | u16 | Format version | `VHDR_VER_OFF` | `0x0001` |
 | 0x004 | u16 | Volume size KB | `VHDR_SIZE_KB_OFF` | varies |
-| 0x006 | u16 | Root directory LBA | `VHDR_ROOT_LBA_OFF` | `1` |
-| 0x008 | u16 | Data area start LBA | `VHDR_DATA_LBA_OFF` | `17` |
+| 0x006 | u16 | Root directory sector | `VHDR_ROOT_SEC_OFF` | `1` |
+| 0x008 | u16 | Data area start sector | `VHDR_DATA_SEC_OFF` | `17` |
 | 0x00A | u16 | Total data blocks | `VHDR_TOT_BLKS_OFF` | varies |
 | 0x1FE | u16 | Signature | - | `0xAA55` |
 
 The volume layout is:
 
 ```text
-Logical LBA 0      Volume header
-Logical LBA 1-16   Root directory
-Logical LBA 17+    Data area
+Logical sector 0      Volume header
+Logical sector 1-16   Root directory
+Logical sector 17+    Data area
 ```
 
 `BD_ROOT_ENTRIES` is 256 entries occupying 16 sectors. Directory block numbers

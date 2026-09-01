@@ -64,7 +64,7 @@ _boot_start:
     or   s1, s1, t0            /* s1 = 32-bit load address */
 
     lhu  s2, S0_KERN_SECTORS(s7)
-    lhu  s6, S0_KERN_LBA(s7)
+    lhu  s6, S0_KERN_SEC(s7)
     beqz s2, err_disk
 
     la   t0, msg_loading
@@ -72,7 +72,7 @@ _boot_start:
 
     /* Load kernel binary — use saved registers across bios_read calls */
     mv   s3, s1                /* Target RAM destination */
-    mv   s4, s6                /* Sector LBA */
+    mv   s4, s6                /* Start sector */
     mv   s5, s2                /* Sector count remaining */
 
 .Lload_kern:

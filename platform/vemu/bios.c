@@ -78,12 +78,12 @@ int bios_conin(void)
     return c;
 }
 
-int bios_read(uint16_t lba, uint8_t *buf)
+int bios_read(uint16_t sec, uint8_t *buf)
 {
     if (buf == NULL)
         return -1;
 
-    MMIO_W16(DISK_SECTOR, lba | DISK_CFG_READ);
+    MMIO_W16(DISK_SECTOR, sec | DISK_CFG_READ);
     return dma_transfer((uint16_t)(uintptr_t)buf, (uint16_t)DISK_BUFFER, DISK_SECTOR_SIZE,
                         DMA_DISK_RD);
 }
@@ -94,7 +94,7 @@ void bios_consize(uint8_t *cw, uint8_t *ch)
     *ch = 24;
 }
 
-int bios_write(uint16_t lba, const uint8_t *buf)
+int bios_write(uint16_t sec, const uint8_t *buf)
 {
     int rc = dma_transfer((uint16_t)DISK_BUFFER, (uint16_t)(uintptr_t)buf, DISK_SECTOR_SIZE,
                           DMA_DISK_WR);
@@ -102,7 +102,7 @@ int bios_write(uint16_t lba, const uint8_t *buf)
     if (rc != 0)
         return rc;
 
-    MMIO_W16(DISK_SECTOR, lba | DISK_CFG_WRITE);
+    MMIO_W16(DISK_SECTOR, sec | DISK_CFG_WRITE);
     return 0;
 }
 

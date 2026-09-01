@@ -82,7 +82,7 @@ typedef struct
 #define VOL_ATTR_RW 0
 #define VOL_ATTR_RO 1
 
-#define KERN_START_LBA 2 /* kernel image LBA */
+#define KERN_START_SEC 2 /* kernel image start sector */
 
 typedef struct
 {
@@ -170,28 +170,28 @@ typedef struct
 
 #define BOOT_MAGIC DISK_MAGIC
 
-/* Volume-map (VMAP) format — sector LBA 1.
+/* Volume-map (VMAP) format — sector 1.
  *
  * 0x000 u16 num_blocks  — total 1K blocks on disk
- * 0x002 u16 base_lba    — LBA of block 0
+ * 0x002 u16 base_sec    — sector of block 0
  * 0x004 u16 magic       — VMAP_MAGIC
  * 0x006 VolRec[VOL_MAX] — 18 B each
  * 0x1FE u16             — BOOT_SIG
  *
- * Block i occupies LBAs [base_lba + i*2, +2) (1 KB = 2 sectors).
+ * Block i occupies sectors [base_sec + i*2, +2) (1 KB = 2 sectors).
  * A volume's logical space is the concatenation of its ordered block
  * runs. run_count == 0 means the volume is unmounted. */
 
-#define VMAP_LBA         1 /* volume-map sector LBA            */
+#define VMAP_SEC         1 /* volume-map sector                */
 #define VMAP_MAGIC       0x4350u /* 'CP' identity              */
 #define VOL_MAX_RUNS     4 /* max runs per volume           */
 #define VMAP_VOLREC_SIZE 18 /* VolRec bytes                  */
 
-#define VMAP_NUM_BLOCKS 0x000 /* u16 — total 1K blocks on disk */
-#define VMAP_BASE_LBA   0x002 /* u16 — LBA of block 0          */
-#define VMAP_MAGIC_OFF  0x004 /* u16 — VMAP_MAGIC              */
-#define VMAP_VOLREC     0x006 /* VolRec[VOL_MAX]               */
-#define VMAP_SIG        0x1FE /* u16 — BOOT_SIG                */
+#define VMAP_NUM_BLOCKS  0x000 /* u16 — total 1K blocks on disk */
+#define VMAP_BASE_SEC    0x002 /* u16 — sector of block 0       */
+#define VMAP_MAGIC_OFF   0x004 /* u16 — VMAP_MAGIC              */
+#define VMAP_VOLREC      0x006 /* VolRec[VOL_MAX]               */
+#define VMAP_SIG         0x1FE /* u16 — BOOT_SIG                */
 
 /* VolRec wire layout (VMAP_VOLREC_SIZE bytes each):
  *   +0  u16 run[0].start   +2  u16 run[0].count
@@ -202,23 +202,23 @@ typedef struct
 #define VMAP_VR_RUN_COUNT   16
 #define VMAP_VR_ATTR        17
 
-/* Volume header — logical LBA 0 of each volume.
+/* Volume header — logical sector 0 of each volume.
  *
  * 0x000 u16 magic     — must equal DISK_MAGIC
  * 0x002 u16 ver       — VHDR_VER
  * 0x004 u16 size_kb   — volume size KB
- * 0x006 u16 root_lba  — root directory LBA
- * 0x008 u16 data_lba  — data area start LBA
+ * 0x006 u16 root_sec  — root directory sector
+ * 0x008 u16 data_sec  — data area start sector
  * 0x00A u16 tot_blks  — total data blocks
  * 0x1FE u16           — 0xAA55
  *
  * Block size is fixed at 2 sectors (1 KB). */
 
-#define VHDR_MAGIC_OFF    0x00
-#define VHDR_VER_OFF      0x02
-#define VHDR_SIZE_KB_OFF  0x04
-#define VHDR_ROOT_LBA_OFF 0x06
-#define VHDR_DATA_LBA_OFF 0x08
+#define VHDR_MAGIC_OFF     0x00
+#define VHDR_VER_OFF       0x02
+#define VHDR_SIZE_KB_OFF   0x04
+#define VHDR_ROOT_SEC_OFF  0x06
+#define VHDR_DATA_SEC_OFF  0x08
 #define VHDR_TOT_BLKS_OFF 0x0A
 
 #define VHDR_VER          0x0001u /* volume header format version */

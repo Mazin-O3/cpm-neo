@@ -23,11 +23,11 @@ int bios_constat(void);
 /* Get the console width and height in characters. */
 void bios_consize(uint8_t *cw, uint8_t *ch);
 
-/* Read one logical block from the disk into buf. Returns 0 on success. */
-int bios_read(uint16_t lba, uint8_t *buf);
+/* Read one sector from the disk into buf. Returns 0 on success. */
+int bios_read(uint16_t sec, uint8_t *buf);
 
-/* Write one logical block from buf to the disk. Returns 0 on success. */
-int bios_write(uint16_t lba, const uint8_t *buf);
+/* Write one sector from buf to the disk. Returns 0 on success. */
+int bios_write(uint16_t sec, const uint8_t *buf);
 
 /* Persistence barrier. Makes all previously accepted bios_write() calls
  * committed according to the platform's storage persistence contract.

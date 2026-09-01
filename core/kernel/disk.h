@@ -4,12 +4,12 @@
  *
  * Disk layout:
  *   Sector 0 : boot sector (geometry + kernel/CCP pointers)
- *   Sector 1 : VMAP  = { u16 num_blocks, u16 base_lba,
+ *   Sector 1 : VMAP  = { u16 num_blocks, u16 base_sec,
  *                        u16 magic=0x4350, VolRec[4], 0xAA55@0x1FE }
- *   Sectors 2.. : kernel (KERN_START_LBA=2), CCP, then the block grid.
+ *   Sectors 2.. : kernel (KERN_START_SEC=2), CCP, then the block grid.
  *
  * A block is a fixed run of 2 sectors (1 KB) at
- * `base_lba + i*2`.  Each volume owns an ordered list of up to
+ * `base_sec + i*2`.  Each volume owns an ordered list of up to
  * VOL_MAX_RUNS runs (contiguous block runs); its logical space is the
  * concatenation of those runs.  A volume with run_count==0 is unmounted.
  *
@@ -29,17 +29,17 @@
 int      disk_init(void);                        /* 0 = OK, nonzero = failure */
 
 uint16_t disk_block_count(void);                 /* total 1 KB blocks on disk (constant) */
-uint16_t disk_base_lba(void);                    /* LBA of block 0                      */
+uint16_t disk_base_sec(void);                    /* sector of block 0                   */
 uint16_t disk_free_blocks(void);                 /* unallocated blocks in the grid       */
 
 /* Flush the disk-layer write-back cache and enforce physical persistence
  * via the BIOS barrier. Returns 0 on success, nonzero on error. */
 int      disk_sync(void);
 
-/* Sector-level I/O: lba is relative to the volume.
+/* Sector-level I/O: sec is relative to the volume.
  * Returns 0 on success, nonzero on I/O error. */
-int      volume_read(int8_t vol_id, uint32_t lba, uint8_t *buf);
-int      volume_write(int8_t vol_id, uint32_t lba, const uint8_t *buf);
+int      volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf);
+int      volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf);
 
 /* Volume lifecycle: mount allocates default runs, unmount frees all.
  * Returns EOK or error. */

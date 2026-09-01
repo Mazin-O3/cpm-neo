@@ -330,7 +330,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
                          uint32_t ccp_size, uint32_t kern_load, uint32_t tpa_base,
                          uint32_t reserved, const char *out_disk_path)
 {
-    const uint8_t *vmap = sysgen_disk() + (uint32_t)VMAP_LBA * DISK_SECTOR_SIZE;
+    const uint8_t *vmap = sysgen_disk() + (uint32_t)VMAP_SEC * DISK_SECTOR_SIZE;
     char tmp[32];
 
     printf("\n=============================================================\n");
@@ -366,15 +366,15 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
     printf("  Kernel base      : 0x%04X\n", kern_load);
     printf("  TPA              : %lu KB\n", (unsigned long)((kern_load - tpa_base) / 1024));
     printf("  Reserved secs    : %u (kernel + CCP)\n", reserved);
-    printf("  Kernel LBA       : %u\n", read16(sysgen_disk() + S0_KERN_LBA));
+    printf("  Kernel sector       : %u\n", read16(sysgen_disk() + S0_KERN_SEC));
 
     printf("  Block size       : 1 KB\n");
-    printf("  Blocks           : %u @ LBA %u\n", read16(vmap + VMAP_NUM_BLOCKS),
-           read16(vmap + VMAP_BASE_LBA));
+    printf("  Blocks           : %u @ sector %u\n", read16(vmap + VMAP_NUM_BLOCKS),
+           read16(vmap + VMAP_BASE_SEC));
 
     printf("-------------------------------------------------------------\n");
 
-    uint16_t base_lba = read16(vmap + VMAP_BASE_LBA);
+    uint16_t base_sec = read16(vmap + VMAP_BASE_SEC);
     uint16_t disk_usable_kb = 0;
 
     for (int8_t v = 0; v < VOL_MAX; v++)
@@ -387,7 +387,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
         /* Usable capacity mirrors bd_vstat: data blocks from the volume header,
          * minus the reserved sentinel block. */
         uint16_t tot_blks = read16(
-            sysgen_disk() + ((uint32_t)(base_lba + start * BD_BLOCK_SECS)) * DISK_SECTOR_SIZE +
+            sysgen_disk() + ((uint32_t)(base_sec + start * BD_BLOCK_SECS)) * DISK_SECTOR_SIZE +
             VHDR_TOT_BLKS_OFF);
         uint32_t usable = tot_blks > 0 ? (uint32_t)(tot_blks - 1) : 0;
         disk_usable_kb += usable;
@@ -1183,12 +1183,12 @@ int cmd_extract(int argc, char **argv)
             FsContext ctx = {(int8_t)v, u};
             FileInfo fi;
             char allpat[NAME83_LEN + 1] = "***********"; /* 8 base + 3 ext */
-            uint16_t pos = 0;
+            uint16_t resume = 0;
             int rc;
 
-            while ((rc = bd_find(allpat, ctx, &fi, pos)) > 0)
+            while ((rc = bd_find(allpat, ctx, &fi, resume)) > 0)
             {
-                pos = (uint16_t)rc;
+                resume = (uint16_t)rc;
 
                 char path[SYSGEN_FULL_PATH_MAX + 256];
                 snprintf(path, sizeof(path), "%s/%s", out_dir, fi.name);
@@ -1286,19 +1286,19 @@ int cmd_dir(int argc, char **argv)
         return 1;
 
     FileInfo fi;
-    uint16_t pos_lba = 0;
+    uint16_t resume = 0;
     int count = 0;
     int rc = 0;
     char allpat[NAME83_LEN + 1] = "***********"; /* 8 base + 3 ext */
 
-    while ((rc = bd_find(allpat, tgt.ctx, &fi, pos_lba)) > 0)
+    while ((rc = bd_find(allpat, tgt.ctx, &fi, resume)) > 0)
     {
         const char *sys = (fi.attrib & FILE_ATTR_SYSTEM) ? "  [SYS]" : "";
         char h[24];
         hr(h, sizeof(h), fi.size);
         printf("  %-13s %9s%s\n", fi.name, h, sys);
         count++;
-        pos_lba = (uint16_t)rc;
+        resume = (uint16_t)rc;
     }
 
     if (rc != ENOENT)
@@ -1451,7 +1451,7 @@ int cmd_stat(int argc, char **argv)
         return 1;
 
     printf("  disk: %s\n", disk_buf);
-    printf("  block: 1K, blocks: %u, base LBA: %u\n", disk_block_count(), disk_base_lba());
+    printf("  block: 1K, blocks: %u, base sector: %u\n", disk_block_count(), disk_base_sec());
 
     for (int8_t v = 0; v < VOL_MAX; v++)
     {

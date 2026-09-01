@@ -31,14 +31,14 @@ typedef struct
 {
     VolRec volumes[VOL_MAX];
     uint16_t num_blocks;
-    uint16_t base_lba;
+    uint16_t base_sec;
     uint8_t initialized;
 
     /* Single-sector write-back correctness cache. Exists to guarantee
      * read-after-write (read-your-own-writes) regardless of the platform's
      * storage behavior. */
     uint8_t wb_buf[DISK_SECTOR_SIZE];
-    uint16_t wb_lba; /* physical LBA, post-translation */
+    uint16_t wb_sec; /* physical sector, post-translation */
     uint8_t wb_valid;
 } DiskState;
 
@@ -218,9 +218,9 @@ static int range_is_free(uint16_t start, uint16_t n)
     return 1;
 }
 
-/* Translate a volume-relative LBA through the volume's block runs into a
- * physical disk LBA. */
-static int vol_translate(int8_t vol_id, uint32_t lba, uint32_t *phys)
+/* Translate a volume-relative sector index through the volume's block runs
+ * into a physical disk sector. */
+static int vol_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX || !g_disk.initialized)
         return -1;
@@ -230,16 +230,15 @@ static int vol_translate(int8_t vol_id, uint32_t lba, uint32_t *phys)
     if (vr->run_count == 0)
         return -1;
 
-    uint32_t sofar = 0;
+    uint16_t sofar = 0;
 
     for (uint8_t i = 0; i < vr->run_count; i++)
     {
-        uint32_t seg = (uint32_t)vr->run[i].count * BD_BLOCK_SECS;
+        uint16_t seg = vr->run[i].count * BD_BLOCK_SECS;
 
-        if (lba < sofar + seg)
+        if (sec < sofar + seg)
         {
-            *phys = (uint32_t)g_disk.base_lba + (uint32_t)vr->run[i].start * BD_BLOCK_SECS +
-                    (lba - sofar);
+            *phy_sec = g_disk.base_sec + vr->run[i].start * BD_BLOCK_SECS + (sec - sofar);
             return 0;
         }
 
@@ -256,12 +255,12 @@ static int vmap_persist(void)
     uint8_t buf[DISK_SECTOR_SIZE];
     memset(buf, 0, sizeof(buf));
     write16(buf + VMAP_NUM_BLOCKS, g_disk.num_blocks);
-    write16(buf + VMAP_BASE_LBA, g_disk.base_lba);
+    write16(buf + VMAP_BASE_SEC, g_disk.base_sec);
     write16(buf + VMAP_MAGIC_OFF, VMAP_MAGIC);
     memcpy(buf + VMAP_VOLREC, g_disk.volumes, sizeof(g_disk.volumes));
     write16(buf + VMAP_SIG, BOOT_SIG);
 
-    return bios_write(VMAP_LBA, buf) ? EIO : EOK;
+    return bios_write(VMAP_SEC, buf) ? EIO : EOK;
 }
 
 int disk_init(void)
@@ -270,11 +269,11 @@ int disk_init(void)
 
     g_disk.wb_valid = 0;
 
-    if (bios_read(VMAP_LBA, buf) != 0)
+    if (bios_read(VMAP_SEC, buf) != 0)
         return -1;
 
     g_disk.num_blocks = read16(buf + VMAP_NUM_BLOCKS);
-    g_disk.base_lba = read16(buf + VMAP_BASE_LBA);
+    g_disk.base_sec = read16(buf + VMAP_BASE_SEC);
 
     if (read16(buf + VMAP_MAGIC_OFF) != VMAP_MAGIC)
         return -1;
@@ -282,7 +281,7 @@ int disk_init(void)
     if (g_disk.num_blocks == 0 || g_disk.num_blocks > BD_VOL_MAX_BLOCKS)
         return -1;
 
-    if (g_disk.base_lba < VMAP_LBA + 1)
+    if (g_disk.base_sec < VMAP_SEC + 1)
         return -1;
 
     memcpy(g_disk.volumes, buf + VMAP_VOLREC, sizeof(g_disk.volumes));
@@ -301,51 +300,51 @@ static int wb_flush(void)
     if (!g_disk.wb_valid)
         return EOK;
 
-    if (bios_write(g_disk.wb_lba, g_disk.wb_buf) != 0)
+    if (bios_write(g_disk.wb_sec, g_disk.wb_buf) != 0)
         return EIO;
 
     g_disk.wb_valid = 0;
     return EOK;
 }
 
-int volume_read(int8_t vol_id, uint32_t lba, uint8_t *buf)
+int volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf)
 {
-    uint32_t phys;
+    uint16_t phy_sec;
 
     if (!buf)
         return -1;
 
-    if (vol_translate(vol_id, lba, &phys) != 0)
+    if (vol_translate(vol_id, sec, &phy_sec) != 0)
         return -1;
 
     /* Serve the cached sector so a read observes the caller's own write. */
-    if (g_disk.wb_valid && g_disk.wb_lba == phys)
+    if (g_disk.wb_valid && g_disk.wb_sec == phy_sec)
     {
         memcpy(buf, g_disk.wb_buf, DISK_SECTOR_SIZE);
         return 0;
     }
 
-    return bios_read(phys, buf) ? -1 : 0;
+    return bios_read(phy_sec, buf) ? -1 : 0;
 }
 
-int volume_write(int8_t vol_id, uint32_t lba, const uint8_t *buf)
+int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf)
 {
-    uint32_t phys;
+    uint16_t phy_sec;
 
     if (!buf)
         return -1;
 
-    if (vol_translate(vol_id, lba, &phys) != 0)
+    if (vol_translate(vol_id, sec, &phy_sec) != 0)
         return -1;
 
-    if (g_disk.wb_valid && g_disk.wb_lba != phys)
+    if (g_disk.wb_valid && g_disk.wb_sec != phy_sec)
     {
         if (wb_flush() != EOK)
             return -1;
     }
 
     memcpy(g_disk.wb_buf, buf, DISK_SECTOR_SIZE);
-    g_disk.wb_lba = (uint16_t)phys;
+    g_disk.wb_sec = phy_sec;
     g_disk.wb_valid = 1;
 
     return 0;
@@ -624,7 +623,7 @@ uint16_t disk_block_count(void)
     return g_disk.num_blocks;
 }
 
-uint16_t disk_base_lba(void)
+uint16_t disk_base_sec(void)
 {
-    return g_disk.base_lba;
+    return g_disk.base_sec;
 }

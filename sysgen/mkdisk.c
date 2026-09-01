@@ -273,11 +273,11 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
     uint32_t num_kern_sects = kernel_sectors(kern_size);
     uint32_t num_ccp_sects = ccp_sectors(ccp_size);
 
-    if (KERN_START_LBA + reserved >= total_secs)
+    if (KERN_START_SEC + reserved >= total_secs)
         return -1;
 
-    uint32_t base_lba = (uint32_t)KERN_START_LBA + reserved;
-    uint32_t num_blocks = (total_secs - base_lba) / BD_BLOCK_SECS;
+    uint16_t base_sec = KERN_START_SEC + reserved;
+    uint32_t num_blocks = (total_secs - base_sec) / BD_BLOCK_SECS;
 
     if (num_blocks == 0)
         return -1;
@@ -297,14 +297,14 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
     write16(disk + S0_DISK_SIZE_KB, (uint16_t)size_kb);
     write32(disk + S0_KERN_LOAD, kern_load);
     write32(disk + S0_KERN_SIZE, kern_size);
-    write16(disk + S0_KERN_SECTORS, (uint16_t)num_kern_sects);
-    write16(disk + S0_KERN_LBA, KERN_START_LBA);
+    write16(disk + S0_KERN_SECTORS, num_kern_sects);
+    write16(disk + S0_KERN_SEC, KERN_START_SEC);
     write16(disk + S0_OS_VER, os_ver);
     write16(disk + S0_KERN_VER, kern_ver);
     write16(disk + S0_CCP_VER, ccp_ver);
-    write16(disk + S0_KERN_SECS, (uint16_t)reserved);
-    write16(disk + S0_CCP_LBA, (uint16_t)(KERN_START_LBA + num_kern_sects));
-    write16(disk + S0_CCP_SIZE, (uint16_t)num_ccp_sects);
+    write16(disk + S0_KERN_SECS, reserved);
+    write16(disk + S0_CCP_SEC, KERN_START_SEC + num_kern_sects);
+    write16(disk + S0_CCP_SIZE, num_ccp_sects);
 
     if (platform)
         memcpy(disk + S0_PLATFORM, platform, 8);
@@ -313,15 +313,15 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
 
     /* ── Kernel image (padded + BOOT_MAGIC trailer) ────────── */
     uint32_t kern_sect_bytes = num_kern_sects * DISK_SECTOR_SIZE;
-    memcpy(disk + (uint32_t)KERN_START_LBA * DISK_SECTOR_SIZE, kern, kern_size);
-    write32(disk + (uint32_t)KERN_START_LBA * DISK_SECTOR_SIZE + kern_sect_bytes - 4, BOOT_MAGIC);
+    memcpy(disk + KERN_START_SEC * DISK_SECTOR_SIZE, kern, kern_size);
+    write32(disk + KERN_START_SEC * DISK_SECTOR_SIZE + kern_sect_bytes - 4, BOOT_MAGIC);
 
     /* ── CCP raw binary ────────────────────────────────────── */
 
     if (ccp_size > 0)
     {
-        uint32_t clba = (uint32_t)KERN_START_LBA + num_kern_sects;
-        memcpy(disk + clba * DISK_SECTOR_SIZE, ccp, ccp_size);
+        uint16_t csec = KERN_START_SEC + num_kern_sects;
+        memcpy(disk + csec * DISK_SECTOR_SIZE, ccp, ccp_size);
     }
 
     /* ── VMAP @ sector 1: geometry + VolRec[4] ─────────────── */
@@ -343,9 +343,9 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
     if (base < min_blocks)
         return -1; /* disk too small to give every volume a viable block count */
 
-    uint8_t *vmap = disk + (uint32_t)VMAP_LBA * DISK_SECTOR_SIZE;
+    uint8_t *vmap = disk + VMAP_SEC * DISK_SECTOR_SIZE;
     write16(vmap + VMAP_NUM_BLOCKS, (uint16_t)num_blocks);
-    write16(vmap + VMAP_BASE_LBA, (uint16_t)base_lba);
+    write16(vmap + VMAP_BASE_SEC, base_sec);
     write16(vmap + VMAP_MAGIC_OFF, VMAP_MAGIC);
 
     for (uint32_t v = 0; v < VOL_MAX; v++)
@@ -377,12 +377,12 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
         if (num_data > BD_VOL_MAX_BLOCKS)
             num_data = BD_VOL_MAX_BLOCKS;
 
-        uint8_t *hdr = disk + (base_lba + start * BD_BLOCK_SECS) * DISK_SECTOR_SIZE;
+        uint8_t *hdr = disk + (base_sec + start * BD_BLOCK_SECS) * DISK_SECTOR_SIZE;
         write16(hdr, DISK_MAGIC);
         write16(hdr + VHDR_VER_OFF, VHDR_VER);
         write16(hdr + VHDR_SIZE_KB_OFF, (uint16_t)(v_secs / 2));
-        write16(hdr + VHDR_ROOT_LBA_OFF, 1);
-        write16(hdr + VHDR_DATA_LBA_OFF, BD_DATA_START);
+        write16(hdr + VHDR_ROOT_SEC_OFF, 1);
+        write16(hdr + VHDR_DATA_SEC_OFF, BD_DATA_START);
         write16(hdr + VHDR_TOT_BLKS_OFF, num_data);
         hdr[0x1FE] = 0x55;
         hdr[0x1FF] = 0xAA;
@@ -399,7 +399,7 @@ int mkdisk_min_size_kb(uint32_t kern_size, uint32_t ccp_size)
 {
     uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size);
 
-    uint32_t min_secs = (uint32_t)KERN_START_LBA + reserved +
+    uint32_t min_secs = (uint32_t)KERN_START_SEC + reserved +
                         (uint32_t)VOL_MAX * min_viable_blocks() * BD_BLOCK_SECS;
     return (int)((min_secs + 1) / 2);
 }
@@ -409,6 +409,6 @@ int mkdisk_max_size_kb(uint32_t kern_size, uint32_t ccp_size)
     uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size);
 
     uint32_t cap_secs = (uint32_t)BD_VOL_MAX_BLOCKS * BD_BLOCK_SECS;
-    uint32_t max_secs = (uint32_t)KERN_START_LBA + reserved + cap_secs;
+    uint32_t max_secs = (uint32_t)KERN_START_SEC + reserved + cap_secs;
     return (int)((max_secs + 1) / 2);
 }

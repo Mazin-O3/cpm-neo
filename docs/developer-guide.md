@@ -41,8 +41,8 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 | `int bios_conin(void)` | Blocking console read |
 | `int bios_constat(void)` | Console status (0xFF = key ready) |
 | `void bios_consize(uint8_t *cw, uint8_t *ch)` | Console dimensions |
-| `int bios_read(uint16_t lba, uint8_t *buf)` | Read one 512-byte sector |
-| `int bios_write(uint16_t lba, const uint8_t *buf)` | Write one sector |
+| `int bios_read(uint16_t sec, uint8_t *buf)` | Read one 512-byte sector |
+| `int bios_write(uint16_t sec, const uint8_t *buf)` | Write one sector |
 | `uint32_t bios_time(void)` | platform-defined time service |
 
 A program that needs to touch hardware directly can use the SDK's `sys_dev()`
@@ -95,12 +95,12 @@ A platform that supports several storage devices can select one at build time
 inside the storage functions:
 
 ```c
-int bios_read(uint16_t lba, uint8_t *buf)
+int bios_read(uint16_t sec, uint8_t *buf)
 {
 #ifdef USE_SDCARD
-    return sdcard_read(lba, buf);
+    return sdcard_read(sec, buf);
 #else
-    return flash_read(lba, buf);
+    return flash_read(sec, buf);
 #endif
 }
 ```

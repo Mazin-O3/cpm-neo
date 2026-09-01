@@ -3,20 +3,15 @@
 ← [README](../README.md)
 
 CP/M Neo applications access OS services through system calls. The SDK
-provides `sys_<name>()` wrappers in `syscall.h`. Assembly programs can invoke
-the same services through `%SYSCALL`.
+provides `sys_<name>()` wrappers in `syscall.h`.
 
 ## Calling convention
 
 Arguments are passed in `a0`–`a3`.
 
-The kernel publishes the syscall table pointer in environment slot 0.
-Syscall `N` is at byte offset `N * 4` in the table.
-
-```asm
-lw   t2, N*4(t1)
-jalr ra, 0(t2)
-```
+The kernel publishes the syscall table pointer in environment slot 0
+(see "Environment slots" below). The table holds one `uint32_t` entry per
+syscall; syscall `N` is at byte offset `N * 4`.
 
 Most syscalls return `0` or a positive result on success and a negative errno
 on failure. File handles are non-negative values; standard handles such as

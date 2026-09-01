@@ -33,9 +33,9 @@ int bios_constat(void)
     return 0;
 }
 
-int bios_read(uint16_t lba, uint8_t *buf)
+int bios_read(uint16_t sec, uint8_t *buf)
 {
-    uint32_t off = (uint32_t)lba * DISK_SECTOR_SIZE;
+    uint32_t off = (uint32_t)sec * DISK_SECTOR_SIZE;
 
     if (off + DISK_SECTOR_SIZE > g_disk_size)
         return -1;
@@ -44,9 +44,9 @@ int bios_read(uint16_t lba, uint8_t *buf)
     return 0;
 }
 
-int bios_write(uint16_t lba, const uint8_t *buf)
+int bios_write(uint16_t sec, const uint8_t *buf)
 {
-    uint32_t off = (uint32_t)lba * DISK_SECTOR_SIZE;
+    uint32_t off = (uint32_t)sec * DISK_SECTOR_SIZE;
 
     if (off + DISK_SECTOR_SIZE > g_disk_size)
         return -1;

@@ -283,7 +283,7 @@ void kexec_ccp(void)
     if (bios_read(0, s0) != 0)
         goto err;
 
-    uint16_t lba = *(uint16_t *)(s0 + S0_CCP_LBA);
+    uint16_t sec = *(uint16_t *)(s0 + S0_CCP_SEC);
     uint16_t nsecs = *(uint16_t *)(s0 + S0_CCP_SIZE);
 
     if (nsecs == 0)
@@ -291,7 +291,7 @@ void kexec_ccp(void)
 
     for (uint16_t i = 0; i < nsecs; i++)
 
-        if (bios_read(lba + i, (void *)((uintptr_t)__tpa_base + i * DISK_SECTOR_SIZE)))
+        if (bios_read(sec + i, (void *)((uintptr_t)__tpa_base + i * DISK_SECTOR_SIZE)))
             goto err;
 
     JUMP_TPA();
