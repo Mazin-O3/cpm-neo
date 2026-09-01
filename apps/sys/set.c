@@ -5,8 +5,8 @@
  * SET B: RW         — clear volume attribute
  * SET B: MT         — mount (format + bind) a volume
  * SET B: UM         — unmount a volume (must be empty)
- * SET B: UM n       — shrink a volume by n blocks
- * SET B: EX n       — extend a volume by n blocks
+ * SET B: RZ +n      — grow a volume by n KB
+ * SET B: RZ -n      — shrink a volume by n KB
  * SET FOO.TXT RO    — set file attribute
  * SET FOO.TXT SYS   — mark as system file
  *
@@ -22,7 +22,7 @@
 
 /* Volume subcommands: "v" rejects user digits (B5: is invalid). */
 static const char *set_vol_fmt = "v a";     /* SET B: RO, MT, UM */
-static const char *set_vol_n_fmt = "v a n"; /* SET B: EX 10, UM 5 */
+static const char *set_vol_n_fmt = "v a n"; /* SET B: RZ 10, RZ -5 */
 
 /* File attribute: "f" accepts optional user digits (B5:FOO.TXT). */
 static const char *set_file_attr_fmt = "f a"; /* SET FOO.TXT RO */
@@ -46,14 +46,14 @@ static CmdErr set_mount(int8_t vol_id)
     return cmderr_ok();
 }
 
-static CmdErr set_extend(int8_t vol_id, char *arg)
+static CmdErr set_resize(int8_t vol_id, char *arg)
 {
     int n;
 
-    if (!parse_int(arg, &n) || n <= 0 || n > (int)USHRT_MAX)
+    if (!parse_int(arg, &n) || n > (int)INT16_MAX || n < (int)INT16_MIN)
         return cmderr_bdos(vol_id, EINVAL);
 
-    int rc = extend(vol_id, (uint16_t)n);
+    int rc = resize(vol_id, (int16_t)n);
 
     if (rc != EOK)
         return cmderr_bdos(vol_id, rc);
@@ -62,24 +62,8 @@ static CmdErr set_extend(int8_t vol_id, char *arg)
     return cmderr_ok();
 }
 
-static CmdErr set_umount(int8_t vol_id, int8_t prompt_vol_id, const char *arg)
+static CmdErr set_umount(int8_t vol_id, int8_t prompt_vol_id)
 {
-    if (arg)
-    {
-        int n;
-
-        if (!parse_int(arg, &n) || n <= 0 || n > (int)USHRT_MAX)
-            return cmderr_bdos(vol_id, EINVAL);
-
-        int rc = shrink(vol_id, (uint16_t)n);
-
-        if (rc != EOK)
-            return cmderr_bdos(vol_id, rc);
-
-        print_vol_size(vol_id);
-        return cmderr_ok();
-    }
-
     if (vol_id == prompt_vol_id)
         return cmderr_bdos(vol_id, EPERM);
 
@@ -171,11 +155,8 @@ static CmdErr cmd_set(FsContext *ctx, int argc, char **argv)
 
     if (check_fmt(argc, argv, set_vol_n_fmt) && name[0] == '\0')
     {
-        if (strcasecmp(argv[2], "EX") == 0)
-            return set_extend(vol_id, argv[3]);
-
-        if (strcasecmp(argv[2], "UM") == 0)
-            return set_umount(vol_id, ctx->vol_id, argv[3]);
+        if (strcasecmp(argv[2], "RZ") == 0)
+            return set_resize(vol_id, argv[3]);
 
         return cmderr_syntax(argv[2]);
     }
@@ -186,7 +167,7 @@ static CmdErr cmd_set(FsContext *ctx, int argc, char **argv)
             return set_mount(vol_id);
 
         if (strcasecmp(argv[2], "UM") == 0)
-            return set_umount(vol_id, ctx->vol_id, NULL);
+            return set_umount(vol_id, ctx->vol_id);
 
         return set_vol_attr(vol_id, argv[2]);
     }

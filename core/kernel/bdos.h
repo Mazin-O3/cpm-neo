@@ -78,18 +78,18 @@ int bd_bind(int8_t vol_id);
 
 /*
  * Format and bind a fresh volume (SET MT).  Requires a prior
- * disk_vmount() call.
+ * volume_mount() call.
  */
 int bd_mount(int8_t vol_id);
 
-/* Extend a volume by n blocks.  Fails with EVOLRO on read-only volumes. */
-int bd_extend(int8_t vol_id, uint16_t n);
-
 /*
- * Shrink a volume by n blocks.  Returns EPERM if any target blocks
- * are allocated; EINVAL if the result would be below BD_MIN_VOL_SECS.
+ * Resize a mounted volume by delta blocks.  delta > 0 grows, delta < 0
+ * shrinks (by |delta|), delta == 0 is a no-op.  Grow fails with EVOLRO
+ * on read-only volumes and ENOSPC at BD_VOL_MAX_BLOCKS.  Shrink returns
+ * EPERM if any target blocks are allocated; EINVAL if the result would
+ * be below BD_MIN_VOL_SECS.
  */
-int bd_shrink(int8_t vol_id, uint16_t n);
+int bd_resize(int8_t vol_id, int16_t delta);
 
 /* Unbind a volume.  Returns EPERM if the volume still has allocated
  * data blocks (not empty). */

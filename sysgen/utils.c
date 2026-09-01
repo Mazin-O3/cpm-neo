@@ -559,7 +559,7 @@ int save_disk(const char *path)
 
 int mount_vol(int8_t vol)
 {
-    if (disk_vruns(vol) == 0)
+    if (volume_run_count(vol) == 0)
     {
         if (bd_mount(vol) != EOK)
         {

@@ -224,13 +224,13 @@ SYS     System file
 DIR     Normal file
 
 MT      Mount volume
-EX N    Extend volume by N KB
+RZ +N   Grow volume by N KB
+RZ -N   Shrink volume by N KB
 UM      Unmount volume
-UM N    Shrink volume by N KB
 ```
 
 `RO` and `RW` apply to files and volumes. `SYS` and `DIR` apply to files.
-`MT`, `EX`, and `UM` apply to volumes.
+`MT`, `RZ`, and `UM` apply to volumes.
 
 Examples:
 
@@ -238,8 +238,8 @@ Examples:
 A> SET DATA.TXT RO
 A> SET B: RW
 A> SET B: MT
-A> SET B: EX 8
-A> SET B: UM 4
+A> SET B: RZ +8
+A> SET B: RZ -4
 A> SET B: UM
 ```
 

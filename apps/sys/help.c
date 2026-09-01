@@ -70,9 +70,9 @@ static const HelpRec g_recs[] = {
      "  SYS     System file\n"
      "  DIR     Directory file\n"
      "  MT      Mount volume\n"
-     "  EX N    Extend volume by N KB\n"
-     "  UM      Unmount volume\n"
-     "  UM N    Shrink volume by N KB"},
+     "  RZ +N   Grow volume by N KB\n"
+     "  RZ -N   Shrink volume by N KB\n"
+     "  UM      Unmount volume"},
 
     {"USER", "system", "USER [u]", "Show or set user area",
      "Shows or sets the current user area (0-15)."},

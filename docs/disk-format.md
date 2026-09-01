@@ -15,8 +15,8 @@ A CP/M Neo disk image is a sequence of 512-byte sectors.
 | Block area | K+S+1..end |
 
 The block area is divided into fixed 1 KB blocks. A volume consists of up to
-four ordered physical extents. Each extent is a contiguous run of blocks.
-The extents define the volume's logical block order. Unallocated blocks form
+four ordered block runs. Each run is a contiguous range of blocks.
+The runs define the volume's logical block order. Unallocated blocks form
 the free pool.
 
 <img src="images/disk-format.png" alt="Disk format" width="100%">
@@ -60,12 +60,12 @@ Block `i` occupies:
 [block_base + i * BD_BLOCK_SECS, block_base + (i + 1) * BD_BLOCK_SECS)
 ```
 
-A single volume can be grown at runtime (`bd_extend` / `EX`) to consume
-blocks freed by shrinking or unmounting the others, up to and including the
-entire grid. Because of that, the grid itself can never be provisioned
-larger than what one volume is allowed to address. Any blocks beyond a
-single volume's cap would be permanently unreachable by every volume, no
-matter how the others are resized. The maximum grid size is therefore:
+A single volume can be grown at runtime (`bd_resize` / `SET RZ +N`) to consume
+blocks freed by shrinking (`SET RZ -N`) or unmounting (`SET UM`) the others, up
+to and including the entire grid. Because of that, the grid itself can never
+be provisioned larger than what one volume is allowed to address. Any blocks
+beyond a single volume's cap would be permanently unreachable by every volume,
+no matter how the others are resized. The maximum grid size is therefore:
 
 ```text
 BD_VOL_MAX_BLOCKS
@@ -77,25 +77,25 @@ BD_VOL_MAX_BLOCKS
 Each volume record is 18 bytes:
 
 ```text
-Bytes  0-15   Ext[4]
-               Each extent: u16 start, u16 count
+Bytes  0-15   Runs[4]
+               Each run: u16 start, u16 count
 
-Byte      16   ext_count
+Byte      16   run_count
 Byte      17   attr
 ```
 
-`ext_count == 0` means unmounted. Otherwise the extents are stored in logical
+`run_count == 0` means unmounted. Otherwise the runs are stored in logical
 order.
 
-A volume's logical sector space is the concatenation of its extents. Logical
-LBA 0 is the first sector of the first extent.
+A volume's logical sector space is the concatenation of its runs. Logical
+LBA 0 is the first sector of the first run.
 
 The kernel enforces:
 
-- Extents do not overlap.
-- Extents do not exceed `num_blocks`.
-- A mounted volume has at least one extent.
-- A volume has at most four extents.
+- Runs do not overlap.
+- Runs do not exceed `num_blocks`.
+- A mounted volume has at least one run.
+- A volume has at most four runs.
 - `attr` contains the volume read-only state.
 
 ## Volume header

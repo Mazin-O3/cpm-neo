@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include "errno.h"
 #include "string.h"
+#include "ctype.h"
 #include "syscall.h"
 
 int putchar(int c)

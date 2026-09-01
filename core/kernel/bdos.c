@@ -20,6 +20,7 @@
 #include "bdos.h"
 #include "disk.h"
 #include "string.h"
+#include "ctype.h"
 
 /* Vol-checked guard: resolves vol_id and returns ENOVOL if unmounted. */
 #define CHECK_VOL(v, vol_id)                                                                       \
@@ -216,7 +217,7 @@ static Volume *vol_checked(int8_t vol_id)
 
 static int vol_read(Volume *v, uint16_t lba, uint8_t *buf)
 {
-    return disk_vread(v->id, lba, buf) ? EIO : EOK;
+    return volume_read(v->id, lba, buf) ? EIO : EOK;
 }
 
 static int vol_write(Volume *v, uint16_t lba, const uint8_t *buf)
@@ -224,7 +225,7 @@ static int vol_write(Volume *v, uint16_t lba, const uint8_t *buf)
     if (v->read_only)
         return EVOLRO;
 
-    return disk_vwrite(v->id, lba, buf) ? EIO : EOK;
+    return volume_write(v->id, lba, buf) ? EIO : EOK;
 }
 
 static int bd_write_header(Volume *v)
@@ -697,14 +698,14 @@ int bd_bind(int8_t vol_id)
 
     uint8_t attr = VOL_ATTR_RW;
 
-    int rc = disk_vgetattr(vol_id, &attr);
+    int rc = volume_getattr(vol_id, &attr);
 
     if (rc != EOK)
         return rc;
 
     v->read_only = attr & VOL_ATTR_RO;
 
-    if (disk_vread(vol_id, 0, hdr) != EOK)
+    if (volume_read(vol_id, 0, hdr) != EOK)
         return EIO;
 
     if (read16(&hdr[VHDR_MAGIC_OFF]) != DISK_MAGIC)
@@ -721,7 +722,7 @@ int bd_bind(int8_t vol_id)
     if ((uint32_t)v->total_blocks * BD_BLOCK_SECS > BD_DISK_MAX_SECS)
         return EBADFS;
 
-    if (v->total_sectors > (uint16_t)disk_vsectors(vol_id))
+    if (v->total_sectors > (uint16_t)volume_sectors(vol_id))
         return EBADFS;
 
     rc = bd_rescan_alloc_map(v);
@@ -742,7 +743,7 @@ int bd_bind(int8_t vol_id)
 
 /*
  * Format and bind a fresh volume (SET MT).  Requires a prior
- * disk_vmount() call.
+ * volume_mount() call.
  */
 int bd_mount(int8_t vol_id)
 {
@@ -754,18 +755,18 @@ int bd_mount(int8_t vol_id)
     if (v->mounted)
         return EINVAL;
 
-    int rc = disk_vmount(vol_id);
+    int rc = volume_mount(vol_id);
 
     if (rc != EOK)
         return rc;
 
-    uint16_t n_secs = (uint16_t)disk_vsectors(vol_id);
+    uint16_t n_secs = (uint16_t)volume_sectors(vol_id);
     uint16_t data_start = (uint16_t)(BD_HEADER_SECS + BD_ROOT_SECS);
     uint16_t num_data = (uint16_t)((n_secs - data_start) / BD_BLOCK_SECS);
 
     if (num_data == 0 || num_data > BD_VOL_MAX_BLOCKS)
     {
-        disk_vunmount(vol_id);
+        volume_unmount(vol_id);
         return EBADFS;
     }
 
@@ -777,9 +778,9 @@ int bd_mount(int8_t vol_id)
     write16(g_bd.sec_buf + VHDR_DATA_LBA_OFF, data_start);
     write16(g_bd.sec_buf + VHDR_TOT_BLKS_OFF, num_data);
 
-    if (disk_vwrite(vol_id, 0, g_bd.sec_buf) != EOK)
+    if (volume_write(vol_id, 0, g_bd.sec_buf) != EOK)
     {
-        disk_vunmount(vol_id);
+        volume_unmount(vol_id);
         return EIO;
     }
 
@@ -787,9 +788,9 @@ int bd_mount(int8_t vol_id)
     {
         memset(g_bd.sec_buf, 0, DISK_SECTOR_SIZE);
 
-        if (disk_vwrite(vol_id, (uint16_t)(BD_HEADER_SECS + s), g_bd.sec_buf) != EOK)
+        if (volume_write(vol_id, (uint16_t)(BD_HEADER_SECS + s), g_bd.sec_buf) != EOK)
         {
-            disk_vunmount(vol_id);
+            volume_unmount(vol_id);
             return EIO;
         }
     }
@@ -798,70 +799,64 @@ int bd_mount(int8_t vol_id)
 }
 
 /*
- * Extend a volume by n blocks.  Fails with EVOLRO on read-only volumes.
+ * Resize a mounted volume.  Positive delta grows, negative shrinks (by
+ * |delta|), zero is a no-op.  Grow fails with EVOLRO on read-only
+ * volumes; shrink returns EPERM if any target blocks are allocated,
+ * EINVAL if the result would fall below BD_MIN_VOL_SECS.
  */
-int bd_extend(int8_t vol_id, uint16_t n)
+int bd_resize(int8_t vol_id, int16_t delta)
 {
     CHECK_VOL(v, vol_id);
 
-    if (n == 0)
+    if (delta == 0)
         return EOK;
 
     if (v->read_only)
         return EVOLRO;
 
-    uint16_t old_secs = v->total_sectors;
-    uint16_t old_blocks = v->total_blocks;
-
-    if (old_blocks >= BD_VOL_MAX_BLOCKS)
-        return ENOSPC;
-
-    uint16_t max_extra = BD_VOL_MAX_BLOCKS - old_blocks;
-
-    if (n > max_extra)
-        n = max_extra;
-
-    int rc = disk_vextend(vol_id, n);
-
-    if (rc != EOK)
-        return rc;
-
-    v->total_sectors = (uint16_t)disk_vsectors(vol_id);
-    v->total_blocks = (uint16_t)((v->total_sectors - v->data_start_lba) / BD_BLOCK_SECS);
-
-    if (v->total_blocks > BD_VOL_MAX_BLOCKS)
-        v->total_blocks = BD_VOL_MAX_BLOCKS;
-
-    rc = bd_write_header(v);
-
-    if (rc != EOK)
+    if (delta > 0)
     {
-        if (disk_vshrink(vol_id, n) == EOK)
+        uint16_t n = (uint16_t)delta;
+        uint16_t old_secs = v->total_sectors;
+        uint16_t old_blocks = v->total_blocks;
+
+        if (old_blocks >= BD_VOL_MAX_BLOCKS)
+            return ENOSPC;
+
+        uint16_t max_extra = BD_VOL_MAX_BLOCKS - old_blocks;
+
+        if (n > max_extra)
+            n = max_extra;
+
+        int rc = volume_resize(vol_id, (int16_t)n);
+
+        if (rc != EOK)
+            return rc;
+
+        v->total_sectors = (uint16_t)volume_sectors(vol_id);
+        v->total_blocks = (uint16_t)((v->total_sectors - v->data_start_lba) / BD_BLOCK_SECS);
+
+        if (v->total_blocks > BD_VOL_MAX_BLOCKS)
+            v->total_blocks = BD_VOL_MAX_BLOCKS;
+
+        rc = bd_write_header(v);
+
+        if (rc != EOK)
         {
-            v->total_sectors = old_secs;
-            v->total_blocks = old_blocks;
-            bd_write_header(v);
+            if (volume_resize(vol_id, (int16_t)(0 - n)) == EOK)
+            {
+                v->total_sectors = old_secs;
+                v->total_blocks = old_blocks;
+                bd_write_header(v);
+            }
+
+            return EIO;
         }
 
-        return EIO;
+        return EOK;
     }
 
-    return EOK;
-}
-
-/*
- * Shrink a volume by n blocks.  Returns EPERM if any target blocks
- * are allocated; EINVAL if the result would be below BD_MIN_VOL_SECS.
- */
-int bd_shrink(int8_t vol_id, uint16_t n)
-{
-    CHECK_VOL(v, vol_id);
-
-    if (n == 0)
-        return EOK;
-
-    if (v->read_only)
-        return EVOLRO;
+    uint16_t n = (uint16_t)(0 - delta);
 
     if (n >= v->total_blocks)
         return EINVAL;
@@ -883,12 +878,12 @@ int bd_shrink(int8_t vol_id, uint16_t n)
     uint16_t old_secs = v->total_sectors;
     uint16_t old_blocks = v->total_blocks;
 
-    int rc = disk_vshrink(vol_id, n);
+    int rc = volume_resize(vol_id, delta);
 
     if (rc != EOK)
         return rc;
 
-    v->total_sectors = (uint16_t)disk_vsectors(vol_id);
+    v->total_sectors = (uint16_t)volume_sectors(vol_id);
     v->total_blocks = (uint16_t)new_total_blocks;
 
     rc = bd_write_header(v);
@@ -897,7 +892,7 @@ int bd_shrink(int8_t vol_id, uint16_t n)
     {
         /* Undo the shrink so VMAP, header and RAM geometry agree. */
 
-        if (disk_vextend(vol_id, n) == EOK)
+        if (volume_resize(vol_id, (int16_t)(0 - delta)) == EOK)
         {
             v->total_sectors = old_secs;
             v->total_blocks = old_blocks;
@@ -948,7 +943,7 @@ int bd_unbind(int8_t vol_id)
             return EPERM;
     }
 
-    int rc = disk_vunmount(vol_id);
+    int rc = volume_unmount(vol_id);
 
     if (rc != EOK)
         return rc;
@@ -1009,7 +1004,7 @@ int bd_vsetattr(int8_t vol_id, uint8_t attr)
     if (attr & (uint8_t)~VOL_ATTR_RO)
         return EINVAL;
 
-    int rc = disk_vsetattr(vol_id, attr & VOL_ATTR_RO);
+    int rc = volume_setattr(vol_id, attr & VOL_ATTR_RO);
 
     if (rc != EOK)
         return rc;

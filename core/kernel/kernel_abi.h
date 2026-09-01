@@ -121,7 +121,9 @@ static inline void write16(uint8_t *p, uint16_t v)
  * Field ORDER is the ABI: slot n lives at byte offset n * 4.  Hand-written
  * asm reaches entries through the table pointer published in environment
  * slot ENV_SYSCALL_PTR (see docs/syscall-reference.md for slot numbers).
- * Only ever append fields at the end; never reorder or remove.
+ * Pre-alignment the table was renumbered freely (pre-1.0 ABI break);
+ * treat the layout below as frozen — only append new fields at the end,
+ * never reorder or remove.
  */
 typedef struct
 {
@@ -137,8 +139,8 @@ typedef struct
     int      (*delete)(const char *name);
     int      (*rename)(const char *old, const char *new);
     int      (*mount)(int8_t vol_id);
-    int      (*unmount)(int8_t vol_id, uint16_t n);
-    int      (*extend)(int8_t vol_id, uint16_t n);
+    int      (*unmount)(int8_t vol_id);
+    int      (*resize)(int8_t vol_id, int16_t delta);
     int      (*vstat)(int8_t vol_id, VolStat *stat);
     int      (*exec)(const char *name, int argc, char **argv);
     int      (*dev)(uint32_t reg, uint32_t cmd, uint32_t *data);
@@ -177,8 +179,8 @@ typedef struct
  * 0x1FE u16             — BOOT_SIG
  *
  * Block i occupies LBAs [block_base + i*2, +2) (1 KB = 2 sectors).
- * A volume's logical space is the concatenation of its ordered extents
- * (block runs). ext_count == 0 means the volume is unmounted. */
+ * A volume's logical space is the concatenation of its ordered block
+ * runs. run_count == 0 means the volume is unmounted. */
 
 #define VMAP_LBA         1 /* volume-map sector LBA            */
 #define VMAP_MAGIC       0x4350u /* 'CP' identity              */
@@ -192,12 +194,12 @@ typedef struct
 #define VMAP_SIG        0x1FE /* u16 — BOOT_SIG                */
 
 /* VolRec wire layout (VMAP_VOLREC_SIZE bytes each):
- *   +0  u16 ext[0].start   +2  u16 ext[0].count
- *   ...    ext[1..VOL_MAX_EXT-1] follow as u16 pairs (+4..+15)
- *   +16 u8  ext_count      +17 u8  attr (VOL_ATTR_RW / VOL_ATTR_RO) */
-#define VMAP_VR_EXT0_START  0
-#define VMAP_VR_EXT0_COUNT  2
-#define VMAP_VR_EXT_COUNT   16
+ *   +0  u16 run[0].start   +2  u16 run[0].count
+ *   ...    run[1..VOL_MAX_RUNS-1] follow as u16 pairs (+4..+15)
+ *   +16 u8  run_count      +17 u8  attr (VOL_ATTR_RW / VOL_ATTR_RO) */
+#define VMAP_VR_RUN0_START  0
+#define VMAP_VR_RUN0_COUNT  2
+#define VMAP_VR_RUN_COUNT   16
 #define VMAP_VR_ATTR        17
 
 /* Volume header — logical LBA 0 of each volume.

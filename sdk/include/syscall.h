@@ -84,17 +84,17 @@ static inline int sys_mount(int8_t slot)
     return g_syscall_table.mount(slot);
 }
 
-/* Extend volume by n blocks.  Returns 0 or negative errno. */
-static inline int sys_extend(int8_t slot, uint16_t n)
+/* Resize volume by delta blocks (+grow / -shrink / 0 = no-op).
+ * Returns 0 or negative errno. */
+static inline int sys_resize(int8_t slot, int16_t delta)
 {
-    return g_syscall_table.extend(slot, n);
+    return g_syscall_table.resize(slot, delta);
 }
 
-/* Unmount volume.  If n > 0, shrink by n blocks instead.
- * Returns 0 or negative errno. */
-static inline int sys_unmount(int8_t slot, uint16_t n)
+/* Unmount volume.  Returns 0 or negative errno. */
+static inline int sys_unmount(int8_t slot)
 {
-    return g_syscall_table.unmount(slot, n);
+    return g_syscall_table.unmount(slot);
 }
 
 /* Read volume metadata into stat.  Returns 0 or negative errno. */

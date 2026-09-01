@@ -7,7 +7,8 @@
  * formatted filesystem for every volume (header + empty root).  The block
  * grid (1 KB blocks) is divided equally between the four volumes (A:-D:), so
  * all of them are mounted and usable at boot; any leftover blocks go to the
- * earliest volumes.  Volumes can later be resized at runtime with $EX / $UM.
+ * earliest volumes.  Volumes can later be resized at runtime with SET RZ +N,
+ * or unmounted with SET UM.
  */
 
 #include "bdos.h"
@@ -328,13 +329,13 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
      * the remainder is distributed to earliest volumes. Each volume's
      * share is further clamped to BD_VOL_MAX_BLOCKS -- the filesystem
      * layer's addressing limit for a single volume (see bd_bind /
-     * bd_extend in bdos.c). Any blocks beyond that per volume are
-     * deliberately left OUT of every volume's extent, so they stay
-     * free in the block grid rather than being locked away in an
-     * extent no volume can ever use. That free pool is what lets a
+     * bd_resize in bdos.c). Any blocks beyond that per volume are
+     * deliberately left OUT of every volume's runs, so they stay
+     * free in the block grid rather than being locked away in a
+     * run no volume can ever use. That free pool is what lets a
      * volume span up to BD_VOL_MAX_BLOCKS blocks -- including nearly
-     * the entire disk -- if it's later grown with $EX after the other
-     * volumes are shrunk or unmounted. */
+     * the entire disk -- if it's later grown with SET RZ +N after the
+     * other volumes are shrunk or unmounted. */
     uint32_t base = num_blocks / VOL_MAX;
     uint32_t rem = num_blocks % VOL_MAX;
     uint32_t min_blocks = min_viable_blocks();
@@ -354,16 +355,16 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
 
         /* Reserve at most BD_VOL_MAX_BLOCKS at the disk layer for this
          * volume. The remainder of its equal share, if any, is simply
-         * not claimed by any extent and stays free in the grid. */
+         * not claimed by any run and stays free in the grid. */
 
         if (count > BD_VOL_MAX_BLOCKS)
             count = BD_VOL_MAX_BLOCKS;
 
         uint32_t vr = VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
 
-        write16(vmap + vr + VMAP_VR_EXT0_START, (uint16_t)start);
-        write16(vmap + vr + VMAP_VR_EXT0_COUNT, (uint16_t)count);
-        vmap[vr + VMAP_VR_EXT_COUNT] = 1;      /* ext_count */
+        write16(vmap + vr + VMAP_VR_RUN0_START, (uint16_t)start);
+        write16(vmap + vr + VMAP_VR_RUN0_COUNT, (uint16_t)count);
+        vmap[vr + VMAP_VR_RUN_COUNT] = 1;      /* run_count */
         vmap[vr + VMAP_VR_ATTR] = VOL_ATTR_RW; /* attr */
 
         /* ── Formatted filesystem: header + (already-zeroed) empty root ── */

@@ -10,6 +10,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include "ctype.h"
 
 /* Shared: index of the volume-colon in a volume ref (arg[1..4]), or -1. */
 static int find_vol_colon(const char *arg)
@@ -95,7 +96,7 @@ int parse_fileref(FsContext *ctx, const char *arg, FileRef *out)
  *   v, v*      = bare volume ref: V: (no user digit, no filename)
  *   p, p*      = general path: V:, VU:, U:, or bare filename
  *   f, f*      = file ref, VU: prefix optional (FOO.TXT, V:FOO.TXT, U:FOO.TXT)
- *   a          = RO RW SYS DIR MT EX UM
+ *   a          = RO RW SYS DIR MT UM RZ
  *   n          = integer
  *   any other  = exact match (case-insensitive)
  * Suffix * = wildcards (?|*) allowed.
@@ -108,7 +109,7 @@ typedef enum
     TOK_VOL,  /* bare volume: V: */
     TOK_PATH, /* general path: V:, VU:, U:, or bare filename */
     TOK_FILE, /* file ref, VU: prefix optional */
-    TOK_ATTR, /* RO RW SYS DIR MT EX UM */
+    TOK_ATTR, /* RO RW SYS DIR MT UM RZ */
     TOK_NUM,  /* integer */
     MAX_FMT_TOKS,
 } TokKind;
@@ -217,7 +218,7 @@ static int tok_match(const char *arg, const FTok *f)
 
     case TOK_ATTR:
     {
-        static const char *const attrs[] = {"RO", "RW", "SYS", "DIR", "MT", "EX", "UM"};
+        static const char *const attrs[] = {"RO", "RW", "SYS", "DIR", "MT", "UM", "RZ"};
 
         for (int i = 0; i < 7; i++)
 

@@ -181,7 +181,7 @@ fi
 echo "  Building kernel..."
 KERNEL_C="core/kernel/main.c core/kernel/kernel.c core/kernel/bdos.c \
           core/kernel/disk.c platform/$PLATFORM_DIR/bios.c \
-          sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
+          sdk/src/ctype.c sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
 KERNEL_S="arch/$ARCH/crt0.S"
 
 KERNEL_OBJS=
@@ -233,7 +233,7 @@ $OBJCOPY -O binary "$INT/kernel.elf" "$INT/kernel.bin"
 
 # ── SDK libc ───────────────────────────────────────────────
 echo "  Building SDK libc..."
-SDK_LIBC_SRCS="sdk/src/stdio.c sdk/src/string.c sdk/src/stdlib.c sdk/src/fs.c sdk/src/ccplib.c sdk/src/start.c"
+SDK_LIBC_SRCS="sdk/src/ctype.c sdk/src/stdio.c sdk/src/string.c sdk/src/stdlib.c sdk/src/fs.c sdk/src/ccplib.c sdk/src/start.c"
 SDK_LIBC_OBJS=
 for src in $SDK_LIBC_SRCS; do
     obj="$SDK_OBJ/$(basename "$src" .c).o"
@@ -247,7 +247,7 @@ $AR rcs "$SDK_LIB/libc.a" $SDK_LIBC_OBJS
 echo "  Building CCP..."
 CCP_C="sdk/src/start.c sdk/src/ccplib.c \
        core/ccp/ccp.c core/ccp/cmd_files.c core/ccp/cmd_system.c \
-       sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
+       sdk/src/ctype.c sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
 CCP_OBJS=
 for src in $CCP_C; do
     obj="$CCP_OBJ/${src%.c}.o"

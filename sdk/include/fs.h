@@ -59,22 +59,17 @@ static inline int mount(int8_t vol)
     return sys_mount(vol);
 }
 
-/* Extend mounted volume by n blocks (1 KB each); returns 0 or negative errno */
-static inline int extend(int8_t vol, uint16_t n)
+/* Resize mounted volume by delta blocks (+grow / -shrink / 0 = no-op);
+ * returns 0 or negative errno */
+static inline int resize(int8_t vol, int16_t delta)
 {
-    return sys_extend(vol, n);
+    return sys_resize(vol, delta);
 }
 
 /* Unmount volume (full teardown, frees all blocks); returns 0 or negative errno */
 static inline int unmount(int8_t vol)
 {
-    return sys_unmount(vol, 0);
-}
-
-/* Shrink mounted volume by n blocks (1 KB each); returns 0 or negative errno */
-static inline int shrink(int8_t vol, uint16_t n)
-{
-    return sys_unmount(vol, n);
+    return sys_unmount(vol);
 }
 
 /* Flush all writeback caches to disk; returns 0 or negative errno */

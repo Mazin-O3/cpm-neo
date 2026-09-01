@@ -17,6 +17,7 @@
 #include "disk.h"
 #include "stdlib.h"
 #include "string.h"
+#include "ctype.h"
 #include <limits.h>
 
 #define JUMP_TPA() ((void (*)(void))(uintptr_t)__tpa_base)()
@@ -567,23 +568,20 @@ int sys_mount(int8_t vol_id)
     return bd_mount(vol_id);
 }
 
-int sys_extend(int8_t vol_id, uint16_t n)
+int sys_resize(int8_t vol_id, int16_t delta)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return EINVAL;
 
-    return bd_extend(vol_id, n);
+    return bd_resize(vol_id, delta);
 }
 
-int sys_unmount(int8_t vol_id, uint16_t n)
+int sys_unmount(int8_t vol_id)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return EINVAL;
 
-    if (n == 0)
-        return bd_unbind(vol_id);
-
-    return bd_shrink(vol_id, n);
+    return bd_unbind(vol_id);
 }
 
 int sys_info(SysInfo *out)
@@ -604,9 +602,9 @@ int sys_info(SysInfo *out)
     out->tpa = ((uint32_t)__kernel_base - (uintptr_t)__tpa_base) / 1024;
 
     for (int v = 0; v < VOL_MAX; v++)
-        out->vol_mounted[v] = (disk_vruns((int8_t)v) > 0) ? 1 : 0;
+        out->vol_mounted[v] = (volume_run_count((int8_t)v) > 0) ? 1 : 0;
 
-    out->disk_size_kb = disk_blocks();
+    out->disk_size_kb = disk_block_count();
     out->disk_unalloc_kb = disk_free_blocks();
 
     return EOK;
@@ -711,7 +709,7 @@ const SyscallTable g_syscall_table = {
     .rename = sys_rename,
     .mount = sys_mount,
     .unmount = sys_unmount,
-    .extend = sys_extend,
+    .resize = sys_resize,
     .vstat = sys_vstat,
     .exec = sys_exec,
     .dev = sys_dev,

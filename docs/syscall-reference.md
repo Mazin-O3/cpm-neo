@@ -40,8 +40,8 @@ The syscall table field order is the ABI. New syscalls may only be appended.
 | 9 | `delete` | Delete a file | `path*` | `0`, or negative errno |
 | 10 | `rename` | Rename a file | `old*`, `new*` | `0`, or negative errno |
 | 11 | `mount` | Mount a volume | `volid` | `0`, or negative errno |
-| 12 | `unmount` | Unmount or shrink a volume | `volid`, `n` | `0`, or negative errno |
-| 13 | `extend` | Extend a mounted volume | `volid`, `n` | `0`, or negative errno |
+| 12 | `unmount` | Unmount a mounted volume | `volid` | `0`, or negative errno |
+| 13 | `resize` | Resize a mounted volume | `volid`, `delta` | `0`, or negative errno |
 | 14 | `vstat` | Get volume information | `volid`, `out*` | `0`, or negative errno |
 | 15 | `exec` | Load and execute a program | `path*`, `argc`, `argv*` | Never returns on success; errno on failure |
 | 16 | `dev` | Access a memory-mapped I/O register | `reg`, `cmd`, `data*` | `0`, or negative errno |
@@ -59,15 +59,14 @@ The syscall table field order is the ABI. New syscalls may only be appended.
 
 ## Volume operations
 
-Volumes are A:–D:. Each volume is composed of ordered physical extents recorded
+Volumes are A:–D:. Each volume is composed of ordered block runs recorded
 in the VMAP.
 
 | Syscall | Operation |
 |---|---|
 | `mount(volid)` | Mount an unmounted volume and format it |
-| `extend(volid, n)` | Add `n` blocks to a mounted volume |
-| `unmount(volid, 0)` | Unmount the volume |
-| `unmount(volid, n)` | Remove `n` blocks from the end of the volume |
+| `resize(volid, delta)` | Resize a mounted volume by `delta` KB (positive grows, negative shrinks) |
+| `unmount(volid)` | Unmount the volume |
 
 Volume layout is stored in the VMAP; see [Disk Format](disk-format.md) for the
 on-disk representation and volume limits.

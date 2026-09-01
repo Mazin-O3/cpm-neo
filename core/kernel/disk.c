@@ -218,7 +218,7 @@ static int range_is_free(uint16_t start, uint16_t n)
     return 1;
 }
 
-/* Translate a volume-relative LBA through the volume's extent list into a
+/* Translate a volume-relative LBA through the volume's block runs into a
  * physical disk LBA. */
 static int vol_translate(int8_t vol_id, uint32_t lba, uint32_t *phys)
 {
@@ -308,7 +308,7 @@ static int wb_flush(void)
     return EOK;
 }
 
-int disk_vread(int8_t vol_id, uint32_t lba, uint8_t *buf)
+int volume_read(int8_t vol_id, uint32_t lba, uint8_t *buf)
 {
     uint32_t phys;
 
@@ -328,7 +328,7 @@ int disk_vread(int8_t vol_id, uint32_t lba, uint8_t *buf)
     return bios_read(phys, buf) ? -1 : 0;
 }
 
-int disk_vwrite(int8_t vol_id, uint32_t lba, const uint8_t *buf)
+int volume_write(int8_t vol_id, uint32_t lba, const uint8_t *buf)
 {
     uint32_t phys;
 
@@ -364,7 +364,7 @@ int disk_sync(void)
     return bios_sync() ? EIO : EOK;
 }
 
-int disk_vmount(int8_t vol_id)
+int volume_mount(int8_t vol_id)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return EINVAL;
@@ -388,8 +388,8 @@ int disk_vmount(int8_t vol_id)
             return ENOSPC;
     }
 
-    /* The extent must leave room for the reserved block plus at least
-     * one usable data block, or the volume would be unusable. */
+/* The run must leave room for the reserved block plus at least
+ * one usable data block, or the volume would be unusable. */
 
     if ((n * BD_BLOCK_SECS - BD_DATA_START) / BD_BLOCK_SECS <= BD_RESERVED_BLOCKS)
         return ENOSPC;
@@ -402,7 +402,7 @@ int disk_vmount(int8_t vol_id)
     return vmap_persist();
 }
 
-int disk_vextend(int8_t vol_id, uint16_t n)
+static int vol_extend(int8_t vol_id, uint16_t n)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return EINVAL;
@@ -422,11 +422,11 @@ int disk_vextend(int8_t vol_id, uint16_t n)
         return EVOLRO;
 
     /* Cap enforcement (BD_VOL_MAX_BLOCKS) lives at the bd layer, in
-     * bd_extend(), before this function is ever called. This layer only
+     * bd_resize(), before this function is ever called. This layer only
      * needs to respect physical disk geometry, which the tail/
      * find_free_run checks below already guarantee. */
 
-    /* Prefer to extend the last extent's tail when the blocks right after it
+    /* Prefer to extend the last run's tail when the blocks right after it
      * are free and contiguous. */
     BlockRun *last = &vr->run[vr->run_count - 1];
     uint16_t tail = (uint16_t)(last->start + last->count);
@@ -445,7 +445,7 @@ int disk_vextend(int8_t vol_id, uint16_t n)
         return EOK;
     }
 
-    /* Otherwise gather a fresh contiguous run in a new extent. */
+    /* Otherwise gather a fresh contiguous run in a new run entry. */
 
     if (vr->run_count >= VOL_MAX_RUNS)
         return ENOSPC;
@@ -469,7 +469,7 @@ int disk_vextend(int8_t vol_id, uint16_t n)
     return EOK;
 }
 
-int disk_vshrink(int8_t vol_id, uint16_t n)
+static int vol_shrink(int8_t vol_id, uint16_t n)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return EINVAL;
@@ -531,7 +531,18 @@ int disk_vshrink(int8_t vol_id, uint16_t n)
     return EOK;
 }
 
-int disk_vunmount(int8_t vol_id)
+int volume_resize(int8_t vol_id, int16_t delta)
+{
+    if (delta > 0)
+        return vol_extend(vol_id, (uint16_t)delta);
+
+    if (delta < 0)
+        return vol_shrink(vol_id, (uint16_t)(0 - delta));
+
+    return EOK;
+}
+
+int volume_unmount(int8_t vol_id)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return EINVAL;
@@ -556,7 +567,7 @@ int disk_vunmount(int8_t vol_id)
     return EOK;
 }
 
-uint32_t disk_vsectors(int8_t vol_id)
+uint32_t volume_sectors(int8_t vol_id)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX || !g_disk.initialized)
         return 0;
@@ -564,7 +575,7 @@ uint32_t disk_vsectors(int8_t vol_id)
     return (uint32_t)vol_blocks(&g_disk.volumes[vol_id]) * BD_BLOCK_SECS;
 }
 
-uint8_t disk_vruns(int8_t vol_id)
+uint8_t volume_run_count(int8_t vol_id)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return 0;
@@ -572,7 +583,7 @@ uint8_t disk_vruns(int8_t vol_id)
     return g_disk.volumes[vol_id].run_count;
 }
 
-int disk_vgetattr(int8_t vol_id, uint8_t *attr)
+int volume_getattr(int8_t vol_id, uint8_t *attr)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX || !attr)
         return EINVAL;
@@ -584,7 +595,7 @@ int disk_vgetattr(int8_t vol_id, uint8_t *attr)
     return EOK;
 }
 
-int disk_vsetattr(int8_t vol_id, uint8_t attr)
+int volume_setattr(int8_t vol_id, uint8_t attr)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX)
         return EINVAL;
@@ -608,12 +619,12 @@ int disk_vsetattr(int8_t vol_id, uint8_t attr)
     return EOK;
 }
 
-uint16_t disk_blocks(void)
+uint16_t disk_block_count(void)
 {
     return g_disk.num_blocks;
 }
 
-uint16_t disk_block_base(void)
+uint16_t disk_base_sector(void)
 {
     return g_disk.block_base;
 }

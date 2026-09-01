@@ -11,7 +11,10 @@
  * A block is a fixed run of 2 sectors (1 KB) at
  * `block_base + i*2`.  Each volume owns an ordered list of up to
  * VOL_MAX_RUNS runs (contiguous block runs); its logical space is the
- * concatenation of those runs.  A volume with ext_count==0 is unmounted.
+ * concatenation of those runs.  A volume with run_count==0 is unmounted.
+ *
+ * The API is split into two groups: whole-disk functions (disk_*) and
+ * per-volume functions (volume_*), which take a vol_id.
  *
  * All byte-level layout constants (VMAP_*, VolRec, BlockRun, caps) live in
  * kernel_abi.h so the sysgen tool shares the same on-disk format.
@@ -25,30 +28,34 @@
 
 int      disk_init(void);                        /* 0 = OK, nonzero = failure */
 
-uint16_t disk_blocks(void);                      /* total 1 KB blocks on disk (constant) */
-uint16_t disk_block_base(void);                  /* first block after kernel/CCP         */
+uint16_t disk_block_count(void);                 /* total 1 KB blocks on disk (constant) */
+uint16_t disk_base_sector(void);                 /* LBA of block 0                      */
 uint16_t disk_free_blocks(void);                 /* unallocated blocks in the grid       */
-
-/* Sector-level I/O: lba is relative to the volume, not the physical disk.
- * Returns 0 on success, nonzero on I/O error. */
-int      disk_vread(int8_t vol_id, uint32_t lba, uint8_t *buf);
-int      disk_vwrite(int8_t vol_id, uint32_t lba, const uint8_t *buf);
 
 /* Flush the disk-layer write-back cache and enforce physical persistence
  * via the BIOS barrier. Returns 0 on success, nonzero on error. */
 int      disk_sync(void);
 
+/* Sector-level I/O: lba is relative to the volume.
+ * Returns 0 on success, nonzero on I/O error. */
+int      volume_read(int8_t vol_id, uint32_t lba, uint8_t *buf);
+int      volume_write(int8_t vol_id, uint32_t lba, const uint8_t *buf);
+
 /* Volume lifecycle: mount allocates default runs, unmount frees all.
  * Returns EOK or error. */
-int      disk_vmount(int8_t vol_id);             /* mount at default blocks */
-int      disk_vunmount(int8_t vol_id);           /* free all blocks         */
-int      disk_vextend(int8_t vol_id, uint16_t n);/* grow by n blocks        */
-int      disk_vshrink(int8_t vol_id, uint16_t n);/* shrink by n blocks      */
+int      volume_mount(int8_t vol_id);            /* mount at default blocks */
+
+/* Unmount a volume: frees all its blocks. Returns EOK or error. */
+int      volume_unmount(int8_t vol_id);
+
+/* Resize a volume by delta blocks. delta > 0 grows by delta, delta < 0
+ * shrinks by |delta|, delta == 0 is a no-op. Returns EOK or error. */
+int      volume_resize(int8_t vol_id, int16_t delta);
 
 /* Query helpers: returns 0 if the volume is unmounted. */
-uint32_t disk_vsectors(int8_t vol_id);           /* capacity in sectors (0 if unmounted) */
-uint8_t  disk_vruns(int8_t vol_id);              /* active runs count (0 = unmounted)  */
-int      disk_vgetattr(int8_t vol_id, uint8_t *attr);
-int      disk_vsetattr(int8_t vol_id, uint8_t attr);
+uint32_t volume_sectors(int8_t vol_id);          /* capacity in sectors (0 if unmounted) */
+uint8_t  volume_run_count(int8_t vol_id);        /* active runs count (0 = unmounted)  */
+int      volume_getattr(int8_t vol_id, uint8_t *attr);
+int      volume_setattr(int8_t vol_id, uint8_t attr);
 
 #endif /* DISK_H */

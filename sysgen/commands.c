@@ -382,7 +382,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
         const uint8_t *vr = vmap + VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
         const char *mode = (vr[VMAP_VR_ATTR] & VOL_ATTR_RO) ? "RO" : "RW";
 
-        uint32_t start = read16(vr + VMAP_VR_EXT0_START);
+        uint32_t start = read16(vr + VMAP_VR_RUN0_START);
 
         /* Usable capacity mirrors bd_vstat: data blocks from the volume header,
          * minus the reserved sentinel block. */
@@ -1451,11 +1451,11 @@ int cmd_stat(int argc, char **argv)
         return 1;
 
     printf("  disk: %s\n", disk_buf);
-    printf("  block: 1K, blocks: %u, block base: LBA %u\n", disk_blocks(), disk_block_base());
+    printf("  block: 1K, blocks: %u, block base: LBA %u\n", disk_block_count(), disk_base_sector());
 
     for (int v = 0; v < VOL_MAX; v++)
     {
-        if (disk_vruns((int8_t)v) == 0)
+        if (volume_run_count((int8_t)v) == 0)
         {
             printf("  %c: unmounted\n", 'A' + v);
             continue;
