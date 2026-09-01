@@ -276,8 +276,8 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
     if (KERN_START_LBA + reserved >= total_secs)
         return -1;
 
-    uint32_t block_base = (uint32_t)KERN_START_LBA + reserved;
-    uint32_t num_blocks = (total_secs - block_base) / BD_BLOCK_SECS;
+    uint32_t base_lba = (uint32_t)KERN_START_LBA + reserved;
+    uint32_t num_blocks = (total_secs - base_lba) / BD_BLOCK_SECS;
 
     if (num_blocks == 0)
         return -1;
@@ -345,7 +345,7 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
 
     uint8_t *vmap = disk + (uint32_t)VMAP_LBA * DISK_SECTOR_SIZE;
     write16(vmap + VMAP_NUM_BLOCKS, (uint16_t)num_blocks);
-    write16(vmap + VMAP_BLOCK_BASE, (uint16_t)block_base);
+    write16(vmap + VMAP_BASE_LBA, (uint16_t)base_lba);
     write16(vmap + VMAP_MAGIC_OFF, VMAP_MAGIC);
 
     for (uint32_t v = 0; v < VOL_MAX; v++)
@@ -377,7 +377,7 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
         if (num_data > BD_VOL_MAX_BLOCKS)
             num_data = BD_VOL_MAX_BLOCKS;
 
-        uint8_t *hdr = disk + (block_base + start * BD_BLOCK_SECS) * DISK_SECTOR_SIZE;
+        uint8_t *hdr = disk + (base_lba + start * BD_BLOCK_SECS) * DISK_SECTOR_SIZE;
         write16(hdr, DISK_MAGIC);
         write16(hdr + VHDR_VER_OFF, VHDR_VER);
         write16(hdr + VHDR_SIZE_KB_OFF, (uint16_t)(v_secs / 2));

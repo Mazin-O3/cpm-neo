@@ -601,7 +601,7 @@ int sys_info(SysInfo *out)
 
     out->tpa = ((uint32_t)__kernel_base - (uintptr_t)__tpa_base) / 1024;
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
         out->vol_mounted[v] = (volume_run_count((int8_t)v) > 0) ? 1 : 0;
 
     out->disk_size_kb = disk_block_count();

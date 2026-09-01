@@ -4,12 +4,12 @@
  *
  * Disk layout:
  *   Sector 0 : boot sector (geometry + kernel/CCP pointers)
- *   Sector 1 : VMAP  = { u16 num_blocks, u16 block_base,
+ *   Sector 1 : VMAP  = { u16 num_blocks, u16 base_lba,
  *                        u16 magic=0x4350, VolRec[4], 0xAA55@0x1FE }
  *   Sectors 2.. : kernel (KERN_START_LBA=2), CCP, then the block grid.
  *
  * A block is a fixed run of 2 sectors (1 KB) at
- * `block_base + i*2`.  Each volume owns an ordered list of up to
+ * `base_lba + i*2`.  Each volume owns an ordered list of up to
  * VOL_MAX_RUNS runs (contiguous block runs); its logical space is the
  * concatenation of those runs.  A volume with run_count==0 is unmounted.
  *
@@ -29,7 +29,7 @@
 int      disk_init(void);                        /* 0 = OK, nonzero = failure */
 
 uint16_t disk_block_count(void);                 /* total 1 KB blocks on disk (constant) */
-uint16_t disk_base_sector(void);                 /* LBA of block 0                      */
+uint16_t disk_base_lba(void);                    /* LBA of block 0                      */
 uint16_t disk_free_blocks(void);                 /* unallocated blocks in the grid       */
 
 /* Flush the disk-layer write-back cache and enforce physical persistence

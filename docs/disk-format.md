@@ -49,7 +49,7 @@ single sector when volume layout or volume attributes change.
 | Offset | Size | Field | Constant | Value |
 |---|---:|---|---|---|
 | 0x000 | u16 | Total blocks | `VMAP_NUM_BLOCKS` | varies |
-| 0x002 | u16 | Block-0 LBA | `VMAP_BLOCK_BASE` | `K + S + 2` |
+| 0x002 | u16 | Block-0 LBA | `VMAP_BASE_LBA` | `K + S + 2` |
 | 0x004 | u16 | Magic | `VMAP_MAGIC_OFF` / `VMAP_MAGIC` | `0x4350` |
 | 0x006 | 4×18 B | Volume records | `VMAP_VOLREC` | see below |
 | 0x1FE | u16 | Signature | `VMAP_SIG` | `0xAA55` |
@@ -57,7 +57,7 @@ single sector when volume layout or volume attributes change.
 Block `i` occupies:
 
 ```text
-[block_base + i * BD_BLOCK_SECS, block_base + (i + 1) * BD_BLOCK_SECS)
+[base_lba + i * BD_BLOCK_SECS, base_lba + (i + 1) * BD_BLOCK_SECS)
 ```
 
 A single volume can be grown at runtime (`bd_resize` / `SET RZ +N`) to consume

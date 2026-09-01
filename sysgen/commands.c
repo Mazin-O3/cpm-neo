@@ -370,14 +370,14 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
 
     printf("  Block size       : 1 KB\n");
     printf("  Blocks           : %u @ LBA %u\n", read16(vmap + VMAP_NUM_BLOCKS),
-           read16(vmap + VMAP_BLOCK_BASE));
+           read16(vmap + VMAP_BASE_LBA));
 
     printf("-------------------------------------------------------------\n");
 
-    uint16_t block_base = read16(vmap + VMAP_BLOCK_BASE);
+    uint16_t base_lba = read16(vmap + VMAP_BASE_LBA);
     uint16_t disk_usable_kb = 0;
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
     {
         const uint8_t *vr = vmap + VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
         const char *mode = (vr[VMAP_VR_ATTR] & VOL_ATTR_RO) ? "RO" : "RW";
@@ -387,7 +387,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
         /* Usable capacity mirrors bd_vstat: data blocks from the volume header,
          * minus the reserved sentinel block. */
         uint16_t tot_blks = read16(
-            sysgen_disk() + ((uint32_t)(block_base + start * BD_BLOCK_SECS)) * DISK_SECTOR_SIZE +
+            sysgen_disk() + ((uint32_t)(base_lba + start * BD_BLOCK_SECS)) * DISK_SECTOR_SIZE +
             VHDR_TOT_BLKS_OFF);
         uint32_t usable = tot_blks > 0 ? (uint32_t)(tot_blks - 1) : 0;
         disk_usable_kb += usable;
@@ -1173,7 +1173,7 @@ int cmd_extract(int argc, char **argv)
 
     int total = 0, skipped = 0, errors = 0;
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
     {
         if (bd_bind((int8_t)v) != EOK)
             continue;
@@ -1451,9 +1451,9 @@ int cmd_stat(int argc, char **argv)
         return 1;
 
     printf("  disk: %s\n", disk_buf);
-    printf("  block: 1K, blocks: %u, block base: LBA %u\n", disk_block_count(), disk_base_sector());
+    printf("  block: 1K, blocks: %u, base LBA: %u\n", disk_block_count(), disk_base_lba());
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
     {
         if (volume_run_count((int8_t)v) == 0)
         {

@@ -173,12 +173,12 @@ typedef struct
 /* Volume-map (VMAP) format — sector LBA 1.
  *
  * 0x000 u16 num_blocks  — total 1K blocks on disk
- * 0x002 u16 block_base   — LBA of block 0
+ * 0x002 u16 base_lba    — LBA of block 0
  * 0x004 u16 magic       — VMAP_MAGIC
  * 0x006 VolRec[VOL_MAX] — 18 B each
  * 0x1FE u16             — BOOT_SIG
  *
- * Block i occupies LBAs [block_base + i*2, +2) (1 KB = 2 sectors).
+ * Block i occupies LBAs [base_lba + i*2, +2) (1 KB = 2 sectors).
  * A volume's logical space is the concatenation of its ordered block
  * runs. run_count == 0 means the volume is unmounted. */
 
@@ -188,7 +188,7 @@ typedef struct
 #define VMAP_VOLREC_SIZE 18 /* VolRec bytes                  */
 
 #define VMAP_NUM_BLOCKS 0x000 /* u16 — total 1K blocks on disk */
-#define VMAP_BLOCK_BASE  0x002 /* u16 — LBA of block 0          */
+#define VMAP_BASE_LBA   0x002 /* u16 — LBA of block 0          */
 #define VMAP_MAGIC_OFF  0x004 /* u16 — VMAP_MAGIC              */
 #define VMAP_VOLREC     0x006 /* VolRec[VOL_MAX]               */
 #define VMAP_SIG        0x1FE /* u16 — BOOT_SIG                */

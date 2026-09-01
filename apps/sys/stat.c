@@ -77,7 +77,7 @@ static CmdErr stat_dsk(void)
 
     uint16_t disk_usable_k = 0;
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
     {
         if (!si.vol_mounted[v])
             continue;
@@ -98,7 +98,7 @@ static CmdErr stat_dsk(void)
     
     printf("Volume  Mode  Used  Total\n");
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
     {
         if (!si.vol_mounted[v] || !vol_stat_ok[v])
             continue;

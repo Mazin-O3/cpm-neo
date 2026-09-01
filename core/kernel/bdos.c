@@ -965,7 +965,7 @@ int bd_sync(void)
     if (rc != EOK)
         return rc;
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
     {
         Volume *vol = &g_bd.vol[v];
 

@@ -31,7 +31,7 @@ typedef struct
 {
     VolRec volumes[VOL_MAX];
     uint16_t num_blocks;
-    uint16_t block_base;
+    uint16_t base_lba;
     uint8_t initialized;
 
     /* Single-sector write-back correctness cache. Exists to guarantee
@@ -69,7 +69,7 @@ static int collect_used_runs(uint16_t *rstart, uint16_t *rend, int cap)
 {
     int n = 0;
 
-    for (int v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < VOL_MAX; v++)
     {
         const VolRec *vr = &g_disk.volumes[v];
 
@@ -238,7 +238,7 @@ static int vol_translate(int8_t vol_id, uint32_t lba, uint32_t *phys)
 
         if (lba < sofar + seg)
         {
-            *phys = (uint32_t)g_disk.block_base + (uint32_t)vr->run[i].start * BD_BLOCK_SECS +
+            *phys = (uint32_t)g_disk.base_lba + (uint32_t)vr->run[i].start * BD_BLOCK_SECS +
                     (lba - sofar);
             return 0;
         }
@@ -256,7 +256,7 @@ static int vmap_persist(void)
     uint8_t buf[DISK_SECTOR_SIZE];
     memset(buf, 0, sizeof(buf));
     write16(buf + VMAP_NUM_BLOCKS, g_disk.num_blocks);
-    write16(buf + VMAP_BLOCK_BASE, g_disk.block_base);
+    write16(buf + VMAP_BASE_LBA, g_disk.base_lba);
     write16(buf + VMAP_MAGIC_OFF, VMAP_MAGIC);
     memcpy(buf + VMAP_VOLREC, g_disk.volumes, sizeof(g_disk.volumes));
     write16(buf + VMAP_SIG, BOOT_SIG);
@@ -274,7 +274,7 @@ int disk_init(void)
         return -1;
 
     g_disk.num_blocks = read16(buf + VMAP_NUM_BLOCKS);
-    g_disk.block_base = read16(buf + VMAP_BLOCK_BASE);
+    g_disk.base_lba = read16(buf + VMAP_BASE_LBA);
 
     if (read16(buf + VMAP_MAGIC_OFF) != VMAP_MAGIC)
         return -1;
@@ -282,7 +282,7 @@ int disk_init(void)
     if (g_disk.num_blocks == 0 || g_disk.num_blocks > BD_VOL_MAX_BLOCKS)
         return -1;
 
-    if (g_disk.block_base < VMAP_LBA + 1)
+    if (g_disk.base_lba < VMAP_LBA + 1)
         return -1;
 
     memcpy(g_disk.volumes, buf + VMAP_VOLREC, sizeof(g_disk.volumes));
@@ -624,7 +624,7 @@ uint16_t disk_block_count(void)
     return g_disk.num_blocks;
 }
 
-uint16_t disk_base_sector(void)
+uint16_t disk_base_lba(void)
 {
-    return g_disk.block_base;
+    return g_disk.base_lba;
 }
