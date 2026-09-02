@@ -18,9 +18,9 @@
  */
 
 #include "bdos.h"
+#include "ctype.h"
 #include "disk.h"
 #include "string.h"
-#include "ctype.h"
 
 /* Vol-checked guard: resolves vol_id and returns ENOVOL if unmounted. */
 #define CHECK_VOL(v, vol_id)                                                                       \
@@ -69,21 +69,15 @@ typedef struct
 /* Runtime state for an open file descriptor. */
 typedef struct
 {
-    uint32_t size; /* total file size in bytes (tracked on write) */
+    uint32_t size; /* Total file size in bytes (tracked on write) */
     uint32_t position;
-    uint16_t extent_bytes;
-    uint8_t ext0_diridx; /* directory index of extent 0 (base for extent calc) */
-    uint8_t cur_diridx;
-    uint8_t attrib;
-    uint8_t extent_idx;
     uint8_t in_use : 1;
     uint8_t writable : 1;
     uint8_t name83[NAME83_LEN];
     FsContext ctx;
-    uint16_t blocks[BD_BLOCKS_PER_EXTENT];
+    DirInfo cur;
 } FCB;
 
-/* Global BDOS state — singleton; holds all volumes and the FCB table. */
 typedef struct
 {
     Volume vol[VOL_MAX];
@@ -405,23 +399,24 @@ static FCB *fcb_get(int fd)
     return (fd < 0 || fd >= BD_MAX_FCBS || !g_bd.fcb[fd].in_use) ? 0 : &g_bd.fcb[fd];
 }
 
-static void fcb_init(FCB *f, FsContext ctx, uint32_t sz, uint8_t w, uint16_t di)
+static void fcb_init(FCB *f, FsContext ctx, uint32_t sz, uint8_t w, uint16_t diridx)
 {
     f->in_use = 1;
+    f->writable = w;
     f->ctx = ctx;
     f->size = sz;
     f->position = 0;
-    f->writable = w;
-    f->ext0_diridx = f->cur_diridx = di;
-    f->extent_idx = 0;
-    f->extent_bytes = 0;
+    f->cur.diridx = diridx;
+    f->cur.extent_idx = 0;
+    f->cur.extent_bytes = 0;
 }
 
 static int bd_vol_has_writable_fcb(int8_t vol_id)
 {
     for (int i = 0; i < BD_MAX_FCBS; i++)
     {
-        if (g_bd.fcb[i].in_use && g_bd.fcb[i].writable && g_bd.fcb[i].ctx.vol_id == vol_id)
+        if (g_bd.fcb[i].in_use && g_bd.fcb[i].writable &&
+            g_bd.fcb[i].ctx.vol_id == vol_id)
             return 1;
     }
 
@@ -485,27 +480,10 @@ static int find_extent_cb(Volume *v, const uint8_t *entry, uint16_t idx, void *a
     return DIR_SCAN_STOP;
 }
 
-static int find_extent(FileKey key, uint8_t extent_idx, int16_t hint_diridx, DirInfo *out)
+static int find_extent(FileKey key, uint8_t extent_idx, DirInfo *out)
 {
     Volume *v = key.v;
     uint8_t user = key.user;
-
-    if (hint_diridx >= 0 && (uint16_t)hint_diridx < BD_ROOT_ENTRIES)
-    {
-        uint8_t *entry = load_dir_entry(v, (uint16_t)hint_diridx);
-
-        if (entry && entry[0] != BD_ENTRY_EMPTY && entry[0] != BD_ENTRY_DELETED &&
-            entry[BD_DIR_USER] == user && name83_match(entry, key.name83) &&
-            entry[BD_DIR_EXTENT_IDX] == extent_idx)
-        {
-            out->diridx = (uint16_t)hint_diridx;
-            entry_block_list(entry, out->blocks);
-            out->extent_bytes = read16(&entry[BD_DIR_EXTENT_BYTES]);
-            out->attrib = entry[BD_DIR_ATTR];
-
-            return EOK;
-        }
-    }
 
     FindExtentCtx ctx = {key, extent_idx, out};
 
@@ -541,26 +519,9 @@ static void fill_dir_entry(uint8_t *entry, const FileKey *key, const DirInfo *de
     write16(&entry[BD_DIR_BLOCKS], first_block);
 }
 
-static int create_extent(FileKey key, const DirInfo *de, uint16_t first_block, int16_t hint_diridx,
-                         uint16_t *out_diridx)
+static int create_extent(FileKey key, const DirInfo *de, uint16_t first_block, uint16_t *out_diridx)
 {
     Volume *v = key.v;
-
-    if (hint_diridx >= 0 && (uint16_t)hint_diridx < BD_ROOT_ENTRIES)
-    {
-        uint8_t *entry = load_dir_entry(v, (uint16_t)hint_diridx);
-
-        if (entry && (entry[0] == BD_ENTRY_EMPTY || entry[0] == BD_ENTRY_DELETED))
-        {
-            fill_dir_entry(entry, &key, de, first_block);
-
-            if (out_diridx)
-                *out_diridx = (uint16_t)hint_diridx;
-
-            return vol_write(v, v->root_start_sec + (uint16_t)hint_diridx / BD_ENTRIES_PER_SEC,
-                             g_bd.sec_buf);
-        }
-    }
 
     for (uint16_t s = 0; s < BD_ROOT_SECS; s++)
     {
@@ -642,22 +603,19 @@ static int resolve_extent(FCB *f, Volume *v)
     uint32_t extent_idx = block_idx / BD_BLOCKS_PER_EXTENT;
     uint32_t block_off = block_idx % BD_BLOCKS_PER_EXTENT;
 
-    if (extent_idx != f->extent_idx)
+    if (extent_idx != f->cur.extent_idx)
     {
         if (extent_idx > UINT8_MAX)
             return -1;
 
         DirInfo di;
         int rc = find_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
-                             (uint8_t)extent_idx, (int16_t)(f->ext0_diridx + extent_idx), &di);
+                             (uint8_t)extent_idx, &di);
 
         if (rc != EOK)
             return -1;
 
-        f->extent_bytes = di.extent_bytes;
-        memcpy(f->blocks, di.blocks, sizeof(di.blocks));
-        f->extent_idx = (uint8_t)extent_idx;
-        f->cur_diridx = (uint8_t)di.diridx;
+        f->cur = di;
     }
 
     return (int)block_off;
@@ -665,14 +623,7 @@ static int resolve_extent(FCB *f, Volume *v)
 
 static int fcb_flush(FCB *f, Volume *v)
 {
-    DirInfo ude = {.diridx = f->cur_diridx,
-                   .extent_bytes = f->extent_bytes,
-                   .extent_idx = f->extent_idx,
-                   .attrib = f->attrib};
-
-    memcpy(ude.blocks, f->blocks, sizeof(ude.blocks));
-
-    return update_extent(v, &ude);
+    return update_extent(v, &f->cur);
 }
 
 /*
@@ -1033,7 +984,7 @@ int bd_open(const char *name83, FsContext ctx, uint8_t writable)
     FCB *f = &g_bd.fcb[fd];
 
     DirInfo di;
-    int rc = find_extent(make_key(v, name83, ctx.user_area), 0, -1, &di);
+    int rc = find_extent(make_key(v, name83, ctx.user_area), 0, &di);
 
     if (rc != EOK)
     {
@@ -1066,11 +1017,7 @@ int bd_open(const char *name83, FsContext ctx, uint8_t writable)
     }
 
     fcb_init(f, ctx, total, writable, di.diridx);
-
-    f->attrib = di.attrib;
-    memcpy(f->blocks, di.blocks, sizeof(di.blocks));
-    f->extent_bytes = di.extent_bytes;
-    f->extent_idx = 0;
+    f->cur = di;
 
     return fd;
 }
@@ -1096,7 +1043,7 @@ int bd_read(int fd, uint8_t *buf, uint16_t len)
         if (block_off < 0 || block_off >= BD_BLOCKS_PER_EXTENT)
             break;
 
-        uint16_t sec = block_offset_sec(v, f->blocks[block_off], f->position);
+        uint16_t sec = block_offset_sec(v, f->cur.blocks[block_off], f->position);
 
         uint16_t off = f->position % DISK_SECTOR_SIZE;
         uint32_t sl = DISK_SECTOR_SIZE - off;
@@ -1134,7 +1081,7 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
         uint32_t block_idx = f->position / BD_BLOCK_BYTES;
         uint32_t extent_idx = block_idx / BD_BLOCKS_PER_EXTENT;
 
-        if (extent_idx != f->extent_idx)
+        if (extent_idx != f->cur.extent_idx)
         {
             if (extent_idx >= BD_MAX_EXTENTS)
                 return bw ? (int)bw : ENOSPC;
@@ -1146,16 +1093,12 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
 
             DirInfo fdi;
 
-            int find_rc =
-                find_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
-                            (uint8_t)extent_idx, (int16_t)(f->ext0_diridx + extent_idx), &fdi);
+            int find_rc = find_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
+                                      (uint8_t)extent_idx, &fdi);
 
             if (find_rc == EOK)
             {
-                f->cur_diridx = (uint8_t)fdi.diridx;
-                memcpy(f->blocks, fdi.blocks, sizeof(fdi.blocks));
-                f->extent_bytes = fdi.extent_bytes;
-                f->extent_idx = (uint8_t)extent_idx;
+                f->cur = fdi;
             }
             else if (find_rc == ENOENT)
             {
@@ -1164,13 +1107,12 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
                 if (new_block < 0)
                     return bw ? (int)bw : ENOSPC;
 
-                DirInfo nde = {.extent_idx = (uint8_t)extent_idx, .attrib = f->attrib};
+                DirInfo nde = {.extent_idx = (uint8_t)extent_idx, .attrib = f->cur.attrib};
 
                 uint16_t ndi;
 
-                int rc = create_extent(make_key(v, (const char *)f->name83, f->ctx.user_area), &nde,
-                                       (uint16_t)new_block, (int16_t)(f->ext0_diridx + extent_idx),
-                                       &ndi);
+                int rc = create_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
+                                       &nde, (uint16_t)new_block, &ndi);
 
                 if (rc != EOK)
                 {
@@ -1178,12 +1120,9 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
                     return bw ? (int)bw : rc;
                 }
 
-                f->cur_diridx = (uint8_t)ndi;
-
-                memset(f->blocks, 0, sizeof(f->blocks));
-                f->blocks[0] = (uint16_t)new_block;
-                f->extent_idx = (uint8_t)extent_idx;
-                f->extent_bytes = 0;
+                f->cur = nde;
+                f->cur.diridx = ndi;
+                f->cur.blocks[0] = (uint16_t)new_block;
             }
             else
             {
@@ -1195,19 +1134,19 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
 
         int new_block = 0;
 
-        if (f->blocks[block_off] == 0)
+        if (f->cur.blocks[block_off] == 0)
         {
             int block_num = alloc_block(v);
 
             if (block_num < 0)
                 return bw ? (int)bw : ENOSPC;
 
-            f->blocks[block_off] = (uint16_t)block_num;
+            f->cur.blocks[block_off] = (uint16_t)block_num;
             memset(g_bd.sec_buf, 0, DISK_SECTOR_SIZE);
             new_block = 1;
         }
 
-        uint16_t sec = block_offset_sec(v, f->blocks[block_off], f->position);
+        uint16_t sec = block_offset_sec(v, f->cur.blocks[block_off], f->position);
 
         uint16_t off = f->position % DISK_SECTOR_SIZE;
         uint32_t sl = DISK_SECTOR_SIZE - off;
@@ -1234,8 +1173,8 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
         if (new_extent_size == 0 && f->position >= extent_max)
             new_extent_size = extent_max;
 
-        if (new_extent_size > f->extent_bytes)
-            f->extent_bytes = (uint16_t)new_extent_size;
+        if (new_extent_size > f->cur.extent_bytes)
+            f->cur.extent_bytes = (uint16_t)new_extent_size;
 
         if (f->position > f->size)
             f->size = f->position;
@@ -1455,8 +1394,8 @@ create_done:
 
     fcb_init(f, ctx, 0, 1, (uint16_t)fidx);
 
-    f->attrib = 0;
-    memset(f->blocks, 0, sizeof(f->blocks));
+    f->cur.attrib = 0;
+    memset(f->cur.blocks, 0, sizeof(f->cur.blocks));
 
     return fd;
 }
@@ -1475,7 +1414,7 @@ int bd_delete(const char *name83, FsContext ctx)
 
     DirInfo di;
 
-    if (find_extent(key, 0, -1, &di) != EOK)
+    if (find_extent(key, 0, &di) != EOK)
         return ENOENT;
 
     if (di.attrib & FILE_ATTR_READ_ONLY)
@@ -1483,7 +1422,7 @@ int bd_delete(const char *name83, FsContext ctx)
 
     for (uint16_t ei = 0; ei <= UINT8_MAX; ei++)
     {
-        if (find_extent(key, (uint8_t)ei, -1, &di) != EOK)
+        if (find_extent(key, (uint8_t)ei, &di) != EOK)
             break;
 
         uint8_t *entry = load_dir_entry(v, di.diridx);
@@ -1607,7 +1546,7 @@ int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib)
     {
         DirInfo di;
 
-        int frc = find_extent(make_key(v, name83, ctx.user_area), (uint8_t)ei, -1, &di);
+        int frc = find_extent(make_key(v, name83, ctx.user_area), (uint8_t)ei, &di);
 
         if (frc == ENOENT)
             break;

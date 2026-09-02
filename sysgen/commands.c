@@ -366,7 +366,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
     printf("  Kernel base      : 0x%04X\n", kern_load);
     printf("  TPA              : %lu KB\n", (unsigned long)((kern_load - tpa_base) / 1024));
     printf("  Reserved secs    : %u (kernel + CCP)\n", reserved);
-    printf("  Kernel sector       : %u\n", read16(sysgen_disk() + S0_KERN_SEC));
+    printf("  Kernel sector    : %u\n", read16(sysgen_disk() + S0_KERN_SEC));
 
     printf("  Block size       : 1 KB\n");
     printf("  Blocks           : %u @ sector %u\n", read16(vmap + VMAP_NUM_BLOCKS),
