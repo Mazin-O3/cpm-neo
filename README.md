@@ -18,12 +18,20 @@
 
 </div>
 
+## What is CP/M Neo?
+
+CP/M Neo is a small CP/M-inspired operating system, designed around simplicity, portability, and a clear separation between the operating system and platform-specific hardware.
+
+It provides a CP/M-style command environment, filesystem, system calls, application SDK, and platform interface for different hardware platforms.
+
 ## Port Status
 
-| Architecture | Platform | Storage | Status |
+| Platform | Architecture | Storage | Status |
 | :--- | :--- | :--- | :--- |
-| **RISC-V** | VEMU | Emulated Disk | ✅ Done |
-| **RISC-V** | TinyMCU | — | ⏳ WIP |
+| **VEMU** | RISC-V | Emulated Disk | ✅ Done |
+| **TinyMCU** | RISC-V | RAM Disk | ⏳ WIP |
+
+--- 
 
 ## Quick Start
 
@@ -53,6 +61,14 @@ make -C sysgen clean
 See the [User Guide](docs/user-guide.md) for the full build and execution walkthrough.
 
 ---
+
+## Features
+- CP/M-style Console Command Processor (CCP)
+- Kernel syscall interface
+- BDOS-inspired filesystem
+- Hardware-independent architecture
+- Application SDK
+- sysgen tool for building and managing disk images
 
 ## The Sysgen Tool
 
