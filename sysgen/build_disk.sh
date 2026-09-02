@@ -110,6 +110,9 @@ fi
 # Architecture metadata (toolchain prefix + CFLAGS) from arch/$ARCH/config.sh
 # shellcheck source=/dev/null
 . "arch/$ARCH/config.sh"
+CROSS_COMPILE=${CROSS_COMPILE:?"$ARCH: CROSS_COMPILE not set in arch/$ARCH/config.sh"}
+ARCH_CFLAGS=${ARCH_CFLAGS:?"$ARCH: ARCH_CFLAGS not set in arch/$ARCH/config.sh"}
+LD_EMULATION=${LD_EMULATION:?"$ARCH: LD_EMULATION not set in arch/$ARCH/config.sh"}
 
 # Derived layout.  RAM_END is the nominal end of SRAM (RAM_BASE + RAM_SIZE);
 # RAM_TOP is the top of usable RAM and may be lower when an MMIO window lies
@@ -168,12 +171,16 @@ $CC $CFLAGS -I arch/$ARCH/ -I core/kernel/ \
     -Wl,--gc-sections -Wl,--strip-debug -Wl,--no-warn-rwx-segments \
     -Wl,--defsym=__io_base="$IO_BASE_HEX" \
     -Wl,--defsym=__ram_top="$RAM_TOP_HEX" \
+    -Wl,--defsym=__ram_base="$RAM_BASE" \
+    -Wl,--defsym=__boot_base="$BOOT_BASE" \
+    -Wl,--defsym=__boot_size="$BOOT_SIZE" \
+    -Wl,--defsym=__boot_ram_size="$BOOT_RAM_SIZE" \
     -T arch/$ARCH/linker_boot.ld \
     arch/$ARCH/boot.S "$INT/boot_plat.o" -o "$INT/bootloader.elf"
 $OBJCOPY -O binary --only-section=.boot "$INT/bootloader.elf" "$BUILD/bootloader.bin"
 SIZE=$(wc -c < "$BUILD/bootloader.bin")
-if [ "$SIZE" -gt 1024 ]; then
-    echo "ERROR: bootloader.bin $SIZE bytes > 1024" >&2
+if [ "$SIZE" -gt "$BOOT_SIZE" ]; then
+    echo "ERROR: bootloader.bin $SIZE bytes > $BOOT_SIZE (BOOT_SIZE)" >&2
     exit 1
 fi
 

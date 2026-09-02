@@ -24,21 +24,20 @@
 .align 2
 
 _boot_start:
-    /* Volatile boot RAM lives as low as possible, right after the boot code:
-     * the 512-byte sector-0 scratch buffer (__boot_scratch) and a 128-byte
-     * stack just above it (__boot_stack_top), both from linker_boot.ld. */
+    /* Boot runtime RAM lives in its own writable region (BOOT code vs BRAM
+     * from linker_boot.ld): the 512-byte sector-0 scratch buffer
+     * (__boot_scratch) and a stack just above it (__boot_stack_top). */
     la   sp, __boot_stack_top
     la   s7, __boot_scratch
 
+    /* Initialize hardware (BIOS) first — console output is not possible
+     * until the platform's peripherals are configured.  On failure we halt
+     * silently: there is no console to report the error through. */
+    jal  ra, bios_init
+    bltz a0, .Lspin
+
     /* Banner */
     la   t0, msg_title
-    jal  ra, print_str
-
-    /* Initialize hardware (BIOS) — required to read the kernel into RAM */
-    jal  ra, bios_init
-    bltz a0, err_bios
-
-    la   t0, msg_bios_ok
     jal  ra, print_str
 
     /* Load sector 0 → scratch buffer */
@@ -66,6 +65,18 @@ _boot_start:
     lhu  s2, S0_KERN_SECTORS(s7)
     lhu  s6, S0_KERN_SEC(s7)
     beqz s2, err_disk
+
+    /* Validate the kernel load range before reading anything, so a corrupt
+     * sector-0 header can never overwrite the bootloader's runtime RAM or
+     * spill past the top of usable RAM. */
+    slli t0, s2, 9             /* total kernel bytes = sectors * 512 */
+    add  t1, s1, t0            /* end of loaded kernel = start + bytes */
+
+    la   t2, __boot_stack_top  /* boot runtime RAM ends here */
+    bltu s1, t2, err_disk      /* start below boot RAM → would clobber it */
+
+    la   t2, __ram_top         /* top of usable RAM */
+    bgtu t1, t2, err_disk      /* end past usable RAM → out of bounds */
 
     la   t0, msg_loading
     jal  ra, print_str
@@ -126,9 +137,6 @@ err_kernel:
 err_disk:
     la   t0, msg_err_disk
     j    .Lhalt
-err_bios:
-    la   t0, msg_err_bios
-    j    .Lhalt
 .Lhalt:
     jal  ra, print_str
 .Lspin:
@@ -136,11 +144,9 @@ err_bios:
 
 /* ── Strings ─────────────────────────────────────────────── */
 msg_title:      .asciz "CP/M Neo RISC-V Bootloader\n\n"
-msg_bios_ok:    .asciz "- BIOS OK\n"
 msg_disk_ok:    .asciz "- Disk OK\n"
 msg_loading:    .asciz "- Loading Kernel\n"
 msg_kernel_ok:  .asciz "- Kernel OK\n"
-msg_err_bios:   .asciz "- BIOS ERR\n"
 msg_err_disk:   .asciz "- DISK ERR\n"
 msg_err_kernel: .asciz "- KERNEL ERR\n"
 

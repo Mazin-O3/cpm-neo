@@ -129,30 +129,43 @@ The `arch/<isa>/` directory needs four files:
 
 | Variable | Meaning |
 | --- | --- |
-| `CROSS_COMPILE` | Cross-compiler prefix, e.g. `riscv64-unknown-elf-` |
+| `CROSS_COMPILE` | Cross-compiler prefix, e.g. `riscv64-unknown-elf-`. Required; the build fails if unset |
 | `ARCH_CFLAGS` | `-march`/`-mabi` flags for the target, e.g. `-march=rv32im -mabi=ilp32` |
 | `LD_EMULATION` | Linker emulation for the target, e.g. `elf32lriscv` |
+| `BOOT_BASE` | Address where the bootloader is placed and executed (reset vector origin) |
+| `BOOT_SIZE` | Maximum bootloader code image bytes. Bounds the boot code `MEMORY` region and the `build_disk.sh` size check |
+| `BOOT_RAM_SIZE` | Boot runtime RAM bytes (scratch buffer + stack + bios `.bss`). Forms the `BRAM` region at `RAM_BASE + BOOT_SIZE` |
 
 The RISC-V example (`arch/riscv32/config.sh`):
 
 ```sh
-CROSS_COMPILE=${CROSS_COMPILE:-riscv64-unknown-elf-}
+CROSS_COMPILE=riscv64-unknown-elf-
 ARCH_CFLAGS="-march=rv32im -mabi=ilp32"
 LD_EMULATION="elf32lriscv"
+
+BOOT_BASE=0x0000
+BOOT_SIZE=1024
+BOOT_RAM_SIZE=0x400
 ```
 
-`arch/<isa>/config.sh` is the per-build ISA override point. Every component
+`arch/<isa>/config.sh` is the per-ISA configuration point. Every component
 (bootloader, kernel, CCP, SDK library, and each app — all of which source this
-file) is compiled with `ARCH_CFLAGS`. To target another ISA, edit
-`ARCH_CFLAGS` here before running `sysgen new`; the build report reflects the
-flags actually used.
+file) is compiled with `ARCH_CFLAGS`. `BOOT_BASE`, `BOOT_SIZE`, and
+`BOOT_RAM_SIZE` are arch constants: boot code is placed at `BOOT_BASE` and
+bounded by `BOOT_SIZE`, and its runtime RAM (scratch + stack + bios `.bss`)
+occupies `BOOT_RAM_SIZE` bytes at `RAM_BASE + BOOT_SIZE` — so code and runtime
+RAM stay in separate regions even when code sits in ROM/flash. To target
+another ISA, edit these here before running `sysgen new`; the build report
+reflects the flags actually used.
 
 ### Bootloader conventions
 
-`boot.S` calls the platform BIOS (`bios_read`, `bios_conout`) to load the
-kernel. Sector-0 field offsets are shared between the bootloader, kernel, and
-sysgen via `core/kernel/s0_layout.h`. The toolchain must produce an image with
-`ld -m $LD_EMULATION` as done by `build_disk.sh` and `app_build.sh`.
+`boot.S` uses the platform BIOS (`bios_read`, `bios_conout`) to load the kernel.
+`bios_init()` must successfully initialize the required BIOS services before they
+are used; failure halts silently. Sector-0 field offsets are shared by the
+bootloader, kernel, and sysgen via `core/kernel/s0_layout.h`. The toolchain must
+produce images with `ld -m $LD_EMULATION`, as used by `build_disk.sh` and
+`app_build.sh`.
 
 ## Building a program with the SDK
 

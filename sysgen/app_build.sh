@@ -65,6 +65,7 @@ ARCH=${ARCH:?"$PLATFORM_DIR: ARCH not set in platform/$PLATFORM_DIR/config.sh"}
 # Architecture metadata (toolchain prefix + CFLAGS) from arch/$ARCH/config.sh
 # shellcheck source=/dev/null
 . "arch/$ARCH/config.sh"
+CROSS_COMPILE=${CROSS_COMPILE:?"$ARCH: CROSS_COMPILE not set in arch/$ARCH/config.sh"}
 
 CC=${CROSS_COMPILE}gcc
 LD=${CROSS_COMPILE}ld

@@ -19,11 +19,19 @@ This page describes how CP/M Neo is laid out in memory, how it boots, and how it
 
 <img src="images/boot-process.png" alt="boot process" width="100%">
 
-1. The bootloader calls `bios_init()` to initialize platform hardware, then
-   reads sector 0 into a scratch buffer and verifies the `0xAA55` boot
-   signature.
-2. Reads the kernel load address and size from the sector-0 header (offsets in `core/kernel/s0_layout.h`).
-3. It loads the kernel sectors into RAM and verifies the kernel magic, then
+1. The bootloader sets up its stack and calls `bios_init()` **before any
+   console output** — on real hardware output is impossible until the
+   platform's peripherals are configured. If `bios_init()` fails, the
+   bootloader halts silently (there is no console to report through).
+2. It prints the banner, reads sector 0 into a scratch buffer, and verifies
+   the `0xAA55` boot signature.
+3. Reads the kernel load address and size from the sector-0 header (offsets
+   in `core/kernel/s0_layout.h`).
+4. **Validates the kernel load range** before reading anything: the
+   destination must start at or above the bootloader's runtime RAM
+   (`__boot_stack_top`) and stay within usable RAM (`__ram_top`), so a corrupt
+   sector-0 header cannot overwrite the bootloader or run past memory.
+5. Loads the kernel sectors into RAM and verifies the kernel magic, then
    jumps to the kernel entry point.
 
 ## Kernel startup
@@ -69,7 +77,12 @@ scans each `platform/*/config.sh` for an `ID=` equal to that argument to find
 the platform's directory, then builds four components in order.
 
 1. **Bootloader**: compiles the platform BIOS + `arch/<isa>/boot.S`, linked
-   with `arch/<isa>/linker_boot.ld` into a `bootloader.bin`.
+   with `arch/<isa>/linker_boot.ld` into a `bootloader.bin`. Boot code is
+   placed at `BOOT_BASE` (`__boot_base`) and bounded by `BOOT_SIZE`
+   (`__boot_size`); its runtime RAM (scratch + stack + bios `.bss`) occupies a
+   separate `BRAM` region at `RAM_BASE + BOOT_SIZE` (`__ram_base + __boot_size`)
+   of size `BOOT_RAM_SIZE`. All three are arch constants from
+   `arch/<isa>/config.sh`, supplied to the boot link via `--defsym`.
 2. **Kernel**: a **two-pass link**:
    - Pass 1 links the kernel at a placeholder address to extract
      `__kernel_total` and `__kstack_guard` from the symbol table.

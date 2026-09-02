@@ -14,8 +14,8 @@ OBJS := $(OBJ_DIR)/bios.o $(OBJ_DIR)/mkdisk.o \
         $(OBJ_DIR)/utils.o $(OBJ_DIR)/commands.o \
         $(OBJ_DIR)/main.o $(OBJ_DIR)/bdos.o $(OBJ_DIR)/disk.o
 
-CROSS_COMPILE ?= riscv64-unknown-elf-
-OBJDUMP := $(CROSS_COMPILE)objdump
+CROSS_COMPILE ?= $(error CROSS_COMPILE is not set; set it in arch/<isa>/config.sh)
+OBJDUMP = $(CROSS_COMPILE)objdump
 
 .PHONY: all help debug check-map clean
 
