@@ -30,7 +30,7 @@ It provides a CP/M-style command environment, filesystem, system calls, applicat
 | :--- | :--- | :--- | :--- |
 | **VEMU** | RISC-V | Emulated Disk | ✅ Done |
 | **TinyMCU** | RISC-V | RAM Disk | ⏳ WIP |
-
+| **Blackpill (F411)** | ARM | RAM Disk | ⏳ WIP |
 --- 
 
 ## Quick Start

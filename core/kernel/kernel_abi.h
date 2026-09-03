@@ -14,10 +14,10 @@
 #include "s0_layout.h"
 
 /* Filename constants */
-#define NAME83_BASE 8
-#define NAME83_EXT 3
-#define NAME83_LEN (NAME83_BASE + NAME83_EXT)
-#define FILENAME_MAX 13
+#define NAME83_BASE  8
+#define NAME83_EXT   3
+#define NAME83_LEN  (NAME83_BASE + NAME83_EXT)
+#define FILENAME_MAX 13 /* 8.3 name + NUL terminator */
 
 /* Console control-key conventions shared by the kernel, SDK and apps. */
 #define CH_BREAK 0x03 /* ^C — break a running program                  */
