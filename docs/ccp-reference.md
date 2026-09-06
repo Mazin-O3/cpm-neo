@@ -195,20 +195,23 @@ With a filespec, shows size, allocation, and attributes for each match:
 
 ```text
 Secs  Bytes  Ext Attributes      Name
-   1     2k    1 Dir RW         B:HELLO   .S
- 213    28k    2 Sys RO         B:STAT    .COM
+   1     2K    1 Dir RW         B:HELLO   .S
+ 213    28K    2 Sys RO         B:STAT    .COM
 ```
 
 With no argument, shows free space on the current volume (`A: RW, Free: 421K`).
 `STAT DSK:` shows all volumes:
 
 ```text
-Vol  Attr  Used  Total
- A:  RW     81k   502k
- B:  -       -     -
- C:  RW     12k   502k
- D:  RO     28k   502k
-Total: 2048K  (502K Unalloc)
+Total            : 2048K
+Usable           : 2048K
+Unallocated      : 0K
+--------------------------
+Volume  Mode  Used  Total
+A:      RW    421K   512K
+B:      RW     12K   512K
+C:      RW     28K   512K
+D:      RW     30K   512K
 ```
 
 ### SET: Set file or volume attributes

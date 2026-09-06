@@ -26,11 +26,11 @@ It provides a CP/M-style command environment, filesystem, system calls, applicat
 
 ## Port Status
 
-| Platform | Architecture | Storage | Status |
-| :--- | :--- | :--- | :--- |
-| **VEMU** | RISC-V | Emulated Disk | ✅ Done |
-| **TinyMCU** | RISC-V | RAM Disk | ⏳ WIP |
-| **Blackpill (F411)** | ARM | RAM Disk | ⏳ WIP |
+| Platform | Architecture | Storage | XIP | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **VEMU** | RISC-V | Emulated | Yes | ✅ Done |
+| **TinyMCU** | RISC-V | — | —  | ⏳ WIP |
+| **Blackpill (F411)** | ARM | —  | —  | ⏳ WIP |
 --- 
 
 ## Quick Start
