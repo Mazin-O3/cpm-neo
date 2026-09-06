@@ -21,6 +21,7 @@
 #define S0_CCP_SEC      0x01A        /* u16   — CCP raw binary start sector */
 #define S0_CCP_SIZE     0x01C        /* u16   — CCP raw binary sector count */
 #define S0_PLATFORM     0x01E        /* u8[8] — Platform name, NUL-padded */
+#define S0_XIP          0x026        /* u8    — 1 = XIP disk image      */
 #define S0_SIG          0x1FE        /* u16   — Must equal BOOT_SIG    */
 
 #endif /* S0_LAYOUT_H */

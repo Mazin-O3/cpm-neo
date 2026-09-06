@@ -25,13 +25,24 @@ static uint32_t min_viable_blocks(void)
     return (BD_MIN_VOL_SECS + BD_BLOCK_SECS - 1) / BD_BLOCK_SECS;
 }
 
-static uint32_t kernel_sectors(uint32_t kern_size)
+/* Sector count for the kernel image.  The raw image is padded up to a whole
+ * sector.  On non-XIP disks one more sector is reserved when the padding is
+ * under 4 bytes, to carry the BOOT_MAGIC trailer the RAM-loading bootloader
+ * validates.  On XIP disks the bootloader jumps straight into the kernel from
+ * flash and never validates the magic, so no trailer sector is taken — the
+ * CCP then starts immediately after the kernel's own footprint. */
+static uint32_t kernel_sectors(uint32_t kern_size, int xip)
 {
     uint32_t num_kern_sects = (kern_size + DISK_SECTOR_SIZE - 1) / DISK_SECTOR_SIZE;
-    uint32_t padding = num_kern_sects * DISK_SECTOR_SIZE - kern_size;
 
-    if (padding < 4)
-        num_kern_sects++;
+    if (!xip)
+    {
+        uint32_t padding = num_kern_sects * DISK_SECTOR_SIZE - kern_size;
+
+        if (padding < 4)
+            num_kern_sects++;
+    }
+
     return num_kern_sects;
 }
 
@@ -41,11 +52,13 @@ static uint32_t ccp_sectors(uint32_t ccp_size)
 }
 
 /* Number of sectors reserved for the kernel + CCP images at the start of
- * the data area.  The kernel image is padded to a sector boundary with a
- * guaranteed 4-byte BOOT_MAGIC trailer slot. */
-static uint32_t reserve_kernel_ccp(uint32_t kern_size, uint32_t ccp_size)
+ * the data area.  On non-XIP disks the kernel image is padded to a sector
+ * boundary with a guaranteed 4-byte BOOT_MAGIC trailer slot; on XIP disks
+ * the CCP must start exactly at the kernel's sector-aligned end so its
+ * on-disk address matches its link origin. */
+static uint32_t reserve_kernel_ccp(uint32_t kern_size, uint32_t ccp_size, int xip)
 {
-    return kernel_sectors(kern_size) + ccp_sectors(ccp_size);
+    return kernel_sectors(kern_size, xip) + ccp_sectors(ccp_size);
 }
 
 static uint32_t read32(const uint8_t *p)
@@ -262,15 +275,15 @@ int write_file(const char *path, const uint8_t *data, uint32_t len)
  */
 int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, const uint8_t *ccp,
                  uint32_t ccp_size, uint32_t kern_load, uint16_t os_ver, uint16_t kern_ver,
-                 uint16_t ccp_ver, const char *platform)
+                 uint16_t ccp_ver, const char *platform, int xip)
 {
     if (!kern || kern_size == 0 || size_kb == 0)
         return -1;
 
     uint32_t total_secs = size_kb * 2;
 
-    uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size);
-    uint32_t num_kern_sects = kernel_sectors(kern_size);
+    uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size, xip);
+    uint32_t num_kern_sects = kernel_sectors(kern_size, xip);
     uint32_t num_ccp_sects = ccp_sectors(ccp_size);
 
     if (KERN_START_SEC + reserved >= total_secs)
@@ -309,12 +322,16 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
     if (platform)
         memcpy(disk + S0_PLATFORM, platform, 8);
 
+    disk[S0_XIP] = (uint8_t)(xip ? 1 : 0);
+
     write16(disk + S0_SIG, BOOT_SIG);
 
-    /* ── Kernel image (padded + BOOT_MAGIC trailer) ────────── */
+    /* ── Kernel image (padded; BOOT_MAGIC trailer on non-XIP only) ── */
     uint32_t kern_sect_bytes = num_kern_sects * DISK_SECTOR_SIZE;
     memcpy(disk + KERN_START_SEC * DISK_SECTOR_SIZE, kern, kern_size);
-    write32(disk + KERN_START_SEC * DISK_SECTOR_SIZE + kern_sect_bytes - 4, BOOT_MAGIC);
+
+    if (!xip)
+        write32(disk + KERN_START_SEC * DISK_SECTOR_SIZE + kern_sect_bytes - 4, BOOT_MAGIC);
 
     /* ── CCP raw binary ────────────────────────────────────── */
 
@@ -354,8 +371,8 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
         uint32_t count = base + (v < rem ? 1 : 0);
 
         /* Reserve at most BD_VOL_MAX_BLOCKS at the disk layer for this
-         * volume. The remainder of its equal share, if any, is simply
-         * not claimed by any run and stays free in the grid. */
+         * volume. The remainder of its equal share, if any, is not claimed by
+         * any run and stays free in the grid. */
 
         if (count > BD_VOL_MAX_BLOCKS)
             count = BD_VOL_MAX_BLOCKS;
@@ -395,18 +412,18 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
 
 /* Minimum disk size (KB) for which every volume can hold at least
  * min-viable blocks (so all VOL_MAX volumes can be mounted at boot). */
-int mkdisk_min_size_kb(uint32_t kern_size, uint32_t ccp_size)
+int mkdisk_min_size_kb(uint32_t kern_size, uint32_t ccp_size, int xip)
 {
-    uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size);
+    uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size, xip);
 
     uint32_t min_secs = (uint32_t)KERN_START_SEC + reserved +
                         (uint32_t)VOL_MAX * min_viable_blocks() * BD_BLOCK_SECS;
     return (int)((min_secs + 1) / 2);
 }
 
-int mkdisk_max_size_kb(uint32_t kern_size, uint32_t ccp_size)
+int mkdisk_max_size_kb(uint32_t kern_size, uint32_t ccp_size, int xip)
 {
-    uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size);
+    uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size, xip);
 
     uint32_t cap_secs = (uint32_t)BD_VOL_MAX_BLOCKS * BD_BLOCK_SECS;
     uint32_t max_secs = (uint32_t)KERN_START_SEC + reserved + cap_secs;

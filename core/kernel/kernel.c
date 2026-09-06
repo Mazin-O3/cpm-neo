@@ -1,8 +1,8 @@
 /*
- * kernel/kernel.c — syscall dispatch and program loader
+ * kernel/kernel.c — syscall implementations and program loader
  *
- * Bridges user-space calls (via the BDOS syscall table) to the bd_*
- * functions in bdos.c.  Each sys_* function:
+ * Each sys_* function is a plain kernel function that user programs call
+ * directly (see syscall-reference.md).  A typical file syscall:
  *   1. Strips the volume/user prefix from the path (parse_prefix)
  *   2. Converts the filename to padded 8.3 format (make_name83)
  *   3. Calls the bd_* function and translates the return value
@@ -19,8 +19,10 @@
 #include "string.h"
 #include "ctype.h"
 #include <limits.h>
+#include "syscall.h"
 
-#define JUMP_TPA() ((void (*)(void))(uintptr_t)__tpa_base)()
+/* JUMP: transfer control to a program at |addr| */
+#define JUMP(addr) ((void (*)(void))(uintptr_t)(addr))()
 
 /* Per-kernel-environment slots: indexed by ENV_* constants.
  * is_ccp gates writes so transient programs cannot corrupt CCP state. */
@@ -40,10 +42,6 @@ typedef struct
 } KernelState;
 
 static KernelState g_kstate = {0};
-
-/* Defined at the end of this file; published to user programs through
- * environment slot ENV_SYSCALL_PTR. */
-extern const SyscallTable g_syscall_table;
 
 /*
  * Volume/user prefixes are optional and position-dependent; scan up to
@@ -189,7 +187,6 @@ int kernel_init(void)
     if (disk_init() != 0)
         return EIO;
 
-    g_kstate.kenv.env[ENV_SYSCALL_PTR] = (uint32_t)&g_syscall_table;
     g_kstate.fs_ctx = (FsContext){VOL_INVALID, 0};
 
     for (uint8_t v = 0; v < VOL_MAX; v++)
@@ -205,6 +202,19 @@ int kernel_init(void)
  * Load a .COM program into the TPA and jump to it.
  * Fails with E2BIG if the file exceeds available TPA space.
  */
+/* XIP address for code at raw physical sector phy_sec, or 0 if the disk is
+ * not XIP-formatted.  Single place that gates on disk_xip() and owns the
+ * XIP_BASE + sec*512 formula.  User .com files are always RAM-loaded (see
+ * kexec); this is used only for the CCP, which is placed exactly at its link
+ * origin so it runs in place. */
+static uint32_t xip_addr(uint16_t phy_sec)
+{
+    if (!disk_xip())
+        return 0;
+
+    return (uintptr_t)XIP_BASE + (uint32_t)phy_sec * DISK_SECTOR_SIZE;
+}
+
 int kexec(const char *name83, int argc, char **argv, FsContext ctx)
 {
     int fd = bd_open(name83, ctx, 0);
@@ -241,6 +251,11 @@ int kexec(const char *name83, int argc, char **argv, FsContext ctx)
     for (int i = g_kstate.args.argc; i < ARGS_MAX; i++)
         g_kstate.args.argv[i][0] = '\0';
 
+    /* User programs always load into the TPA and run there.  On XIP disks
+     * only the kernel and CCP execute from flash; .com files stay
+     * RAM-resident (their blocks can sit anywhere, so in-place execution
+     * could never match their link origin). */
+
     uint8_t *dest = (uint8_t *)__tpa_base;
     uint32_t remaining = file_size;
 
@@ -263,7 +278,7 @@ int kexec(const char *name83, int argc, char **argv, FsContext ctx)
 
     g_kstate.kenv.is_ccp = 0;
 
-    JUMP_TPA();
+    JUMP(__tpa_base);
 
     for (;;)
         ;
@@ -286,15 +301,39 @@ void kexec_ccp(void)
     uint16_t sec = *(uint16_t *)(s0 + S0_CCP_SEC);
     uint16_t nsecs = *(uint16_t *)(s0 + S0_CCP_SIZE);
 
-    if (nsecs == 0)
+    /* Sector 0 (boot sector) and sector 1 (volume map) can never be the
+     * CCP or kernel location.  Reject a corrupt or stale header that would
+     * warm-boot into the boot-sector data at XIP_BASE + 0*512. */
+    if (nsecs == 0 || sec < KERN_START_SEC)
         goto err;
+
+    /* XIP path: the CCP is written contiguously by sysgen at exactly its
+     * link origin (the sector-aligned end of the kernel image), so it is
+     * always eligible for direct execution when the disk is XIP-formatted.
+     * S0_CCP_SEC is a physical disk sector, so entry = XIP_BASE + sec*512.
+     * If it somehow crosses the XIP window top the disk geometry is broken —
+     * refuse to run rather than executing XIP-origin code from the TPA. */
+    uint32_t ccp_entry = xip_addr(sec);
+
+    if (ccp_entry != 0)
+    {
+        if ((uintptr_t)ccp_entry + (uintptr_t)nsecs * DISK_SECTOR_SIZE <= (uintptr_t)__xip_top)
+        {
+            JUMP(ccp_entry);
+
+            for (;;)
+                ;
+        }
+
+        goto err;
+    }
 
     for (uint16_t i = 0; i < nsecs; i++)
 
         if (bios_read(sec + i, (void *)((uintptr_t)__tpa_base + i * DISK_SECTOR_SIZE)))
             goto err;
 
-    JUMP_TPA();
+    JUMP(__tpa_base);
 
 err:
     puts("  CCP ERR");
@@ -606,6 +645,7 @@ int sys_info(SysInfo *out)
 
     out->disk_size_kb = disk_block_count();
     out->disk_unalloc_kb = disk_free_blocks();
+    out->xip = disk_xip();
 
     return EOK;
 }
@@ -650,7 +690,6 @@ uint32_t sys_getenv(uint8_t slot)
 
 /*
  * sys_setenv — write to a kernel environment slot.
- * ENV_SYSCALL_PTR is read-only (set at init).
  * ENV_RETURN_CODE and ENV_BATCH_OFFSET may only be written by the CCP
  * (gated by the is_ccp flag) so transient programs cannot hijack
  * batch control or fake a return code.
@@ -658,9 +697,6 @@ uint32_t sys_getenv(uint8_t slot)
 int sys_setenv(uint8_t slot, uint32_t value)
 {
     if (slot >= ENV_SLOTS_MAX)
-        return -1;
-
-    if (slot == ENV_SYSCALL_PTR)
         return -1;
 
     if (slot == ENV_RETURN_CODE && !g_kstate.kenv.is_ccp)
@@ -689,39 +725,3 @@ int sys_consize(uint8_t *cw, uint8_t *ch)
     bios_consize(cw, ch);
     return 0;
 }
-
-/*
- * The syscall jump table itself — published to user programs through
- * environment slot ENV_SYSCALL_PTR.  Field order must match SyscallTable
- * in kernel_abi.h exactly.
- */
-const SyscallTable g_syscall_table = {
-    .open = sys_open,
-    .read = sys_read,
-    .write = sys_write,
-    .close = sys_close,
-    .exit = sys_exit,
-    .args = sys_args,
-    .findfile = sys_findfile,
-    .getsize = sys_getsize,
-    .create = sys_create,
-    .delete = sys_delete,
-    .rename = sys_rename,
-    .mount = sys_mount,
-    .unmount = sys_unmount,
-    .resize = sys_resize,
-    .vstat = sys_vstat,
-    .exec = sys_exec,
-    .dev = sys_dev,
-    .fsetattr = sys_fsetattr,
-    .info = sys_info,
-    .seek = sys_seek,
-    .getctx = sys_getctx,
-    .setctx = sys_setctx,
-    .getenv = sys_getenv,
-    .setenv = sys_setenv,
-    .vsetattr = sys_vsetattr,
-    .time = sys_time,
-    .sync = sys_sync,
-    .consize = sys_consize,
-};

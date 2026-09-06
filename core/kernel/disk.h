@@ -27,6 +27,11 @@
 #include "kernel_abi.h"
 
 int      disk_init(void);                        /* 0 = OK, nonzero = failure */
+int      disk_xip(void);                         /* 1 = XIP disk image         */
+
+/* Translate a volume-relative sector index through the volume's block runs
+ * into a physical disk sector.  Returns 0 on success, -1 on error. */
+int      disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec);
 
 uint16_t disk_block_count(void);                 /* total 1 KB blocks on disk (constant) */
 uint16_t disk_base_sec(void);                    /* sector of block 0                   */
