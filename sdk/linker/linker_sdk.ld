@@ -1,14 +1,20 @@
 ENTRY(_entry)
 
-/* Configuration Symbols
- * __stack_size / __stack_top are owned by the kernel link
- * (core/kernel/linker_kernel.ld) and come in here via --just-symbols. */
-
-MEMORY {
-    /* Length = available TPA RAM (from __tpa_base up to the kernel;
-     * both supplied by kernel.elf via --just-symbols) */
-    RAM (rwx) : ORIGIN = __tpa_base, LENGTH = __kernel_base - __tpa_base
-}
+/* Shared SDK program layout — used by user .com apps (RAM) and the XIP CCP.
+ *
+ * The wrappers declare the concrete memory regions and bind the abstract
+ * placement names used here:
+ *   TEXT — region that holds .text (code + rodata); linker_app.ld maps it
+ *          to RAM, linker_ccp_xip.ld to XIP_REGION.
+ *   RAM  — region that holds writable .data/.bss and the stack; both
+ *          wrappers already name it RAM.
+ * The unified `AT(ADDR(.text) + SIZEOF(.text))` gives .data an explicit
+ * load address; in the single-region (plain) build that LMA equals the
+ * VMA — the same result as the old implicit placement.
+ *
+ * Configuration symbols arrive via --just-symbols from the kernel link
+ * (__stack_size / __stack_top / __tpa_base / __kernel_base) except
+ * __tpa_len / __kernel_xip_end, which the XIP build passes as --defsym. */
 
 SECTIONS {
     .text : {
@@ -20,9 +26,9 @@ SECTIONS {
         *(.srodata .srodata.*)
         . = ALIGN(4);
         _text_end = .;
-    } > RAM
+    } > TEXT
 
-    .data : {
+    .data : AT(ADDR(.text) + SIZEOF(.text)) {
         . = ALIGN(4);
         _data_start = .;
 
@@ -31,6 +37,8 @@ SECTIONS {
         . = ALIGN(4);
         _data_end = .;
     } > RAM
+
+    _data_load = LOADADDR(.data);
 
     .bss (NOLOAD) : {
         . = ALIGN(4);
@@ -51,8 +59,7 @@ SECTIONS {
     _stack_bottom = __stack_top - __stack_size;
     _stack_top    = __stack_top;
 
-    /* --- CRITICAL SAFETY CHECK --- */
-    ASSERT(ABSOLUTE(_bss_end) <= _stack_bottom, "ERROR: TPA code/BSS reaches stack (Collision!)")
+    ASSERT(ABSOLUTE(_bss_end) <= _stack_bottom, "ERROR: TPA code/BSS reaches stack")
 
     /DISCARD/ : { *(.comment) *(.eh_frame) *(.note*) }
 }

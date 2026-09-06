@@ -25,14 +25,14 @@ int mkdisk_build(uint32_t size_kb,
                 const uint8_t *ccp, uint32_t ccp_size,
                 uint32_t kern_load,
                 uint16_t os_ver, uint16_t kern_ver, uint16_t ccp_ver,
-                const char *platform);
+                const char *platform, int xip);
 
 /* Minimum disk size (KB) so every volume can hold min-viable blocks */
-int mkdisk_min_size_kb(uint32_t kern_size, uint32_t ccp_size);
+int mkdisk_min_size_kb(uint32_t kern_size, uint32_t ccp_size, int xip);
 
 /* Maximum useful disk size (KB): bounded by VOL_MAX x the 2 MB volume cap,
  * plus the reserved area. */
-int mkdisk_max_size_kb(uint32_t kern_size, uint32_t ccp_size);
+int mkdisk_max_size_kb(uint32_t kern_size, uint32_t ccp_size, int xip);
 
 /* Whole-file helpers */
 int read_file(const char *path, uint8_t **out, uint32_t *out_len);

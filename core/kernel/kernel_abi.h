@@ -101,6 +101,7 @@ typedef struct
     uint16_t disk_unalloc_kb;         /* unallocated pool (KB) */
     uint8_t  vol_mounted[VOL_MAX];    /* 1 = mounted                    */
     char     platform[9];             /* platform name, NUL-terminated  */
+    uint8_t  xip;                     /* 1 = XIP disk image              */
 } SysInfo;
 
 /* Little-endian byte accessors */
@@ -115,47 +116,9 @@ static inline void write16(uint8_t *p, uint16_t v)
     p[1] = (uint8_t)(v >> 8);
 }
 
-/*
- * Syscall jump table — the kernel/SDK ABI.
- *
- * Field ORDER is the ABI: slot n lives at byte offset n * 4.  Hand-written
- * asm reaches entries through the table pointer published in environment
- * slot ENV_SYSCALL_PTR (see docs/syscall-reference.md for slot numbers).
- * Pre-alignment the table was renumbered freely (pre-1.0 ABI break);
- * treat the layout below as frozen — only append new fields at the end,
- * never reorder or remove.
- */
-typedef struct
-{
-    int      (*open)(const char *name, uint8_t writable);
-    int      (*read)(int fd, void *buf, uint32_t len);
-    int      (*write)(int fd, const void *buf, uint32_t len);
-    int      (*close)(int fd);
-    void     (*exit)(int rc);
-    int      (*args)(ArgBlock *out);
-    int      (*findfile)(const char *pattern, FileInfo *out, uint16_t start_pos);
-    uint32_t (*getsize)(int fd);
-    int      (*create)(const char *name);
-    int      (*delete)(const char *name);
-    int      (*rename)(const char *old, const char *new);
-    int      (*mount)(int8_t vol_id);
-    int      (*unmount)(int8_t vol_id);
-    int      (*resize)(int8_t vol_id, int16_t delta);
-    int      (*vstat)(int8_t vol_id, VolStat *stat);
-    int      (*exec)(const char *name, int argc, char **argv);
-    int      (*dev)(uint32_t reg, uint32_t cmd, uint32_t *data);
-    int      (*fsetattr)(const char *name, uint8_t attrib);
-    int      (*info)(SysInfo *out);
-    int      (*seek)(int fd, uint32_t offset);
-    int      (*getctx)(FsContext *out);
-    int      (*setctx)(FsContext ctx);
-    uint32_t (*getenv)(uint8_t slot);
-    int      (*setenv)(uint8_t slot, uint32_t value);
-    int      (*vsetattr)(int8_t vol_id, uint8_t attr);
-    uint32_t (*time)(void);
-    int      (*sync)(void);
-    int      (*consize)(uint8_t *cw, uint8_t *ch);
-} SyscallTable;
+/* System calls are plain functions in the kernel (sys_open, sys_read, ...)
+ * declared in sdk/include/syscall.h and called directly by user programs;
+ * the kernel exports their addresses through --just-symbols at link time. */
 
 /* IOCTL command encoding: [7] write=1/read=0, [5:0] offset (adds to reg) */
 #define IOCTL_WRITE_FLAG 0x80 /* flag indicating a write operation */
@@ -225,10 +188,9 @@ typedef struct
 
 /* Environment slot indices */
 
-#define ENV_SYSCALL_PTR  0   /* Pointer to syscall table */
-#define ENV_RETURN_CODE  1   /* Return code of last program/command */
-#define ENV_BATCH_OFFSET 2   /* Offset of batch file in CCP */
-#define ENV_USER_DEFINED 3   /* User-defined environment slot */
-#define ENV_SLOTS_MAX    4
+#define ENV_RETURN_CODE  0   /* Return code of last program/command */
+#define ENV_BATCH_OFFSET 1   /* Offset of batch file in CCP */
+#define ENV_USER_DEFINED 2   /* User-defined environment slot */
+#define ENV_SLOTS_MAX    3
 
 #endif /* KERNEL_ABI_H */

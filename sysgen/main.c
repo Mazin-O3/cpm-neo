@@ -21,9 +21,9 @@ static void usage(void)
            "  sysgen install <folder|file.c> [opts]  Compile sources to .com and add to disk\n"
            "      --sys-apps    Install bundled sys apps (apps/sys)\n"
            "      --extra-apps  Install bundled extra apps (apps/extra)\n"
-           "  sysgen add     <file|folder> [opts]  Add a file (or flat folder) to disk\n"
-           "  sysgen extract [opts]  Extract every file to <build_dir>/extract/\n"
-           "  sysgen dir     [Vn]     [opts]  List files\n"
+"  sysgen add     <file|folder> [opts]  Add a file (or flat folder) to disk\n"
+            "  sysgen extract [opts]  Extract every file to <build_dir>/extract/\n"
+            "  sysgen dir     [Vn]     [opts]  List files\n"
            "  sysgen stat             [opts]  Show disk stats\n"
            "  sysgen type    <name>   [opts]  Print file contents\n"
            "  sysgen era     <name>   [opts]  Erase file\n"
@@ -45,9 +45,10 @@ typedef struct
 static const SysgenCmd g_cmds[] = {
     {.name = "new", .fn = cmd_new},         {.name = "add", .fn = cmd_add},
     {.name = "install", .fn = cmd_install}, {.name = "extract", .fn = cmd_extract},
-    {.name = "dir", .fn = cmd_dir},         {.name = "type", .fn = cmd_type},
-    {.name = "era", .fn = cmd_era},         {.name = "ren", .fn = cmd_ren},
-    {.name = "stat", .fn = cmd_stat},       {0}};
+    {.name = "dir", .fn = cmd_dir},
+    {.name = "type", .fn = cmd_type},       {.name = "era", .fn = cmd_era},
+    {.name = "ren", .fn = cmd_ren},         {.name = "stat", .fn = cmd_stat},
+    {0}};
 
 int main(int argc, char **argv)
 {

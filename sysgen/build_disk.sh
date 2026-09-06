@@ -1,7 +1,11 @@
 #!/usr/bin/env sh
 # CP/M Neo OS build backend — driven by the sysgen tool.
 #
-#   sh sysgen/build_disk.sh --platform=<PLATFORM>
+#   sh sysgen/build_disk.sh --platform=<PLATFORM> [--xip]
+#
+# XIP mode is opt-in: the build is XIP (kernel/CCP linked into the flash
+# window) only when --xip is passed; without it the build is always non-XIP,
+# regardless of any XIP_* fields the platform declares in config.sh.
 #
 # Builds the bootloader, kernel and CCP into sysgen/build/, next to the
 # tool binary.  Runs from anywhere: it locates the CP/M Neo root relative
@@ -19,10 +23,12 @@
 set -eu
 
 PLATFORM_ID=""
+FORCE_XIP=0
 
 for arg in "$@"; do
     case "$arg" in
         --platform=*) PLATFORM_ID="${arg#--platform=}" ;;
+        --xip) FORCE_XIP=1 ;;
         *) echo "Unknown option: $arg" >&2; exit 1 ;;
     esac
 done
@@ -94,6 +100,62 @@ IO_BASE=${IO_BASE:?"$PLATFORM_ID: IO_BASE not set in platform/$PLATFORM_DIR/conf
 RAM_BASE=${RAM_BASE:?"$PLATFORM_ID: RAM_BASE not set in platform/$PLATFORM_DIR/config.sh"}
 RAM_SIZE=${RAM_SIZE:?"$PLATFORM_ID: RAM_SIZE not set in platform/$PLATFORM_DIR/config.sh"}
 ID=${ID:?"$PLATFORM_ID: ID not set in platform/$PLATFORM_DIR/config.sh (8-char OS platform id)"}
+
+# XIP mode is selected explicitly with --xip; a build without it is always
+# non-XIP, regardless of any XIP_* fields the platform declares (those exist
+# solely to support --xip builds).  Under --xip the disk is XIP-formatted and
+# the kernel and CCP are linked into the XIP region at XIP_BASE; .data/.bss
+# still live in RAM. User .com files are always RAM-loaded (TPA) regardless
+# of XIP. XIP requires BOTH XIP_BASE and XIP_SIZE — a missing one under --xip
+# is a build error, never a silent non-XIP image.
+if [ "$FORCE_XIP" = "1" ]; then
+    if [ -z "${XIP_BASE+x}" ] || [ -z "$XIP_BASE" ]; then
+        echo "ERROR: --xip build requires XIP_BASE — declare XIP_BASE in platform/$PLATFORM_DIR/config.sh" >&2
+        exit 1
+    fi
+    if [ -z "${XIP_SIZE+x}" ] || [ -z "$XIP_SIZE" ]; then
+        echo "ERROR: --xip build (XIP_BASE=$XIP_BASE) but XIP_SIZE is not set — declare XIP_SIZE in platform/$PLATFORM_DIR/config.sh" >&2
+        exit 1
+    fi
+    IS_XIP=1
+    KERN_LD="core/kernel/linker_kernel_xip.ld"
+    SDK_LD="core/ccp/linker_ccp_xip.ld"
+    XIP_DEFSYM="--defsym=XIP_BASE=$XIP_BASE"
+else
+    IS_XIP=0
+    XIP_BASE=0
+    KERN_LD="core/kernel/linker_kernel.ld"
+    SDK_LD="sdk/linker/linker_app.ld"
+    XIP_DEFSYM="--defsym=XIP_BASE=0"
+fi
+
+# XIP window geometry.  All XIP code and disk images must live in
+# [XIP_BASE, XIP_BASE + XIP_SIZE); __xip_top is that exclusive end and is
+# what the linker regions, the boot target, and the kernel's runtime XIP
+# checks are bounded by.  On non-XIP builds the window is empty (__xip_top =
+# 0, XIP_BASE = 0).
+DISK_SECTOR_SIZE=512   # core/kernel/kernel_abi.h: DISK_SECTOR_SIZE
+KERN_START_SEC=2       # core/kernel/kernel_abi.h: KERN_START_SEC (boot+VMAP)
+XIP_TOP=0x0000
+KERN_XIP_BASE=0x0000
+if [ "$IS_XIP" = "1" ]; then
+    XIP_TOP_DEC=$((XIP_BASE + XIP_SIZE))
+    XIP_TOP=$(printf '0x%X' "$XIP_TOP_DEC")
+    KERN_XIP_BASE_DEC=$((XIP_BASE + KERN_START_SEC * DISK_SECTOR_SIZE))
+    KERN_XIP_BASE=$(printf '0x%X' "$KERN_XIP_BASE_DEC")
+fi
+XIP_TOPSYM="--defsym=__xip_top=$XIP_TOP"
+KERN_XIP_SYM=
+if [ "$IS_XIP" = "1" ]; then
+    KERN_XIP_SYM="--defsym=__kernel_xip_base=$KERN_XIP_BASE"
+fi
+# Boot target on XIP disks: the kernel's real XIP placement (first byte of
+# kernel.bin, which sysgen writes at KERN_START_SEC).  Zero on non-XIP so a
+# stray S0_XIP flag traps in the bootloader guard instead of jumping to junk.
+XIP_TARGET=$XIP_BASE
+if [ "$IS_XIP" = "1" ]; then
+    XIP_TARGET=$KERN_XIP_BASE
+fi
 
 CFG_ID_U=$(printf '%s' "$ID"          | tr '[:lower:]' '[:upper:]')
 ARG_ID_U=$(printf '%s' "$PLATFORM_ID" | tr '[:lower:]' '[:upper:]')
@@ -175,6 +237,7 @@ $CC $CFLAGS -I arch/$ARCH/ -I core/kernel/ \
     -Wl,--defsym=__boot_base="$BOOT_BASE" \
     -Wl,--defsym=__boot_size="$BOOT_SIZE" \
     -Wl,--defsym=__boot_ram_size="$BOOT_RAM_SIZE" \
+    -Wl,--defsym=__xip_base="$XIP_TARGET" \
     -T arch/$ARCH/linker_boot.ld \
     arch/$ARCH/boot.S "$INT/boot_plat.o" -o "$INT/bootloader.elf"
 $OBJCOPY -O binary --only-section=.boot "$INT/bootloader.elf" "$BUILD/bootloader.bin"
@@ -208,14 +271,13 @@ $LD $LDFLAGS \
     --defsym=__io_base="$IO_BASE_HEX" \
     --defsym=__ram_top="$RAM_TOP_HEX" \
     --defsym=__tpa_base="$TPA_BASE_HEX" \
-    -T core/kernel/linker_kernel.ld \
+    $XIP_DEFSYM $XIP_TOPSYM $KERN_XIP_SYM \
+    -T $KERN_LD \
     $KERNEL_OBJS "$LIBGCC" -o "$INT/kernel_pass1.elf"
 
 KERN_TOTAL_HEX=$($OBJDUMP -t "$INT/kernel_pass1.elf" | awk '/[[:space:]]__kernel_total$/{print "0x"$1}')
-KSTACK_GUARD_HEX=$($OBJDUMP -t "$INT/kernel_pass1.elf" | awk '/[[:space:]]__kstack_guard$/{print "0x"$1}')
 KERN_TOTAL=$(printf "%d" "$KERN_TOTAL_HEX")
-KSTACK_GUARD=$(printf "%d" "$KSTACK_GUARD_HEX")
-KERN_START=$(((RAM_TOP_DEC - KERN_TOTAL - KSTACK_GUARD) & ~3))
+KERN_START=$(((RAM_TOP_DEC - KERN_TOTAL) & ~3))
 KERN_START_HEX=0x$(printf '%x' "$KERN_START")
 
 $LD $LDFLAGS \
@@ -223,20 +285,30 @@ $LD $LDFLAGS \
     --defsym=__io_base="$IO_BASE_HEX" \
     --defsym=__ram_top="$RAM_TOP_HEX" \
     --defsym=__tpa_base="$TPA_BASE_HEX" \
-    -T core/kernel/linker_kernel.ld \
+    $XIP_DEFSYM $XIP_TOPSYM $KERN_XIP_SYM \
+    -T $KERN_LD \
     $KERNEL_OBJS "$LIBGCC" -o "$INT/kernel.elf"
 
-BSS_END=$($OBJDUMP -t "$INT/kernel.elf" | awk '/[[:space:]]_bss_end$/{print "0x"$1}')
-KSTACK=$($OBJDUMP -t "$INT/kernel.elf" | awk '/[[:space:]]__kstack_origin$/{print "0x"$1}')
-if [ -n "$BSS_END" ] && [ -n "$KSTACK" ]; then
-    BSS_DEC=$(printf "%d" "$BSS_END")
-    STK_DEC=$(printf "%d" "$KSTACK")
-    if [ "$BSS_DEC" -gt "$STK_DEC" ]; then
-        echo "ERROR: Kernel .bss overlaps the stack!" >&2
+$OBJCOPY -O binary "$INT/kernel.elf" "$INT/kernel.bin"
+
+# CCP XIP geometry.  The XIP SDK linker script sizes its XIP_REGION and RAM
+# regions from these (kernel.elf symbols), but those symbols arrive via
+# --just-symbols and GNU ld will NOT reliably fold them into MEMORY geometry
+# (it reports "invalid origin for memory region XIP_REGION" and silently uses
+# 0).  So we extract them here and pass them back as --defsym constants — the
+# same mechanism the kernel scripts already use and that provably works.
+# User .com files never link against the XIP script (they always run from the
+# TPA), so only the CCP consumes this geometry.
+SDK_GEOM=
+if [ "$IS_XIP" = "1" ]; then
+    XIP_END_HEX=$($OBJDUMP -t "$INT/kernel.elf" | awk '/[[:space:]]__kernel_xip_end$/{print "0x"$1}')
+    if [ -z "$XIP_END_HEX" ]; then
+        echo "ERROR: __kernel_xip_end not found in $INT/kernel.elf" >&2
         exit 1
     fi
+    TPA_LEN_HEX=$(printf '0x%X' "$((KERN_START - TPA_BASE_DEC))")
+    SDK_GEOM="--defsym=__kernel_xip_end=$XIP_END_HEX --defsym=__tpa_len=$TPA_LEN_HEX"
 fi
-$OBJCOPY -O binary "$INT/kernel.elf" "$INT/kernel.bin"
 
 # ── SDK libc ───────────────────────────────────────────────
 echo "  Building SDK libc..."
@@ -261,12 +333,23 @@ for src in $CCP_C; do
     compile "$CFLAGS $CCP_INC" "$src" "$obj"
     CCP_OBJS="$CCP_OBJS $obj"
 done
-$LD $LDFLAGS -T sdk/linker/linker_sdk.ld \
+$LD $LDFLAGS -T $SDK_LD \
     $CCP_OBJS "$SDK_OBJ/crt0.o" "$LIBGCC" \
-    --just-symbols="$INT/kernel.elf" -o "$INT/ccp.elf"
+    --just-symbols="$INT/kernel.elf" $XIP_DEFSYM $XIP_TOPSYM $SDK_GEOM -o "$INT/ccp.elf"
 $OBJCOPY -O binary "$INT/ccp.elf" "$INT/ccp.bin"
 
 printf '%s' "$PLATFORM_DIR" > "$BUILD/.platform_dir"
 printf '%s' "$ID" > "$BUILD/.platform_id"
 printf '%s' "$ARCH" > "$BUILD/.arch"
 printf '%s' "$ARCH_CFLAGS" > "$BUILD/.archflags"
+printf '%s' "$IS_XIP" > "$BUILD/.xip"
+
+# XIP window size in bytes (0 on non-XIP).  sysgen validates that it never
+# exceeds the max disk size the platform can produce.  The disk image itself
+# may be larger than the window -- only the kernel/CCP code runs in place
+# from it -- but the window must not outgrow the disk capacity.
+XIP_SIZE_BYTES=0
+if [ "$IS_XIP" = "1" ]; then
+    XIP_SIZE_BYTES=$((XIP_SIZE))
+fi
+printf '%s' "$XIP_SIZE_BYTES" > "$BUILD/.xipsize"

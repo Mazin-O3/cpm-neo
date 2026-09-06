@@ -39,6 +39,7 @@ the free pool.
 | 0x01A | u16 | CCP start sector | `S0_CCP_SEC` | `2 + K` |
 | 0x01C | u16 | CCP sector count | `S0_CCP_SIZE` | `S` |
 | 0x01E | u8[8] | Platform name | `S0_PLATFORM` | varies |
+| 0x026 | u8 | XIP disk image (1 = XIP) | `S0_XIP` | `0` |
 | 0x1FE | u16 | Boot signature | `S0_SIG` | `0xAA55` |
 
 ## Volume map: sector 1
@@ -60,12 +61,10 @@ Block `i` occupies:
 [base_sec + i * BD_BLOCK_SECS, base_sec + (i + 1) * BD_BLOCK_SECS)
 ```
 
-A single volume can be grown at runtime (`bd_resize` / `SET RZ +N`) to consume
-blocks freed by shrinking (`SET RZ -N`) or unmounting (`SET UM`) the others, up
-to and including the entire grid. Because of that, the grid itself can never
-be provisioned larger than what one volume is allowed to address. Any blocks
-beyond a single volume's cap would be permanently unreachable by every volume,
-no matter how the others are resized. The maximum grid size is therefore:
+A volume can be grown at runtime (`SET RZ +N`/`bd_resize`) to consume blocks
+freed by shrinking or unmounting others, up to the entire grid. The grid can
+therefore never exceed what one volume can address, or the excess blocks would
+be permanently unreachable. The maximum grid size is:
 
 ```text
 BD_VOL_MAX_BLOCKS

@@ -7,7 +7,8 @@ platform.
 
 ### `sysgen install`: Compile and install a source file or folder
 
-Put your program's source files in a folder, or provide a single source file, and let `sysgen` compile and install it:
+Put your program's sources in a folder (or use a single source file) and let
+`sysgen` compile and install it:
 
 ```sh
 $ ./sysgen/build/sysgen install myapp --dst=A0 --attr=RW
@@ -26,10 +27,11 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 ### SDK surface
 
 - `cpm.h`: umbrella header (syscalls + kernel ABI types).
-- `syscall.h`: `sys_open`/`sys_read`/… wrappers over the kernel's
-  `SyscallTable` (see [Syscall Reference](syscall-reference.md)).
-- `kernel_abi.h`: shared ABI: the `SyscallTable` type, `SysInfo`, disk
-  constants (VMAP/block layout), env slot layout, `FD_*` handles.
+- `syscall.h`: plain `sys_open`/`sys_read`/… declarations — the kernel
+  functions themselves, called directly (see
+  [Syscall Reference](syscall-reference.md)).
+- `kernel_abi.h`: shared ABI: `SysInfo`, disk constants (VMAP/block
+  layout), env slot layout, `FD_*` handles.
 - `bios.h`: BIOS interface (see below).
 
 ## The BIOS layer
@@ -45,27 +47,34 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 | `int bios_write(uint16_t sec, const uint8_t *buf)` | Write one sector |
 | `uint32_t bios_time(void)` | platform-defined time service |
 
-A program that needs to touch hardware directly can use the SDK's `sys_dev()`
-helper, which reads/writes a 32-bit memory-mapped I/O register in the window
-at `__io_base` (the platform's MMIO base from `platform/<name>/config.sh`).
-The register and command offsets are encoded with the `IOCTL_*` macros in
-`kernel_abi.h`; the in/out `data` pointer carries the value being written or
-read (it is required, and may not be `NULL`).
+To touch hardware directly, the SDK provides `sys_dev()`, which reads/writes
+a 32-bit memory-mapped I/O register in the window at `__io_base` (the
+platform's MMIO base from `platform/<name>/config.sh`). Register/command
+offsets are the `IOCTL_*` macros in `kernel_abi.h`; the `data` pointer
+carries the value and is required.
 
 ## Adding a platform
 
 A platform is a self-contained `platform/<name>/` directory:
 
 1. `config.sh` declares the platform facts:
-   - `ID` — the 8-char max platform id shown by the OS and stamped into
-     sector 0 (`S0_PLATFORM`). It is the platform's identity for `--platform`,
-     so it is required. e.g. `platform/blackpill-411fe/` with `ID="BPF411E"`.
+   - `ID` — the 8-char max platform id, required and stamped into sector 0
+     (`S0_PLATFORM`). e.g. `platform/blackpill-411fe/` with `ID="BPF411E"`.
    - `ARCH` — the ISA directory under `arch/` (selects the toolchain)
    - `RAM_SIZE` — total RAM in bytes (hex), e.g. `0x10000` = 64 KB
    - `RAM_BASE` — base address of the RAM region holding CP/M Neo
    - `IO_BASE` — base address of the peripheral MMIO window
+   - `XIP_BASE`, `XIP_SIZE` — consulted only when the build passes `--xip`
+     (see below); under `--xip` both are required; a platform declaring only
+     one is a build error. `XIP_BASE` declares the execute-in-place window
+     base and `XIP_SIZE` its size (see [Architecture](architecture.md#execute-in-place-xip)),
+     which must not exceed the max disk size the platform can produce (the
+     disk image itself may be larger than the window); `sysgen` rejects
+     oversized windows at build time.
 2. `bios.c` implements the functions in `bios.h`.
-3. Build with `sysgen new ... --platform=<id>`.
+3. Build with `sysgen new ... --platform=<id> [--xip]` — `--xip` selects an
+   XIP disk; omit it for a plain (RAM-loading) disk. The flag alone selects
+   the mode: a plain build ignores `XIP_BASE`/`XIP_SIZE` entirely.
 
 ### Platform lookup
 
@@ -100,14 +109,13 @@ int bios_read(uint16_t sec, uint8_t *buf)
 #ifdef USE_SDCARD
     return sdcard_read(sec, buf);
 #else
-    return flash_read(sec, buf);
+    return disk_read(sec, buf);
 #endif
 }
 ```
 
-Driver code may be organized within `bios.c` however the platform likes.
-
-See [Architecture](architecture.md) for the boot and build flow.
+Driver code may be organized within `bios.c` however the platform likes. See
+[Architecture](architecture.md) for the boot and build flow.
 
 ## Adding an architecture
 
@@ -130,7 +138,7 @@ The `arch/<isa>/` directory needs four files:
 | Variable | Meaning |
 | --- | --- |
 | `CROSS_COMPILE` | Cross-compiler prefix, e.g. `riscv64-unknown-elf-`. Required; the build fails if unset |
-| `ARCH_CFLAGS` | `-march`/`-mabi` flags for the target, e.g. `-march=rv32im -mabi=ilp32` |
+| `ARCH_CFLAGS` | `-march`/`-mabi` flags for the target, e.g. `-march=rv32im -mabi=ilp32`. Must include the ISA's code-model flag (RISC-V: `-mcmodel=medany`); every binary runs at its fixed link origin — the kernel and CCP in place from flash on XIP disks, apps from the TPA |
 | `LD_EMULATION` | Linker emulation for the target, e.g. `elf32lriscv` |
 | `BOOT_BASE` | Address where the bootloader is placed and executed (reset vector origin) |
 | `BOOT_SIZE` | Maximum bootloader code image bytes. Bounds the boot code `MEMORY` region and the `build_disk.sh` size check |
@@ -140,7 +148,7 @@ The RISC-V example (`arch/riscv32/config.sh`):
 
 ```sh
 CROSS_COMPILE=riscv64-unknown-elf-
-ARCH_CFLAGS="-march=rv32im -mabi=ilp32"
+ARCH_CFLAGS="-march=rv32im -mabi=ilp32 -mcmodel=medany"
 LD_EMULATION="elf32lriscv"
 
 BOOT_BASE=0x0000
@@ -148,15 +156,10 @@ BOOT_SIZE=1024
 BOOT_RAM_SIZE=0x400
 ```
 
-`arch/<isa>/config.sh` is the per-ISA configuration point. Every component
-(bootloader, kernel, CCP, SDK library, and each app — all of which source this
-file) is compiled with `ARCH_CFLAGS`. `BOOT_BASE`, `BOOT_SIZE`, and
-`BOOT_RAM_SIZE` are arch constants: boot code is placed at `BOOT_BASE` and
-bounded by `BOOT_SIZE`, and its runtime RAM (scratch + stack + bios `.bss`)
-occupies `BOOT_RAM_SIZE` bytes at `RAM_BASE + BOOT_SIZE` — so code and runtime
-RAM stay in separate regions even when code sits in ROM/flash. To target
-another ISA, edit these here before running `sysgen new`; the build report
-reflects the flags actually used.
+Every component (bootloader, kernel, CCP, SDK library, and each app) sources
+this file and compiles with `ARCH_CFLAGS`; `BOOT_BASE`/`BOOT_SIZE`/
+`BOOT_RAM_SIZE` keep boot code and its runtime RAM in separate regions. To
+target another ISA, edit these here before running `sysgen new`.
 
 ### Bootloader conventions
 
@@ -169,13 +172,6 @@ produce images with `ld -m $LD_EMULATION`, as used by `build_disk.sh` and
 
 ## Building a program with the SDK
 
-Any program can be compiled in a source folder and installed with `sysgen
-install`:
-
-```sh
-$ ./sysgen/build/sysgen install myapp --dst=A0 --attr=RW
-```
-
-See [syscall-reference.md](syscall-reference.md) for the API.
-
-See the [User Guide](user-guide.md) for the `sysgen` command reference.
+Compile a program from a source folder and install it with `sysgen install`
+as shown above. See [syscall-reference.md](syscall-reference.md) for the API
+and the [User Guide](user-guide.md) for the `sysgen` command reference.
