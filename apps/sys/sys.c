@@ -26,6 +26,7 @@ static CmdErr cmd_sys(FsContext *ctx, int argc, char **argv)
     }
 
     putchar('\n');
+    printf("%-16s : %s\n", "XIP", si.xip ? "Yes" : "No");
     printf("%-16s : %uK\n", "Disk", si.disk_size_kb);
     printf("%-16s : %uK\n", "TPA", si.tpa);
     printf("%-16s : [", "Volumes");

@@ -7,19 +7,18 @@ provides `sys_<name>()` wrappers in `syscall.h`.
 
 ## Calling convention
 
-Arguments are passed in `a0`–`a3`.
+System calls are plain kernel functions called directly: a user program's
+call to `sys_open()` is a direct jump to the kernel's implementation, bound
+at link time via `--just-symbols=kernel.elf`. There is no jump table, trap,
+or `ecall`.
 
-The kernel publishes the syscall table pointer in environment slot 0
-(see "Environment slots" below). The table holds one `uint32_t` entry per
-syscall; syscall `N` is at byte offset `N * 4`.
+Arguments are passed in `a0`–`a3`.
 
 Most syscalls return `0` or a positive result on success and a negative errno
 on failure. File handles are non-negative values; standard handles such as
 `FD_STDIN`, `FD_STDOUT`, and `FD_STDERR` are defined by the SDK.
 
-The syscall table field order is the ABI. New syscalls may only be appended.
-
-## Syscall table
+## Syscall catalog
 
 | # | Name | Description | Arguments | Returns |
 |---:|---|---|---|---|
@@ -82,15 +81,15 @@ volume layouts containing overlapping or out-of-range file blocks.
 | `vol_mounted[4]` | 1 if mounted, 0 otherwise |
 | `disk_size_kb` | Disk block-grid capacity in KB |
 | `disk_unalloc_kb` | Unallocated block pool in KB |
+| `xip` | Set to 1 when the disk image is XIP-formatted |
 
 ## Environment slots
 
-CP/M Neo provides four environment slots. Slots 0–2 are reserved by the
-system; slot 3 is available to applications.
+CP/M Neo provides three environment slots. Slots 0–1 are reserved by the
+system; slot 2 is available to applications.
 
 | Slot | Purpose |
 |---:|---|
-| 0 | Syscall table pointer; write-protected |
-| 1 | Return code of the last program/command; read-only to programs |
-| 2 | CCP batch offset; writable only by the CCP |
-| 3 | User-defined |
+| 0 | Return code of the last program/command; read-only to programs |
+| 1 | CCP batch offset; writable only by the CCP |
+| 2 | User-defined |

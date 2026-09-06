@@ -33,6 +33,7 @@ typedef struct
     uint16_t num_blocks;
     uint16_t base_sec;
     uint8_t initialized;
+    uint8_t xip;                     /* cached S0_XIP flag */
 
     /* Single-sector write-back correctness cache. Exists to guarantee
      * read-after-write (read-your-own-writes) regardless of the platform's
@@ -220,7 +221,7 @@ static int range_is_free(uint16_t start, uint16_t n)
 
 /* Translate a volume-relative sector index through the volume's block runs
  * into a physical disk sector. */
-static int vol_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec)
+int disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec)
 {
     if (vol_id < 0 || vol_id >= VOL_MAX || !g_disk.initialized)
         return -1;
@@ -289,8 +290,16 @@ int disk_init(void)
     if (validate_layout() != 0)
         return -1;
 
+    if (bios_read(0, buf) == 0)
+        g_disk.xip = buf[S0_XIP];
+
     g_disk.initialized = 1;
     return 0;
+}
+
+int disk_xip(void)
+{
+    return g_disk.initialized ? g_disk.xip : 0;
 }
 
 /* Flush the write-back cache to the platform. On write failure the cache
@@ -314,7 +323,7 @@ int volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf)
     if (!buf)
         return -1;
 
-    if (vol_translate(vol_id, sec, &phy_sec) != 0)
+    if (disk_translate(vol_id, sec, &phy_sec) != 0)
         return -1;
 
     /* Serve the cached sector so a read observes the caller's own write. */
@@ -334,7 +343,7 @@ int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf)
     if (!buf)
         return -1;
 
-    if (vol_translate(vol_id, sec, &phy_sec) != 0)
+    if (disk_translate(vol_id, sec, &phy_sec) != 0)
         return -1;
 
     if (g_disk.wb_valid && g_disk.wb_sec != phy_sec)

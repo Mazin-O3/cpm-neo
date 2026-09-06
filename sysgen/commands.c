@@ -2,6 +2,7 @@
 #include "bdos.h"
 #include "disk.h"
 #include "kernel_abi.h"
+#include "s0_layout.h"
 #include "sysgen.h"
 #include "utils.h"
 
@@ -75,6 +76,7 @@ typedef struct
     long disk_size_kb;
     const char *platform;
     bool no_extra;
+    bool xip;
 } CmdNewConfig;
 
 /* Disk image path + filesystem context for host-side operations. */
@@ -297,7 +299,7 @@ static int setup_disk_target(int argc, char **argv, const char *vn_arg, ImageTar
  * System Generation & Build Logic
  * ========================================================================= */
 
-static int run_build_script(const SysgenPaths *paths, const char *platform)
+static int run_build_script(const SysgenPaths *paths, const char *platform, int xip)
 {
     char script[SYSGEN_FULL_PATH_MAX];
     snprintf(script, sizeof(script), "%s/../build_disk.sh", paths->build_dir);
@@ -306,7 +308,7 @@ static int run_build_script(const SysgenPaths *paths, const char *platform)
     snprintf(plat_flag, sizeof(plat_flag), "--platform=%s", platform);
 
     char *argv[] = {
-        (char *)"sh", script, plat_flag, NULL,
+        (char *)"sh", script, plat_flag, (char *)(xip ? "--xip" : NULL), NULL,
     };
 
     printf("Starting disk build for %s\n", platform);
@@ -314,9 +316,9 @@ static int run_build_script(const SysgenPaths *paths, const char *platform)
     return spawn_and_wait(argv);
 }
 
-static int disk_size_over_cap(long size_kb, uint32_t ksz, uint32_t ccpsz)
+static int disk_size_over_cap(long size_kb, uint32_t ksz, uint32_t ccpsz, int xip)
 {
-    int max_kb = mkdisk_max_size_kb(ksz, ccpsz);
+    int max_kb = mkdisk_max_size_kb(ksz, ccpsz, xip);
 
     if (size_kb <= max_kb)
         return 0;
@@ -358,12 +360,29 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
         printf("\n");
     }
 
+    char xip_buf[8];
+    int have_xip = read_build_tag(paths, ".xip", xip_buf, sizeof(xip_buf)) == 0;
+
+    if (have_xip)
+        printf("  XIP              : %s\n", (xip_buf[0] == '1') ? "Yes" : "No");
+
+    if (have_xip && xip_buf[0] == '1')
+    {
+        char xip_size_buf[32];
+
+        if (read_build_tag(paths, ".xipsize", xip_size_buf, sizeof(xip_size_buf)) == 0)
+        {
+            hr(tmp, sizeof(tmp), (uint32_t)strtoul(xip_size_buf, NULL, 0));
+            printf("  XIP window       : %s (XIP_SIZE)\n", tmp);
+        }
+    }
+
     printf("-------------------------------------------------------------\n");
 
     printf("  Bootloader size  : %u B\n", boot_size);
+    printf("  Kernel base      : 0x%04X\n", kern_load);
     printf("  Kernel size      : %u B\n", kern_size);
     printf("  CCP size         : %u B\n", ccp_size);
-    printf("  Kernel base      : 0x%04X\n", kern_load);
     printf("  TPA              : %lu KB\n", (unsigned long)((kern_load - tpa_base) / 1024));
     printf("  Reserved secs    : %u (kernel + CCP)\n", reserved);
     printf("  Kernel sector    : %u\n", read16(sysgen_disk() + S0_KERN_SEC));
@@ -416,7 +435,7 @@ static bool get_bool_flag(int argc, char **argv, const char *flag_name)
 
 /* Whitelists of flags accepted by each command (NULL-terminated). */
 static const char *const FLAGS_NEW[] = {
-    "--disk-size", "--platform", "--no-extra", NULL,
+    "--disk-size", "--platform", "--no-extra", "--xip", NULL,
 };
 static const char *const FLAGS_FILE[] = {
     "--dst",
@@ -457,6 +476,7 @@ static bool parse_cmd_new_args(int argc, char **argv, CmdNewConfig *cfg)
     const char *platform_str = get_str_flag(argc, argv, "--platform");
 
     cfg->no_extra = get_bool_flag(argc, argv, "--no-extra");
+    cfg->xip = get_bool_flag(argc, argv, "--xip");
 
     cfg->disk_size_kb = 0; /* 0 means "unset"; resolved to max after build */
 
@@ -524,11 +544,14 @@ int cmd_new(int argc, char **argv)
     snprintf(path_buf, sizeof(path_buf), "%s/core/int/ccp.bin", paths->build_dir);
     uint32_t pc = get_file_size(path_buf);
 
+    /* Pre-build size check against the previous build's binaries.  The mode
+     * is already known from --xip, so the matching cap is used; it only guards
+     * an explicit --disk-size against the platform's useful maximum. */
     if (cfg.disk_size_kb > 0 && pk > 0 && pc > 0 &&
-        disk_size_over_cap(cfg.disk_size_kb, pk, pc) != 0)
+        disk_size_over_cap(cfg.disk_size_kb, pk, pc, cfg.xip) != 0)
         return 1;
 
-    if (run_build_script(paths, cfg.platform) != 0)
+    if (run_build_script(paths, cfg.platform, cfg.xip) != 0)
         return 1;
 
     char os_platform_buf[16];
@@ -536,6 +559,10 @@ int cmd_new(int argc, char **argv)
 
     if (read_build_tag(paths, ".platform_id", os_platform_buf, sizeof(os_platform_buf)) == 0)
         os_platform = os_platform_buf;
+
+    char xip_buf[8] = "0";
+    read_build_tag(paths, ".xip", xip_buf, sizeof(xip_buf));
+    int is_xip = (xip_buf[0] == '1');
 
     int ret = 1;
     uint8_t *kern = NULL, *elf = NULL, *ccp = NULL;
@@ -595,16 +622,44 @@ int cmd_new(int argc, char **argv)
     }
 
     /* Size the disk image */
-    int min_kb = mkdisk_min_size_kb(ksz, ccpsz);
+    int min_kb = mkdisk_min_size_kb(ksz, ccpsz, is_xip);
 
     if (cfg.disk_size_kb == 0)
-        cfg.disk_size_kb = mkdisk_max_size_kb(ksz, ccpsz);
+        cfg.disk_size_kb = mkdisk_max_size_kb(ksz, ccpsz, is_xip);
 
-    if (disk_size_over_cap(cfg.disk_size_kb, ksz, ccpsz) != 0)
+    if (disk_size_over_cap(cfg.disk_size_kb, ksz, ccpsz, is_xip) != 0)
         goto cleanup;
 
+    /* XIP window invariant: a disk image may be larger than the XIP window
+     * (only the kernel/CCP code executes in place from it), but the window
+     * must never exceed the largest disk the platform can produce.  An
+     * oversized XIP_SIZE is a platform misconfiguration, not a bigger window. */
+    if (is_xip)
+    {
+        char xip_size_buf[32];
+
+        if (read_build_tag(paths, ".xipsize", xip_size_buf, sizeof(xip_size_buf)) != 0)
+        {
+            err("XIP build missing .xipsize tag (stale sysgen build?)");
+            goto cleanup;
+        }
+
+        unsigned long xip_bytes = strtoul(xip_size_buf, NULL, 0);
+        uint32_t max_disk_bytes = (uint32_t)mkdisk_max_size_kb(ksz, ccpsz, is_xip) * 1024;
+
+        if (xip_bytes > max_disk_bytes)
+        {
+            err("XIP_SIZE %s (%lu B) exceeds the %u B (%uK) max disk size -- "
+                "the XIP window must not exceed the largest disk the platform "
+                "can produce; shrink XIP_SIZE in platform/%s/config.sh",
+                xip_size_buf, xip_bytes, max_disk_bytes, max_disk_bytes / 1024,
+                cfg.platform);
+            goto cleanup;
+        }
+    }
+
     int reserved = mkdisk_build((uint32_t)cfg.disk_size_kb, kern, ksz, ccp, ccpsz, kern_load,
-                                OS_VER, KERN_VER, CCP_VER, os_platform);
+                                OS_VER, KERN_VER, CCP_VER, os_platform, is_xip);
 
     if (reserved < 0)
     {

@@ -7,7 +7,10 @@
 # .platform_dir), used only to locate the platform's config.sh and includes.
 #
 # Scans <APP_DIR> recursively for .c/.s/.S sources and links a raw .com
-# binary ready to run from the TPA.  Requires a prior 'sysgen new' build
+# binary ready to run from the TPA.  User programs always load into the TPA
+# and run there — only the kernel and CCP execute in place from flash on XIP
+# disks — so every .com is linked with the standard TPA script regardless of
+# the platform's XIP_BASE.  Requires a prior 'sysgen new' build
 # (sdk/lib/libc.a, sdk/obj/crt0.o, core/int/kernel.elf).  Object files
 # go under build/apps/obj/<appname>/ mirroring the source layout so
 # multi-file apps with repeated filenames never collide.  Runs from
@@ -56,7 +59,9 @@ INT="$BUILD/core/int"
 SDK_OBJ="$BUILD/sdk/obj"
 SDK_LIB="$BUILD/sdk/lib"
 
-# Platform metadata (ARCH, IO_BASE, RAM_BASE) from platform/$PLATFORM_DIR/config.sh
+# Platform metadata (ARCH, IO_BASE, RAM_BASE, optional XIP_BASE)
+# from platform/$PLATFORM_DIR/config.sh — XIP_BASE is informational here;
+# .com files are never linked against the XIP region.
 # shellcheck source=/dev/null
 . "platform/$PLATFORM_DIR/config.sh"
 
@@ -70,6 +75,8 @@ CROSS_COMPILE=${CROSS_COMPILE:?"$ARCH: CROSS_COMPILE not set in arch/$ARCH/confi
 CC=${CROSS_COMPILE}gcc
 LD=${CROSS_COMPILE}ld
 OBJCOPY=${CROSS_COMPILE}objcopy
+
+SDK_LD=sdk/linker/linker_app.ld
 
 ARCH_FLAGS="$ARCH_CFLAGS"
 LIBGCC=$($CC $ARCH_FLAGS -print-libgcc-file-name)
@@ -138,7 +145,7 @@ if [ -z "$objs" ]; then
     exit 1
 fi
 
-$LD $LDFLAGS -T sdk/linker/linker_sdk.ld \
+$LD $LDFLAGS -T $SDK_LD \
     $objs "$SDK_OBJ/crt0.o" "$SDK_LIB/libc.a" "$LIBGCC" \
     --just-symbols="$INT/kernel.elf" -o "$APP_OBJ/$APP_NAME.elf"
 $OBJCOPY -O binary "$APP_OBJ/$APP_NAME.elf" "$OUT"

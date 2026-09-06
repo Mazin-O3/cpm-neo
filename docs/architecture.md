@@ -39,7 +39,6 @@ This page describes how CP/M Neo is laid out in memory, how it boots, and how it
 `os_entry()` (core/kernel/main.c) runs `kernel_init()`:
 
 - `disk_init()`: reads the volume map (VMAP) from sector 1.
-- Publishes the syscall table address into environment slot 0.
 - Binds the mounted volumes (A:–D:); the first mount becomes the default drive.
 
 It then prints the TPA size and calls `kexec_ccp()`, which loads the CCP into
@@ -48,7 +47,14 @@ reloads the CCP and restarts the command loop.
 
 ## Syscalls
 
-Applications reach the kernel through a function-pointer jump table. The kernel publishes the `SyscallTable` address in environment slot 0; syscall `N` lives at byte offset `N * 4` in the table (field order is the ABI: new syscalls may only be appended).
+System calls are plain kernel functions (`sys_open`, `sys_read`, …). User
+programs and the CCP declare them in `<syscall.h>` and call them directly;
+there is no jump table, trap, or `ecall`. The kernel exports each function's
+address through `--just-symbols=kernel.elf` at link time, so a call site is a
+direct jump (PC-relative or absolute) into the kernel's body. Because the
+addresses are baked in at build time, programs and the kernel must be built
+together — the `sysgen` workflow always rebuilds applications against the
+current `kernel.elf`.
 
 See [Syscall Reference](syscall-reference.md) for the full list.
 
@@ -56,7 +62,7 @@ See [Syscall Reference](syscall-reference.md) for the full list.
 
 The kernel, the CCP, and user programs share a single stack at the boundary
 between the TPA and the kernel (`__kernel_base`), reserving `__stack_size`
-(2 KB). `__stack_size` and `__stack_top` are owned by the kernel linker
+(4 KB). `__stack_size` and `__stack_top` are owned by the kernel linker
 script and reach the CCP/apps via `--just-symbols`. Each program starts with
 a fresh stack via `crt0.S` (`sp = _stack_top = __kernel_base`).
 
@@ -64,11 +70,119 @@ a fresh stack via `crt0.S` (`sp = _stack_top = __kernel_base`).
 
 A `.COM` binary is loaded at the TPA base (`__tpa_base`):
 
-1. `arch/<isa>/crt0.S` sets the stack pointer and global pointer and zeroes
-   `.bss`, then jumps to `_start`. The same crt0 is the entry point for the
-   kernel, the CCP, and every user program.
+1. `arch/<isa>/crt0.S` sets the stack pointer and global pointer, copies
+   `.data` from its load address (`_data_load`) to its runtime address
+   (`_data_start`) and zeroes `.bss`, then jumps to `_start`. The same crt0
+   is the entry point for the kernel, the CCP, and every user program.
 2. `_start` (`sdk/src/start.c`) fetches arguments, calls `main(argc, argv)`,
    then calls `sys_exit()`, returning to the kernel which reloads the CCP.
+
+## Execute-in-place (XIP)
+
+CP/M Neo can run its kernel and CCP directly from storage instead of loading
+them into RAM. XIP is an opt-in property of a disk image: the two image types
+are structurally identical, differing only in the `S0_XIP` byte (sector 0,
+offset `0x026`) and in which linker scripts were used.
+
+### Enabling XIP
+
+XIP is enabled per build by the `--xip` flag of `sysgen new` (or
+`mksysgen`/`mkvemu`), and `--xip` alone selects the mode: without it the build
+is a plain non-XIP disk, even if the platform declares a window. Under `--xip`,
+the platform must declare both `XIP_BASE` and `XIP_SIZE` in
+`platform/<name>/config.sh`; a platform declaring only one is a build error:
+
+```sh
+XIP_BASE=0x10000
+XIP_SIZE=0x207C00
+```
+
+All in-place code must live in `[XIP_BASE, XIP_BASE + XIP_SIZE)`. The disk
+image itself may be larger than the window — only the kernel and CCP execute
+from it; everything else on the disk is read through the storage controller.
+The window must never exceed the largest disk the platform can produce:
+`sysgen` computes that ceiling (`mkdisk_max_size_kb`) and rejects an oversized
+`XIP_SIZE` at build time. On `vemu`, `XIP_SIZE` equals the max disk size —
+the window covers the whole alternate (XIP) disk. `build_disk.sh` derives
+`__xip_top = XIP_BASE + XIP_SIZE`, sizes the kernel and CCP `XIP_REGION` linker
+regions from it via `ASSERT`, and stamps `IS_XIP=1` into `sysgen/build/.xip`;
+`sysgen new` writes `S0_XIP=1` and prints `XIP: Yes` in the build report. The
+kernel enforces `__xip_top` at runtime (below). XIP requires a memory-mapped
+storage window; platforms without one do not declare it.
+
+### Who runs in place
+
+Only the **kernel** and the **CCP** execute from flash. Every user `.com`
+loads into the TPA and runs there, exactly as on a non-XIP disk.
+
+The governing constraint is that an executable is *not* relocatable across an
+arbitrary base: the linker resolves absolute data addresses, jump/data-table
+addresses, and stored function pointers against one fixed origin. Running the
+same bytes from any other base would dereference the wrong locations. In-place
+execution is therefore only sound when a component sits at its **link origin**
+(Δ = 0 between on-disk address and link address), which is guaranteed by
+construction for exactly two components:
+
+- **Kernel** — linked at `__kernel_xip_base = XIP_BASE + KERN_START_SEC*512`,
+  the XIP address of the first byte of `kernel.bin` (past the bootloader and
+  volume-map sectors), exactly where sysgen writes it. The bootloader jumps
+  there directly.
+- **CCP** — linked at `__kernel_xip_end`; the kernel link pads that symbol to
+  a whole disk sector (`ALIGN(..., 512)`), and sysgen writes the CCP at the
+  very next sector, so the on-disk address `XIP_BASE + (KERN_START_SEC +
+  kernel_sectors)*512` equals the link origin.
+
+User `.com` files occupy arbitrary, often fragmented data blocks, so no link
+origin can match their on-disk placement; they are always RAM-loaded. For the
+same reason there is no RAM "fallback" for XIP components — a fallback would
+execute XIP-origin code from the wrong address, so the kernel refuses to run a
+CCP that crosses `__xip_top`.
+
+### Layout differences
+
+| | Non-XIP (`vemu`) | XIP |
+|---|---|---|
+| kernel `.text` | RAM (`__KERN_START`) | XIP at `__kernel_xip_base = XIP_BASE + KERN_START_SEC*512` (past bootloader + volume-map) |
+| CCP `.text` | RAM (TPA) | XIP at `__kernel_xip_end` |
+| app `.text` | RAM (TPA) | RAM (TPA) |
+| `.data` VMA | RAM | RAM |
+| `.data` LMA | == VMA (no-op) | XIP, right after `.text` |
+| `.bss` | RAM (NOLOAD) | RAM (NOLOAD) |
+| `.data` copy in crt0 | self-copy no-op | XIP → RAM |
+
+The CCP starts at `__kernel_xip_end` (sector-aligned end of the kernel's
+`.text` + `.data` image), so it never overlaps the kernel in the XIP region.
+
+On boot, `S0_XIP` picks the path: non-XIP loads the kernel into RAM at
+`S0_KERN_LOAD`; XIP skips the load and jumps to `XIP_BASE +
+KERN_START_SEC*512` (the first byte of `kernel.bin`, equal to the kernel's
+`_entry`). After each program exits, the kernel reloads the CCP to run it in
+place from flash. Link-time `ASSERT`s in both XIP scripts catch an overfull
+window at build time.
+
+### TPA sizing
+
+The TPA — where user programs run and (on non-XIP) load — spans
+`[__tpa_base, __kernel_base)`:
+
+- `__tpa_base` is fixed at `RAM_BASE + 0x100`.
+- `__kernel_base` (the TPA ceiling) is packed at the top of RAM:
+  `__kernel_base = (RAM_TOP − __kernel_total) & ~3`, where `RAM_TOP` is
+  `min(RAM_BASE + RAM_SIZE, IO_BASE)` and `__kernel_total` is the kernel's
+  RAM footprint from the two-pass link.
+
+Only `__kernel_total` differs between modes: non-XIP keeps `.text` in RAM
+(the whole image); XIP counts only `.data` + `.bss`, so the kernel takes
+less RAM and the TPA grows. The shared 4 KB stack sits at
+`__stack_top = __kernel_base`, so usable program space is
+`__kernel_base − __tpa_base − 4 KB`; `kexec` rejects larger files with
+`E2BIG`.
+
+### Why it is safe
+
+CP/M Neo is single-task: only one program runs at a time, and nothing else
+runs or writes the filesystem until it exits. An in-place program can't be
+corrupted by later deletes/frees/reuse, so no block-pinning is needed.
 
 ## Building the OS
 
@@ -85,9 +199,9 @@ the platform's directory, then builds four components in order.
    `arch/<isa>/config.sh`, supplied to the boot link via `--defsym`.
 2. **Kernel**: a **two-pass link**:
    - Pass 1 links the kernel at a placeholder address to extract
-     `__kernel_total` and `__kstack_guard` from the symbol table.
+     `__kernel_total` from the symbol table.
    - The real base `__KERN_START` is computed from
-     `min(RAM_BASE + RAM_SIZE, IO_BASE) - __kernel_total - guard`, then
+     `min(RAM_BASE + RAM_SIZE, IO_BASE) - __kernel_total`, then
      pass 2 re-links with it, producing `kernel.bin`. The platform's
      `IO_BASE`, `RAM_BASE`, and the derived `__tpa_base`/`__ram_top` are
      supplied to both passes via `--defsym=`.
@@ -102,8 +216,10 @@ unset or exceeds 8 characters.
 ### Linking against the kernel
 
 The CCP and user apps are linked with `--just-symbols=kernel.elf` plus the SDK
-linker script (`sdk/linker/linker_sdk.ld`). This lets them resolve kernel
-symbols such as `g_syscall_table`, `__kernel_base`, and `__tpa_base` without
+linker script (`sdk/linker/linker_app.ld` for apps and the non-XIP CCP; the
+XIP CCP uses `core/ccp/linker_ccp_xip.ld`). Both wrap the shared program layout
+in `sdk/linker/linker_sdk.ld`. This lets them resolve kernel
+symbols such as `sys_open`, `__kernel_base`, and `__tpa_base` without
 embedding the kernel: the symbols resolve to whatever kernel is present at
 runtime.
 
