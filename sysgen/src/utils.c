@@ -189,23 +189,6 @@ const char *resolve_disk(int argc, char **argv, char *buf, size_t n)
     return buf;
 }
 
-long parse_sized_kb(const char *s)
-{
-    if (!s || !*s)
-        return -1;
-
-    char *end = NULL;
-    long v = strtol(s, &end, 10);
-
-    if (end == s || *end == '\0')
-        return -1;
-
-    if ((*end == 'K' || *end == 'k') && end[1] == '\0')
-        return v;
-
-    return -1;
-}
-
 int parse_vn(const char *s, int *vol, int *user)
 {
     if (!s || !*s)

@@ -30,7 +30,6 @@ int collect_positional(int argc, char **argv, const char **out, int max_out);
 const char *resolve_disk(int argc, char **argv, char *buf, size_t n);
 void sysgen_default_disk(char *buf, size_t n);
 
-long parse_sized_kb(const char *s);
 int parse_vn(const char *s, int *vol, int *user);
 
 int dir_exists(const char *p);

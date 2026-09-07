@@ -25,17 +25,24 @@ void to_name83(const char *src, char *out83);
 typedef struct
 {
     uint16_t vol_count;      /* Active volume count (A:..)               */
-    uint16_t vol_max_blocks; /* Per-volume (and total-image) block cap   */
+    uint16_t disk_size_kb;   /* CONFIG_DISK_SIZE: total image size in KB, */
+                             /* overhead included.  It is also the whole- */
+                             /* disk block-coverage bound for any one     */
+                             /* volume (its alloc bitmap is /8 bytes)     */
 } SysgenDiskCfg;
 
 /* Defaults to the host compile-time ceilings; used when build tags are
  * missing. */
 SysgenDiskCfg sysgen_disk_cfg_default(void);
 
-/* Build a new disk image in place (fills sysgen_disk()); returns reserved secs or -1.
- * Divides the block grid equally between all cfg->vol_count volumes and
- * formats each one (header + empty root), so every volume is mounted at
- * boot.  Each volume's share is clamped to cfg->vol_max_blocks. */
+/* Build a new disk image in place (fills sysgen_disk()); returns reserved
+ * secs or -1.  size_kb is the TOTAL image size in KB (cfg->disk_size_kb):
+ * the boot/VMAP and reserved kernel+CCP sectors come out of that budget
+ * first, and the remaining block grid is divided equally between all
+ * cfg->vol_count volumes, each one formatted (header + empty root) so every
+ * volume is mounted at boot.  No volume's share can exceed the grid, which
+ * is itself smaller than cfg->disk_size_kb, so the coverage clamp is a
+ * backstop only. */
 int mkdisk_build(const SysgenDiskCfg *cfg,
                 uint32_t size_kb,
                 const uint8_t *kern, uint32_t kern_size,
@@ -46,10 +53,6 @@ int mkdisk_build(const SysgenDiskCfg *cfg,
 
 /* Minimum disk size (KB) so every volume can hold min-viable blocks */
 int mkdisk_min_size_kb(const SysgenDiskCfg *cfg, uint32_t kern_size, uint32_t ccp_size, int xip);
-
-/* Maximum useful disk size (KB): bounded by cfg->vol_max_blocks, plus the
- * reserved area. */
-int mkdisk_max_size_kb(const SysgenDiskCfg *cfg, uint32_t kern_size, uint32_t ccp_size, int xip);
 
 /* Whole-file helpers */
 int read_file(const char *path, uint8_t **out, uint32_t *out_len);

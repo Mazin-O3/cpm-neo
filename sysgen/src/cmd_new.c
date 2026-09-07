@@ -27,10 +27,8 @@
 /* Parsed arguments for the `sysgen new` command. */
 typedef struct
 {
-    long disk_size_kb;
     const char *platform;
     bool no_extra;
-    bool xip;
 } CmdNewConfig;
 
 static uint32_t get_file_size(const char *path)
@@ -99,7 +97,7 @@ static int isa_variant_from_flags(const char *flags, char *out, size_t n)
     return -1;
 }
 
-static int run_build_script(const SysgenPaths *paths, const char *platform, int xip)
+static int run_build_script(const SysgenPaths *paths, const char *platform)
 {
     char script[SYSGEN_FULL_PATH_MAX];
     snprintf(script, sizeof(script), "%s/../build_disk.sh", paths->build_dir);
@@ -108,7 +106,7 @@ static int run_build_script(const SysgenPaths *paths, const char *platform, int 
     snprintf(plat_flag, sizeof(plat_flag), "--platform=%s", platform);
 
     char *argv[] = {
-        (char *)"sh", script, plat_flag, (char *)(xip ? "--xip" : NULL), NULL,
+        (char *)"sh", script, plat_flag, NULL,
     };
 
     printf("Starting disk build for %s\n", platform);
@@ -116,19 +114,7 @@ static int run_build_script(const SysgenPaths *paths, const char *platform, int 
     return spawn_and_wait(argv);
 }
 
-static int disk_size_over_cap(const SysgenDiskCfg *cfg, long size_kb, uint32_t ksz,
-                              uint32_t ccpsz, int xip)
-{
-    int max_kb = mkdisk_max_size_kb(cfg, ksz, ccpsz, xip);
-
-    if (size_kb <= max_kb)
-        return 0;
-
-    err("--disk-size %ldK exceeds the %dK maximum useful disk size", size_kb, max_kb);
-    return 1;
-}
-
-static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uint32_t size_kb,
+static int report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uint32_t size_kb,
                          uint32_t boot_size, uint32_t kern_size,
                          uint32_t ccp_size, uint32_t kern_load, uint32_t tpa_base,
                          uint32_t reserved, const char *out_disk_path)
@@ -222,18 +208,14 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
 
 /* Whitelist of flags accepted by `sysgen new` (NULL-terminated). */
 static const char *const FLAGS_NEW[] = {
-    "--disk-size", "--platform", "--no-extra", "--xip", NULL,
+    "--platform", "--no-extra", NULL,
 };
 
 static bool parse_cmd_new_args(int argc, char **argv, CmdNewConfig *cfg)
 {
-    const char *disk_size_str = get_str_flag(argc, argv, "--disk-size");
     const char *platform_str = get_str_flag(argc, argv, "--platform");
 
     cfg->no_extra = get_bool_flag(argc, argv, "--no-extra");
-    cfg->xip = get_bool_flag(argc, argv, "--xip");
-
-    cfg->disk_size_kb = 0; /* 0 means "unset"; resolved to max after build */
 
     if (!platform_str)
     {
@@ -242,17 +224,6 @@ static bool parse_cmd_new_args(int argc, char **argv, CmdNewConfig *cfg)
     }
 
     cfg->platform = platform_str;
-
-    if (disk_size_str)
-    {
-        cfg->disk_size_kb = parse_sized_kb(disk_size_str);
-
-        if (cfg->disk_size_kb <= 0)
-        {
-            err("invalid --disk-size '%s' (K suffix required)", disk_size_str);
-            return false;
-        }
-    }
 
     return true;
 }
@@ -293,7 +264,7 @@ int cmd_new(int argc, char **argv)
         return 1;
 
     char path_buf[SYSGEN_FULL_PATH_MAX];
-    if (run_build_script(paths, cfg.platform, cfg.xip) != 0)
+    if (run_build_script(paths, cfg.platform) != 0)
         return 1;
 
     char os_platform_buf[16];
@@ -332,10 +303,10 @@ int cmd_new(int argc, char **argv)
         long v = strtol(tag_buf, NULL, 10);
 
         if (v > 0 && v <= BD_VOL_MAX_BLOCKS)
-            dcfg.vol_max_blocks = (uint16_t)v;
+            dcfg.disk_size_kb = (uint16_t)v;
         else
         {
-            err("platform '%s' disk-size cap %ldK exceeds the host ceiling %dK "
+            err("platform '%s' disk size %ldK exceeds the host ceiling %dK "
                 "or is invalid", os_platform, v, BD_VOL_MAX_BLOCKS);
             return 1;
         }
@@ -343,8 +314,8 @@ int cmd_new(int argc, char **argv)
 
     /* Mount-time caps use the platform's active values so the host validates
      * images exactly as the platform kernel would. */
-    bd_set_block_cap(dcfg.vol_max_blocks);
-    disk_set_block_cap(dcfg.vol_max_blocks);
+    bd_set_block_cap(dcfg.disk_size_kb);
+    disk_set_block_cap(dcfg.disk_size_kb);
 
     int ret = 1;
     uint8_t *kern = NULL, *elf = NULL, *ccp = NULL;
@@ -403,16 +374,11 @@ int cmd_new(int argc, char **argv)
         ccpsz = 0;
     }
 
-    /* Size the disk image.  The platform cap is applied post-build: the
-     * requested/derived size is validated against the runtime min/max before
-     * the image is written (see disk_size_over_cap below for the guard). */
+    /* Size the disk image exactly as the platform declares: CONFIG_DISK_SIZE
+     * (read into dcfg.disk_size_kb above) is the TOTAL image size in KB,
+     * overhead included.  mkdisk_build fails if the bootloader, kernel, CCP
+     * and every volume's minimum block count cannot fit in that size. */
     int min_kb = mkdisk_min_size_kb(&dcfg, ksz, ccpsz, is_xip);
-
-    if (cfg.disk_size_kb == 0)
-        cfg.disk_size_kb = mkdisk_max_size_kb(&dcfg, ksz, ccpsz, is_xip);
-
-    if (disk_size_over_cap(&dcfg, cfg.disk_size_kb, ksz, ccpsz, is_xip) != 0)
-        goto cleanup;
 
     /* Record the resolved disk size in bytes for XIP builds: the flash
      * window is the disk image itself (there is no configured XIP_SIZE),
@@ -429,17 +395,17 @@ int cmd_new(int argc, char **argv)
             goto cleanup;
         }
 
-        fprintf(f, "%lu", (unsigned long)cfg.disk_size_kb * 1024);
+        fprintf(f, "%lu", (unsigned long)dcfg.disk_size_kb * 1024);
         fclose(f);
     }
 
-    int reserved = mkdisk_build(&dcfg, (uint32_t)cfg.disk_size_kb, kern, ksz, ccp, ccpsz, kern_load,
+    int reserved = mkdisk_build(&dcfg, dcfg.disk_size_kb, kern, ksz, ccp, ccpsz, kern_load,
                                 OS_VER, KERN_VER, CCP_VER, os_platform, is_xip);
 
     if (reserved < 0)
     {
-        err("mkdisk_build failed: --disk-size %ldK is too small (minimum %dK for all %d volumes)",
-            cfg.disk_size_kb, min_kb, dcfg.vol_count);
+        err("mkdisk_build failed: CONFIG_DISK_SIZE %uK is too small (minimum %dK for all %d volumes)",
+            dcfg.disk_size_kb, min_kb, dcfg.vol_count);
         goto cleanup;
     }
 
@@ -482,7 +448,7 @@ int cmd_new(int argc, char **argv)
     if (save_disk(out_disk_path) != 0)
         goto cleanup;
 
-report_build(paths, &dcfg, (uint32_t)cfg.disk_size_kb, bsz, ksz, ccpsz, kern_load,
+report_build(paths, &dcfg, dcfg.disk_size_kb, bsz, ksz, ccpsz, kern_load,
              tpa_base, (uint32_t)reserved, out_disk_path);
     ret = 0;
 

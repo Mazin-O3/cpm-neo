@@ -12,7 +12,7 @@ Thanks for your interest! This guide gets you from a fresh checkout to your firs
 
    ```sh
    $ make -C sysgen
-   $ ./sysgen/build/sysgen new --disk-size=2048K --platform=vemu
+   $ ./sysgen/build/sysgen new --platform=vemu
    ```
 
    This produces `sysgen/build/disk.img`, a bootable CP/M Neo disk.

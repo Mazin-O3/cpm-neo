@@ -27,7 +27,7 @@ the free pool.
 |---|---:|---|---|---|
 | 0x000 | u16 | Magic | `S0_MAGIC` / `DISK_MAGIC` | `0x4350` (`'CP'`) |
 | 0x002 | u16 | Disk format version | `S0_DISK_VER` | `0` |
-| 0x004 | u16 | Disk size KB | `S0_DISK_SIZE_KB` | varies |
+| 0x004 | u16 | Disk size KB (total image, incl. overhead) | `S0_DISK_SIZE_KB` | varies |
 | 0x006 | u32 | Kernel RAM load address | `S0_KERN_LOAD` | varies |
 | 0x00A | u32 | Kernel byte count | `S0_KERN_SIZE` | varies |
 | 0x00E | u16 | Kernel sectors | `S0_KERN_SECTORS` | varies |
@@ -52,7 +52,7 @@ single sector when volume layout or volume attributes change.
 | 0x000 | u16 | Total blocks | `VMAP_NUM_BLOCKS` | varies |
 | 0x002 | u16 | Block-0 sector | `VMAP_BASE_SEC` | `K + S + 2` |
 | 0x004 | u16 | Magic | `VMAP_MAGIC_OFF` / `VMAP_MAGIC` | `0x4350` |
-| 0x006 | 4×18 B | Volume records | `VMAP_VOLREC` | see below |
+| 0x006 | up to 28×18 B | Volume records | `VMAP_VOLREC` | see below |
 | 0x1FE | u16 | Signature | `VMAP_SIG` | `0xAA55` |
 
 Block `i` occupies:
@@ -68,10 +68,15 @@ be permanently unreachable. The maximum grid size is:
 
 ```text
 BD_VOL_MAX_BLOCKS
-= CONFIG_DISK_SIZE blocks   (= 2048 for vemu; host ceiling 32768 = 32 MB;
-               a single volume is additionally bounded to 32767 blocks by
-               BD_DISK_MAX_SECS, since 1K block = 2 sectors)
+= CONFIG_DISK_SIZE blocks   (the whole disk, so one volume can be grown to
+               claim the grid; for vemu CONFIG_DISK_SIZE = 2048, host ceiling
+               32768 = 32 MB.  A single volume is additionally bounded to
+               32767 blocks by BD_DISK_MAX_SECS, since 1K block = 2 sectors)
 ```
+
+The image itself is exactly `CONFIG_DISK_SIZE` KB: the boot/VMAP and kernel
++ CCP sectors come out of that budget first, and the block grid is what
+remains.
 
 ## Volume record
 

@@ -23,18 +23,18 @@ $ make -C sysgen
 
 ## Create a disk image
 
-Create a 2 MB disk image with 64 KB of RAM (`CONFIG_RAM_SIZE=0x10000` in the platform's `config.sh`):
+Create a disk image of exactly `CONFIG_DISK_SIZE` KB (e.g. 2048 for `vemu`).
+The platform's `config.sh` supplies the total image size plus the memory
+layout (`CONFIG_RAM_SIZE`, e.g. `0x10000` = 64 KB):
 
 ```sh
 $ ./sysgen/build/sysgen new \
-    --disk-size=2048K \
     --platform=vemu
 ```
 
 | Option | Description |
 |---|---|
-| `--disk-size` | Disk size in KB. Requires a `K` suffix, e.g. `2048K`. Defaults to the maximum useful size |
-| `--platform` | Target platform id: the 8-char max `CONFIG_ID=` declared by a platform's `config.sh` (platforms under `platform/`). `vemu` is included with the repository; its `config.sh` selects the ISA, `CONFIG_RAM_SIZE`, and memory layout |
+| `--platform` | Target platform id: the 8-char max `CONFIG_ID=` declared by a platform's `config.sh` (platforms under `platform/`). `vemu` is included with the repository; its `config.sh` selects the ISA, `CONFIG_RAM_SIZE`, memory layout, and the total disk size `CONFIG_DISK_SIZE` |
 | `--no-extra` | Do not install optional apps from `apps/extra` |
 
 `sysgen new` always writes the image to:
@@ -47,7 +47,10 @@ The build report identifies the target architecture and ISA variant used, taken
 from the platform's `config.sh` (`ARCH`) and the arch's `config.sh`
 (`-march`), e.g. `Architecture : riscv32 (rv32im)`.
 
-The image contains four formatted volumes, A:–D:. The maximum useful disk size is the size of a single volume.
+The image is `CONFIG_DISK_SIZE` KB total, overhead included: the boot/VMAP
+and kernel/CCP sectors come out of that budget first, and the remaining 1 KB
+block grid is divided evenly between the `CONFIG_VOL_MAX` formatted volumes
+(A:..).
 
 ## Inspect an image
 
@@ -148,7 +151,6 @@ area.
 $ sysgen extract
 
 $ ./sysgen/build/sysgen new \
-    --disk-size=2048K \
     --platform=vemu
 
 $ sysgen add sysgen/build/extract

@@ -56,20 +56,21 @@ parameter carries the `CONFIG_` prefix and all four software knobs are
 required (there are no defaults).  `build_disk.sh` reads them and writes the
 effective values to `build/gen/config.h`, which every kernel/CCP/SDK/app
 compile includes.  The sysgen host tool is compiled once and sizes its arrays
-to the *ceilings* in `sysgen/include/config.h` (16 volumes / 32 MB per volume
-/ 8 FCBs — the maximum any platform may declare); it applies each platform's
-active values at runtime and rejects a platform that exceeds them.
+to the *ceilings* in `sysgen/include/config.h` (16 volumes / 32 MB total disk
+size / 8 FCBs — the maximum any platform may declare); it applies each
+platform's active values at runtime and rejects a platform that exceeds them.
 
-| Knob | Default | Kernel RAM cost (roughly) |
-|------|---------|---------------------------|
+| Knob | Example (vemu) | Kernel RAM cost (roughly) |
+|------|----------------|---------------------------|
 | `CONFIG_VOL_MAX` | 4 | `MAX_VOLUMES`-backed arrays and `SysInfo.vol_mounted[]` |
-| `CONFIG_DISK_SIZE` | 2048 | alloc bitmap bytes per volume (KB/8); block cap `BD_VOL_MAX_BLOCKS` = KB |
+| `CONFIG_DISK_SIZE` | 2048 | alloc bitmap covers the whole grid (KB/8 bytes); total image size in KB, overhead included |
 | `CONFIG_FCB_MAX` | 4 | `CONFIG_FCB_MAX` open-file control blocks |
 | `CONFIG_STACK_SIZE` | 0x1000 | single shared kernel/CCP/app stack (top of TPA) |
 
-`CONFIG_VOL_MAX` and `CONFIG_DISK_SIZE` (the per-volume block cap) are also
-on-disk *format* parameters, so changing them must be paired with a fresh
-image: `sysgen new --platform=<name>`. `CONFIG_STACK_SIZE` is consumed by the
+`CONFIG_VOL_MAX` and `CONFIG_DISK_SIZE` are on-disk *format* parameters (the
+volume count, and the total image size including the kernel/CCP overhead), so
+changing them must be paired with a fresh image:
+`sysgen new --platform=<name>`. `CONFIG_STACK_SIZE` is consumed by the
 linker (linker scripts cannot include C headers); `build_disk.sh` passes the
 platform's value to the kernel links as `--defsym=__stack_size`, with the
 `PROVIDE` in `linker_kernel_common.ld` serving as a hand-link fallback only.
@@ -93,19 +94,19 @@ A platform is a self-contained `platform/<name>/` directory:
    - `CONFIG_RAM_SIZE` — total RAM in bytes (hex), e.g. `0x10000` = 64 KB
    - `CONFIG_RAM_BASE` — base address of the RAM region holding CP/M Neo
    - `CONFIG_IO_BASE` — base address of the peripheral MMIO window
-   - `CONFIG_XIP_BASE` — consulted only when the build passes `--xip` (see below);
-      there is no configured window size. Under `--xip`, `CONFIG_XIP_BASE` is the
-      base of the execute-in-place window, which extends over the disk image
-      itself (see [Architecture](architecture.md#execute-in-place-xip)); the
-      kernel/CCP run in place from it and whether they fit the produced disk
-      is validated at build time.
+   - `CONFIG_XIP_BASE` — declaring it selects XIP builds (see below): it is
+      the base of the execute-in-place window, which extends over the disk
+      image itself (see [Architecture](architecture.md#execute-in-place-xip));
+      the kernel/CCP run in place from it and whether they fit the produced
+      disk is validated at build time. A platform that omits the field always
+      builds a plain (RAM-loading) disk.
    - the four software knobs `CONFIG_VOL_MAX`, `CONFIG_DISK_SIZE`,
      `CONFIG_FCB_MAX`, `CONFIG_STACK_SIZE` (all required, no defaults) — see
      [Configuring the system](#configuring-the-system).
 2. `bios.c` implements the functions in `bios.h`.
-3. Build with `sysgen new ... --platform=<id> [--xip]` — `--xip` selects an
-   XIP disk; omit it for a plain (RAM-loading) disk. The flag alone selects
-   the mode: a plain build ignores `CONFIG_XIP_BASE` entirely.
+3. Build with `sysgen new --platform=<id>` — XIP is automatic when
+   `CONFIG_XIP_BASE` is declared; a platform that omits the field always
+   builds a plain (RAM-loading) disk.
 
 ### Platform lookup
 

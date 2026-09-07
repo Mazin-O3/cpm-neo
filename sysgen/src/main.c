@@ -14,7 +14,6 @@ static void usage(void)
     printf("\n*** CP/M Neo SYSGEN Utility ***\n\n"
            "Usage:\n\n"
             "  sysgen new <args> [opts]        Create a new disk image\n"
-            "      --disk-size=<KB>   Size in KB (e.g., 2048K) [default: maximum useful size]\n"
             "      --platform=<ID>   Platform id (8-char max; declared by ID= in\n"
             "                       the platform's config.sh; provides the ISA and RAM_SIZE)\n"
             "      --no-extra       Skip optional bundled apps (apps/extra)\n\n"

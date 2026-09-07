@@ -39,7 +39,7 @@ This page describes how CP/M Neo is laid out in memory, how it boots, and how it
 `os_entry()` (core/kernel/main.c) runs `kernel_init()`:
 
 - `disk_init()`: reads the volume map (VMAP) from sector 1.
-- Binds the mounted volumes (A:–D:); the first mount becomes the default drive.
+- Binds the mounted volumes (A:.. up to `CONFIG_VOL_MAX`); the first mount becomes the default drive.
 
 It then prints the TPA size and calls `kexec_ccp()`, which loads the CCP into
 the TPA and jumps to it. When a user program calls `sys_exit()`, the kernel
@@ -86,10 +86,11 @@ offset `0x026`) and in which linker scripts were used.
 
 ### Enabling XIP
 
-XIP is enabled per build by the `--xip` flag of `sysgen new` (or
-`mksysgen`/`mkvemu`), and `--xip` alone selects the mode: without it the build
-is a plain non-XIP disk, even if the platform declares a window. Under `--xip`,
-the platform must declare `CONFIG_XIP_BASE` in `platform/<name>/config.sh`:
+XIP is selected per platform: declaring `CONFIG_XIP_BASE` in
+`platform/<name>/config.sh` makes every `sysgen new` build an XIP disk; a
+platform that omits the field always builds a plain non-XIP (RAM-loaded)
+disk. There is no flag to override this. A XIP platform declares the window
+in `config.sh`:
 
 ```sh
 CONFIG_XIP_BASE=0x10000
@@ -214,10 +215,11 @@ unset or exceeds 8 characters. `build_disk.sh` also reads the four required
 software knobs (`CONFIG_VOL_MAX`, `CONFIG_DISK_SIZE`, `CONFIG_FCB_MAX`,
 `CONFIG_STACK_SIZE`) — every platform must declare them, there are no
 defaults — and writes the effective values to `build/gen/config.h`, which
-every kernel/CCP/SDK build includes.  The effective volume count and
-per-volume cap are stamped as build tags (`.vol_max`, `.disk_size_kb`) that
-`sysgen new` reads back to size and mount the image, validated against the
-host ceilings in `sysgen/include/config.h` (16 volumes, 32 MB).
+every kernel/CCP/SDK build includes.  The effective volume count and total
+image size (`CONFIG_DISK_SIZE`, KB) are stamped as build tags (`.vol_max`,
+`.disk_size_kb`) that `sysgen new` reads back to size and mount the image,
+validated against the host ceilings in `sysgen/include/config.h` (16
+volumes, 32 MB).
 
 ### Linking against the kernel
 

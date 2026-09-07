@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 # CP/M Neo OS build backend — driven by the sysgen tool.
 #
-#   sh sysgen/build_disk.sh --platform=<PLATFORM> [--xip]
+#   sh sysgen/build_disk.sh --platform=<PLATFORM>
 #
-# XIP mode is opt-in: the build is XIP (kernel/CCP linked into the flash
-# window) only when --xip is passed; without it the build is always non-XIP,
-# regardless of any XIP_* fields the platform declares in config.sh.
+# XIP is selected per platform: declaring CONFIG_XIP_BASE in config.sh makes
+# every build XIP (kernel/CCP linked into the flash window); a platform that
+# omits the field always builds non-XIP.
 #
 # Builds the bootloader, kernel and CCP into sysgen/build/, next to the
 # tool binary.  Runs from anywhere: it locates the CP/M Neo root relative
@@ -29,12 +29,10 @@
 set -eu
 
 PLATFORM_ID=""
-FORCE_XIP=0
 
 for arg in "$@"; do
     case "$arg" in
         --platform=*) PLATFORM_ID="${arg#--platform=}" ;;
-        --xip) FORCE_XIP=1 ;;
         *) echo "Unknown option: $arg" >&2; exit 1 ;;
     esac
 done
@@ -116,8 +114,9 @@ CONFIG_DISK_SIZE=${CONFIG_DISK_SIZE:?"$PLATFORM_ID: CONFIG_DISK_SIZE not set in 
 CONFIG_FCB_MAX=${CONFIG_FCB_MAX:?"$PLATFORM_ID: CONFIG_FCB_MAX not set in platform/$PLATFORM_DIR/config.sh"}
 CONFIG_STACK_SIZE=${CONFIG_STACK_SIZE:?"$PLATFORM_ID: CONFIG_STACK_SIZE not set in platform/$PLATFORM_DIR/config.sh"}
 
-# One bitmap byte covers 8 blocks (8 KB), so the per-volume cap must be a
-# multiple of 8 KB to keep the block map exactly sized.
+# One bitmap byte covers 8 blocks (8 KB), so CONFIG_DISK_SIZE — the total
+# image size in KB, overhead included — must be a multiple of 8 to keep the
+# block map exactly sized.
 if [ $((CONFIG_DISK_SIZE % 8)) -ne 0 ]; then
     echo "ERROR: CONFIG_DISK_SIZE=$CONFIG_DISK_SIZE must be a multiple of 8 (KB)" >&2
     exit 1
@@ -138,21 +137,14 @@ cat > "$BUILD/gen/config.h" <<EOF
 #endif /* CONFIG_H */
 EOF
 
-# XIP mode is selected explicitly with --xip; a build without it is always
-# non-XIP, regardless of any CONFIG_XIP_BASE the platform declares (that
-# field exists solely to support --xip builds).  Under --xip the disk is
-# XIP-formatted and the kernel and CCP are linked into the XIP region at the
-# XIP base; .data/.bss still live in RAM. User .com files are always
-# RAM-loaded (TPA) regardless of XIP. XIP requires CONFIG_XIP_BASE — a
-# missing one under --xip is a build error, never a silent non-XIP image.
-# There is no XIP window size: the window starts at the XIP base and extends
-# over the produced disk image, so sysgen sizes everything against the
-# actual linked contents.
-if [ "$FORCE_XIP" = "1" ]; then
-    if [ -z "${CONFIG_XIP_BASE+x}" ] || [ -z "$CONFIG_XIP_BASE" ]; then
-        echo "ERROR: --xip build requires CONFIG_XIP_BASE — declare it in platform/$PLATFORM_DIR/config.sh" >&2
-        exit 1
-    fi
+# XIP is selected per platform by CONFIG_XIP_BASE in config.sh: declaring it
+# makes every build XIP (the kernel and CCP are linked into the XIP region at
+# the XIP base; .data/.bss still live in RAM, and user .com files are always
+# RAM-loaded from the TPA).  A platform that omits the field always builds
+# non-XIP (RAM-loaded kernel/CCP).  There is no configured XIP window size:
+# the window starts at the XIP base and extends over the produced disk image,
+# so sysgen sizes everything against the actual linked contents.
+if [ -n "${CONFIG_XIP_BASE:-}" ]; then
     IS_XIP=1
     KERN_LD="core/kernel/linker_kernel_xip.ld"
     SDK_LD="core/ccp/linker_ccp_xip.ld"

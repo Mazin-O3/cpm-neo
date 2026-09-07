@@ -4,13 +4,15 @@
  *
  * Writes sector 0 (geometry), the VMAP at sector 1 (block grid + VolRec), the
  * kernel image (with BOOT_MAGIC trailer), the raw CCP binary, and a formatted
- * filesystem for every volume (header + empty root).  The block grid (1 KB
- * blocks) is divided equally between the platform's volumes (A:..), so all of
- * them are mounted and usable at boot; any leftover blocks go to the earliest
- * volumes.  Volumes can later be resized at runtime with SET RZ +N, or
- * unmounted with SET UM.  The active volume count and per-volume block cap
- * come from the platform's build tags (SysgenDiskCfg), not from the host's
- * compile-time ceilings.
+ * filesystem for every volume (header + empty root).  The image is exactly
+ * CONFIG_DISK_SIZE KB: the boot/VMAP and reserved kernel+CCP sectors come out
+ * of that budget first, and the remaining block grid (1 KB blocks) is divided
+ * equally between the platform's volumes (A:..), so all of them are mounted
+ * and usable at boot; any leftover blocks go to the earliest volumes.
+ * Volumes can later be resized at runtime with SET RZ +N, or unmounted with
+ * SET UM.  The active volume count and total image size come from the
+ * platform's build tags (SysgenDiskCfg), not from the host's compile-time
+ * ceilings.
  */
 
 #include "bdos.h"
@@ -275,7 +277,7 @@ SysgenDiskCfg sysgen_disk_cfg_default(void)
     SysgenDiskCfg cfg;
 
     cfg.vol_count = MAX_VOLUMES;
-    cfg.vol_max_blocks = BD_VOL_MAX_BLOCKS;
+    cfg.disk_size_kb = BD_VOL_MAX_BLOCKS;
     return cfg;
 }
 
@@ -358,17 +360,17 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
     }
 
     /* ── VMAP @ sector 1: geometry + VolRec[cfg->vol_count] ── */
-    /* Equal division ensures all volumes are mountable at boot;
-     * the remainder is distributed to earliest volumes. Each volume's
-     * share is further clamped to cfg->vol_max_blocks -- the filesystem
-     * layer's addressing limit for a single volume (see bd_bind /
-     * bd_resize in bdos.c). Any blocks beyond that per volume are
-     * deliberately left OUT of every volume's runs, so they stay
-     * free in the block grid rather than being locked away in a
-     * run no volume can ever use. That free pool is what lets a
-     * volume span up to cfg->vol_max_blocks blocks -- including nearly
-     * the entire disk -- if it's later grown with SET RZ +N after the
-     * other volumes are shrunk or unmounted. */
+    /* The block grid holds (size_kb*2 - (KERN_START_SEC + reserved))/2
+     * blocks: the image is exactly CONFIG_DISK_SIZE KB (size_kb), with the
+     * boot/VMAP and reserved kernel+CCP sectors taken out of that budget.
+     * Equal division ensures all volumes are mountable at boot; the
+     * remainder goes to the earliest volumes.  The cfg->disk_size_kb clamp
+     * below mirrors the alloc bitmap's whole-disk coverage (see bd_bind /
+     * bd_resize in bdos.c) and never binds here, because a volume's share
+     * can never exceed the grid, which is itself smaller than disk_size_kb.
+     * That matching also means a volume may later be grown with SET RZ +N
+     * after the other volumes are shrunk or unmounted, up to the entire
+     * grid. */
     uint32_t base = num_blocks / cfg->vol_count;
     uint32_t rem = num_blocks % cfg->vol_count;
     uint32_t min_blocks = min_viable_blocks();
@@ -386,12 +388,10 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
         uint32_t start = v * base + (v < rem ? v : rem);
         uint32_t count = base + (v < rem ? 1 : 0);
 
-        /* Reserve at most cfg->vol_max_blocks at the disk layer for this
-         * volume. The remainder of its equal share, if any, is not claimed
-         * by any run and stays free in the grid. */
-
-        if (count > cfg->vol_max_blocks)
-            count = cfg->vol_max_blocks;
+        /* Coverage backstop: a share never exceeds the grid, which never
+         * exceeds cfg->disk_size_kb, so this cannot fire. */
+        if (count > cfg->disk_size_kb)
+            count = cfg->disk_size_kb;
 
         uint32_t vr = VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
 
@@ -403,12 +403,12 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
         /* ── Formatted filesystem: header + (already-zeroed) empty root ── */
         uint16_t v_secs = (uint16_t)(count * BD_BLOCK_SECS);
         uint16_t num_data = (uint16_t)((v_secs - BD_DATA_START) / BD_BLOCK_SECS);
-        /* Count is already <= cfg->vol_max_blocks above, and num_data <=
+        /* Count is already <= cfg->disk_size_kb above, and num_data <=
          * count after subtracting the header/root overhead, so this can
          * no longer fire -- kept as a defensive backstop only. */
 
-        if (num_data > cfg->vol_max_blocks)
-            num_data = cfg->vol_max_blocks;
+        if (num_data > cfg->disk_size_kb)
+            num_data = cfg->disk_size_kb;
 
         uint8_t *hdr = disk + (base_sec + start * BD_BLOCK_SECS) * DISK_SECTOR_SIZE;
         write16(hdr, DISK_MAGIC);
@@ -435,13 +435,4 @@ int mkdisk_min_size_kb(const SysgenDiskCfg *cfg, uint32_t kern_size, uint32_t cc
     uint32_t min_secs = (uint32_t)KERN_START_SEC + reserved +
                         (uint32_t)cfg->vol_count * min_viable_blocks() * BD_BLOCK_SECS;
     return (int)((min_secs + 1) / 2);
-}
-
-int mkdisk_max_size_kb(const SysgenDiskCfg *cfg, uint32_t kern_size, uint32_t ccp_size, int xip)
-{
-    uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size, xip);
-
-    uint32_t cap_secs = (uint32_t)cfg->vol_max_blocks * BD_BLOCK_SECS;
-    uint32_t max_secs = (uint32_t)KERN_START_SEC + reserved + cap_secs;
-    return (int)((max_secs + 1) / 2);
 }

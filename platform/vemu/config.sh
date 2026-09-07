@@ -3,8 +3,8 @@
 #
 # Supplies the platform facts everything else is derived from.  All
 # parameters carry the CONFIG_ prefix; all are required (there are no
-# defaults).  Only CONFIG_XIP_BASE may be absent, and only when --xip
-# builds are not used.
+# defaults).  Only CONFIG_XIP_BASE may be absent, and only when plain
+# (non-XIP) builds are used — declaring it selects XIP builds.
 #
 #   CONFIG_ID         — 8-char max OS platform id stamped into S0_PLATFORM
 #                     (the platform identity used by --platform)
@@ -18,20 +18,23 @@
 
 #   CONFIG_IO_BASE    — Base address of the peripheral MMIO window
 
-#   CONFIG_XIP_BASE   — Flash/XIP window base; used only by `sysgen new --xip`
-#                       builds (the kernel/CCP run in place from this window)
-#                       Plain builds (no --xip) ignore it.
-#                       The XIP window has no configured size: it extends from
-#                       the XIP base to the end of the on-disk kernel/CCP
-#                       contents, and the flash simply maps the XIP disk image
+#   CONFIG_XIP_BASE   — Flash/XIP window base; declaring it selects XIP
+#                       builds (the kernel/CCP run in place from this window).
+#                       A platform that omits the field always builds plain
+#                       (RAM-loading) disks.  The XIP window has no configured
+#                       size: it extends from the XIP base to the end of the
+#                       on-disk kernel/CCP contents, and the flash simply maps
+#                       the XIP disk image
 
 #   CONFIG_VOL_MAX    — Volume count, A:..P; required.  Must not exceed
 #                       The sysgen host ceiling of 16
 
-#   CONFIG_DISK_SIZE  — Per-volume disk-size cap in KB; the block map /
-#                       volume cap derives from it (CONFIG_DISK_SIZE/8 bitmap
-#                       bytes, CONFIG_DISK_SIZE blocks).  Must be a multiple
-#                       of 8 and must not exceed the host ceiling of 32768 (32 MB)
+#   CONFIG_DISK_SIZE  — Total disk image size in KB, overhead included: the
+#                       boot/VMAP and kernel+CCP sectors come out of this
+#                       budget first, and the remaining block grid is divided
+#                       between the CONFIG_VOL_MAX volumes.  Must be a
+#                       multiple of 8 and must not exceed the host ceiling of
+#                       32768 (32 MB)
 
 #   CONFIG_FCB_MAX    — Open-file control blocks (kernel RAM); must not
 #                       exceed the host ceiling of 8

@@ -52,7 +52,7 @@ on failure. File handles are non-negative values; standard handles such as
 
 ## Volume operations
 
-Volumes are A:–D:. Each volume is composed of ordered block runs recorded
+Volumes are A:.. (up to `CONFIG_VOL_MAX`). Each volume is composed of ordered block runs recorded
 in the VMAP.
 
 | Syscall | Operation |
