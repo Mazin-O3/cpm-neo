@@ -1,4 +1,4 @@
-/* DUMP.COM — prints a file as a formatted hex dump.  Extracted from the
+/* DUMP.COM — Prints a file as a formatted hex dump.  Extracted from the
  * resident TYPE command's `h` flag; the transient app keeps the CCP small. */
 
 #include <ccplib.h>

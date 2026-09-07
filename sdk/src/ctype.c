@@ -1,6 +1,6 @@
 /*
  * libc/ctype.c
- * CP/M Neo — character classification and case conversion (software only)
+ * CP/M Neo — Character classification and case conversion (software only)
  *
  * Definitions must match the prototypes in ctype.h exactly.  All functions
  * operate on the low 7-bit ASCII range and are safe for any int input.

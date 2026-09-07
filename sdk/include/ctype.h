@@ -1,6 +1,6 @@
 /*
  * libc/ctype.h
- * CP/M Neo — character classification and case conversion
+ * CP/M Neo — Character classification and case conversion
  *
  * These predicates and converters operate on ASCII characters passed as an
  * int.  They only inspect the low 7-bit ASCII range, so any int (including

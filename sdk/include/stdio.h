@@ -11,16 +11,16 @@
 
 /* Output */
 int putchar(int c);
-int puts(const char *s); /* appends \n           */
+int puts(const char *s); /* Appends \n           */
 int printf(const char *fmt, ...);
 int snprintf(char *buf, size_t size, const char *fmt, ...);
 int vprintf(const char *fmt, va_list ap);
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list ap);
 
 /* Input */
-int peekchar(void); /* non-blocking: 1 = char ready, never consumes */
+int peekchar(void); /* Non-blocking: 1 = char ready, never consumes */
 int getchar(void);
-int getline(char *buf, int maxlen); /* echo + backspace      */
+int getline(char *buf, int maxlen); /* Echo + backspace      */
 
 /* Pause output after a full screen of lines: prints msg, waits for a key,
  * erases the prompt, returns 1 when the user pressed ESC.  `row` is a

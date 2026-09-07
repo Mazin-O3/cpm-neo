@@ -1,6 +1,6 @@
 /*
  * libc/limits.h
- * CP/M Neo — implementation limits for the 32-bit int model
+ * CP/M Neo — Implementation limits for the 32-bit int model
  *
 */
 
@@ -22,7 +22,7 @@
 #define SHRT_MAX  32767
 #define USHRT_MAX 65535
 
-#define LONG_MAX  0x7FFFFFFFL /* long is 32-bit on rv32           */
+#define LONG_MAX  0x7FFFFFFFL /* Long is 32-bit on rv32           */
 #define LONG_MIN  (-LONG_MAX - 1L)
 #define ULONG_MAX 0xFFFFFFFFul
 

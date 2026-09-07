@@ -3,8 +3,8 @@
 CC      ?= cc
 CFLAGS  ?= -Os -Wall -Wextra
 
-INC_LOCAL := -I ../core/kernel -I .. -iquote ../sdk/include
-INC_BDOS  := -I ../core/kernel -I ../sdk/include -I .. -Wno-builtin-declaration-mismatch
+INC_LOCAL := -I ../core/kernel -I ../core -I .. -iquote ../sdk/include
+INC_BDOS  := -I ../core/kernel -I ../core -I ../sdk/include -I .. -Wno-builtin-declaration-mismatch
 
 BUILD_DIR := build
 OBJ_DIR   := $(BUILD_DIR)/obj
@@ -24,19 +24,19 @@ all: $(BIN)
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(OBJ_DIR)/bios.o: bios.c sysgen.h ../core/kernel/bios.h ../core/kernel/kernel_abi.h
+$(OBJ_DIR)/bios.o: bios.c sysgen.h ../core/bios.h ../sdk/include/abi.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/mkdisk.o: mkdisk.c sysgen.h ../core/kernel/bdos.h ../core/kernel/kernel_abi.h
+$(OBJ_DIR)/mkdisk.o: mkdisk.c sysgen.h ../core/kernel/bdos.h ../core/kernel/disk_format.h ../core/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/utils.o: utils.c utils.h sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h
+$(OBJ_DIR)/utils.o: utils.c utils.h sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h ../core/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/commands.o: commands.c commands.h utils.h sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h
+$(OBJ_DIR)/commands.o: commands.c commands.h utils.h sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h ../core/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
@@ -45,12 +45,12 @@ $(OBJ_DIR)/main.o: main.c commands.h utils.h
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
 $(OBJ_DIR)/bdos.o: ../core/kernel/bdos.c ../core/kernel/bdos.h ../core/kernel/disk.h \
-        ../core/kernel/kernel_abi.h ../core/kernel/bios.h
+        ../sdk/include/abi.h ../core/bios.h ../core/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_BDOS) -c $< -o $@
 
-$(OBJ_DIR)/disk.o: ../core/kernel/disk.c ../core/kernel/disk.h ../core/kernel/kernel_abi.h \
-        ../core/kernel/bios.h
+$(OBJ_DIR)/disk.o: ../core/kernel/disk.c ../core/kernel/disk.h ../core/kernel/disk_format.h \
+        ../sdk/include/abi.h ../core/bios.h ../core/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_BDOS) -c $< -o $@
 

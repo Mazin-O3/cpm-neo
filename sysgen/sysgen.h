@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "kernel_abi.h"
+#include "abi.h"
+#include "disk_format.h"
 
 /* Image buffer owned by bios_host.c */
 void     sysgen_set_disk(uint8_t *disk, uint32_t size);
@@ -18,7 +19,7 @@ int elf32_symbol(const uint8_t *elf, size_t len, const char *name, uint32_t *val
 void to_name83(const char *src, char *out83);
 
 /* Build a new disk image in place (fills sysgen_disk()); returns reserved secs or -1.
- * Divides the block grid equally between all VOL_MAX volumes (A:-D:) and
+ * Divides the block grid equally between all MAX_VOLUMES volumes (A:-D:) and
  * formats each one (header + empty root), so every volume is mounted at boot. */
 int mkdisk_build(uint32_t size_kb,
                 const uint8_t *kern, uint32_t kern_size,
@@ -30,7 +31,7 @@ int mkdisk_build(uint32_t size_kb,
 /* Minimum disk size (KB) so every volume can hold min-viable blocks */
 int mkdisk_min_size_kb(uint32_t kern_size, uint32_t ccp_size, int xip);
 
-/* Maximum useful disk size (KB): bounded by VOL_MAX x the 2 MB volume cap,
+/* Maximum useful disk size (KB): bounded by MAX_VOLUMES x the 2 MB volume cap,
  * plus the reserved area. */
 int mkdisk_max_size_kb(uint32_t kern_size, uint32_t ccp_size, int xip);
 

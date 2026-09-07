@@ -1,6 +1,6 @@
 /*
  * libc/string.c
- * CP/M Neo — string and memory utilities (software only)
+ * CP/M Neo — String and memory utilities (software only)
  */
 
 #include "string.h"

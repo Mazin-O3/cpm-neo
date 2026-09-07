@@ -2,13 +2,14 @@
  * platform/vemu/bios.c
  * CP/M Neo — Vemu hardware BIOS implementation
  *
- * Pure physical I/O.  No volume awareness — translation
+ * Pure physical I/O.  No volume awareness — Translation
  * happens in kernel/disk.c.  Includes mmio.h for direct
  * register access.
  */
 
 #include "bios.h"
 #include "mmio.h"
+#include "disk_format.h"
 #include <stddef.h>
 
 /* DMA-based sector read/write */

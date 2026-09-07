@@ -1,7 +1,6 @@
 #include "utils.h"
 #include "bdos.h"
 #include "disk.h"
-#include "kernel_abi.h"
 #include "sysgen.h"
 
 #include <ctype.h>

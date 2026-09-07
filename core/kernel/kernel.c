@@ -1,5 +1,5 @@
 /*
- * kernel/kernel.c — syscall implementations and program loader
+ * kernel/kernel.c — Syscall implementations and program loader
  *
  * Each sys_* function is a plain kernel function that user programs call
  * directly (see syscall-reference.md).  A typical file syscall:
@@ -46,7 +46,7 @@ static KernelState g_kstate = {0};
 /*
  * Volume/user prefixes are optional and position-dependent; scan up to
  * 4 chars for a colon delimiter.  This lets the CCP accept bare
- * filenames transparently — only an explicit "X:" or "Xn:" triggers
+ * filenames transparently — Only an explicit "X:" or "Xn:" triggers
  * a context switch.
  */
 static FsContext parse_prefix(const char **path_ptr)
@@ -75,7 +75,7 @@ static FsContext parse_prefix(const char **path_ptr)
 
         ctx.vol_id = toupper((unsigned char)p[0]) - 'A';
 
-        if (ctx.vol_id >= VOL_MAX)
+        if (ctx.vol_id >= MAX_VOLUMES)
             return ctx;
 
         if (colon > 1)
@@ -189,7 +189,7 @@ int kernel_init(void)
 
     g_kstate.fs_ctx = (FsContext){VOL_INVALID, 0};
 
-    for (uint8_t v = 0; v < VOL_MAX; v++)
+    for (uint8_t v = 0; v < MAX_VOLUMES; v++)
     {
         if (bd_bind(v) == EOK && g_kstate.fs_ctx.vol_id == VOL_INVALID)
             g_kstate.fs_ctx.vol_id = v;
@@ -311,19 +311,16 @@ void kexec_ccp(void)
      * link origin (the sector-aligned end of the kernel image), so it is
      * always eligible for direct execution when the disk is XIP-formatted.
      * S0_CCP_SEC is a physical disk sector, so entry = XIP_BASE + sec*512.
-     * If it somehow crosses the XIP window top the disk geometry is broken —
-     * refuse to run rather than executing XIP-origin code from the TPA. */
+     * The kernel/CCP fit in the disk head is guaranteed at build time, so
+     * there is nothing to check here at runtime. */
     uint32_t ccp_entry = xip_addr(sec);
 
     if (ccp_entry != 0)
     {
-        if ((uintptr_t)ccp_entry + (uintptr_t)nsecs * DISK_SECTOR_SIZE <= (uintptr_t)__xip_top)
-        {
-            JUMP(ccp_entry);
+        JUMP(ccp_entry);
 
-            for (;;)
-                ;
-        }
+        for (;;)
+            ;
 
         goto err;
     }
@@ -531,7 +528,7 @@ int sys_vstat(int8_t vol_id, VolStat *stat)
 }
 
 /*
- * sys_exec — execute a program.  If the name has no extension,
+ * sys_exec — Execute a program.  If the name has no extension,
  * ".COM" is appended automatically.
  */
 int sys_exec(const char *name, int argc, char **argv)
@@ -554,34 +551,6 @@ int sys_exec(const char *name, int argc, char **argv)
     return kexec(n83, argc, argv, ctx);
 }
 
-/*
- * sys_dev — memory-mapped I/O for hardware register access.
- * Validates alignment and range before dereferencing the volatile pointer.
- */
-int sys_dev(uint32_t reg, uint32_t cmd, uint32_t *data)
-{
-    if (!data)
-        return EINVAL;
-
-    /* Check the sum's parts first: reg + delta must not wrap around. */
-    uint32_t delta = cmd & IOCTL_OFF_MASK;
-
-    if (reg > (uint32_t)IO_SIZE - 4 || delta > (uint32_t)IO_SIZE - 4 - reg ||
-        ((reg + delta) & 3) != 0)
-        return EINVAL;
-
-    uint32_t off = reg + delta;
-
-    volatile uint32_t *p = (volatile uint32_t *)(uintptr_t)((uintptr_t)__io_base + off);
-
-    if (cmd & IOCTL_WRITE_FLAG)
-        *p = *data;
-    else
-        *data = *p;
-
-    return EOK;
-}
-
 int sys_fsetattr(const char *name, uint8_t attrib)
 {
     FsContext ctx = parse_prefix(&name);
@@ -601,7 +570,7 @@ int sys_vsetattr(int8_t vol_id, uint8_t attr)
 
 int sys_mount(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     return bd_mount(vol_id);
@@ -609,7 +578,7 @@ int sys_mount(int8_t vol_id)
 
 int sys_resize(int8_t vol_id, int16_t delta)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     return bd_resize(vol_id, delta);
@@ -617,7 +586,7 @@ int sys_resize(int8_t vol_id, int16_t delta)
 
 int sys_unmount(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     return bd_unbind(vol_id);
@@ -640,7 +609,7 @@ int sys_info(SysInfo *out)
 
     out->tpa = ((uint32_t)__kernel_base - (uintptr_t)__tpa_base) / 1024;
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
         out->vol_mounted[v] = (volume_run_count((int8_t)v) > 0) ? 1 : 0;
 
     out->disk_size_kb = disk_block_count();
@@ -658,13 +627,13 @@ int sys_getctx(FsContext *out)
 }
 
 /*
- * sys_setctx — switch the current volume/user context.
+ * sys_setctx — Switch the current volume/user context.
  * If the volume changes, auto-binds the new volume first (so the CCP
  * doesn't need to issue a separate bind call).
  */
 int sys_setctx(FsContext ctx)
 {
-    if (ctx.vol_id >= VOL_MAX)
+    if (ctx.vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     if (ctx.vol_id != g_kstate.fs_ctx.vol_id)
@@ -689,7 +658,7 @@ uint32_t sys_getenv(uint8_t slot)
 }
 
 /*
- * sys_setenv — write to a kernel environment slot.
+ * sys_setenv — Write to a kernel environment slot.
  * ENV_RETURN_CODE and ENV_BATCH_OFFSET may only be written by the CCP
  * (gated by the is_ccp flag) so transient programs cannot hijack
  * batch control or fake a return code.

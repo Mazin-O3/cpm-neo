@@ -7,7 +7,7 @@
  * layer; BDOS deals only with filesystem semantics.
  *
  * All public bd_* functions accept a vol_id that must already be mounted
- * (bd_bind or bd_mount) — callers never touch raw sectors.  The CHECK_VOL
+ * (bd_bind or bd_mount) — Callers never touch raw sectors.  The CHECK_VOL
  * and CHECK_FCB macros enforce this invariant at the top of each entry
  * point, returning ENOVOL/EBADF on violations.
  *
@@ -20,6 +20,7 @@
 #include "bdos.h"
 #include "ctype.h"
 #include "disk.h"
+#include "disk_format.h"
 #include "string.h"
 
 /* Vol-checked guard: resolves vol_id and returns ENOVOL if unmounted. */
@@ -40,15 +41,15 @@ typedef struct
     uint16_t root_start_sec;
     uint16_t data_start_sec;
     uint16_t total_sectors;
-    uint16_t total_blocks; /* capped at BD_VOL_MAX_BLOCKS */
-    uint16_t alloc_next;   /* hint for next free-block scan */
+    uint16_t total_blocks; /* Capped at BD_VOL_MAX_BLOCKS */
+    uint16_t alloc_next;   /* Hint for next free-block scan */
     int8_t id;
-    uint8_t mounted : 1;                         /* set by bd_bind/bd_mount, cleared by bd_unbind */
-    uint8_t read_only : 1;                       /* mirrors VOL_ATTR_RO on the disk */
-    uint8_t block_alloc_map[BD_BLOCK_MAP_BYTES]; /* rebuilt on mount */
+    uint8_t mounted : 1;                         /* Set by bd_bind/bd_mount, cleared by bd_unbind */
+    uint8_t read_only : 1;                       /* Mirrors VOL_ATTR_RO on the disk */
+    uint8_t block_alloc_map[BD_BLOCK_MAP_BYTES]; /* Rebuilt on mount */
 } Volume;
 
-/* FileKey: unique identity for a directory entry — volume + 8.3 name + user. */
+/* FileKey: unique identity for a directory entry — Volume + 8.3 name + user. */
 typedef struct
 {
     Volume *v;
@@ -80,7 +81,7 @@ typedef struct
 
 typedef struct
 {
-    Volume vol[VOL_MAX];
+    Volume vol[MAX_VOLUMES];
     FCB fcb[BD_MAX_FCBS];
     uint8_t sec_buf[DISK_SECTOR_SIZE];
 } BDState;
@@ -95,10 +96,10 @@ typedef struct
 typedef struct
 {
     FileKey key;
-    uint16_t *first_diridx; /* set to the first extent's dir index */
+    uint16_t *first_diridx; /* Set to the first extent's dir index */
     uint16_t n;
-    uint32_t size;  /* logical size: sum of exact extent byte counts */
-    uint32_t alloc; /* allocated bytes: sum of block-rounded extent sizes */
+    uint32_t size;  /* Logical size: sum of exact extent byte counts */
+    uint32_t alloc; /* Allocated bytes: sum of block-rounded extent sizes */
 } ScanExtentsCtx;
 
 typedef int (*dir_scan_fn)(Volume *v, const uint8_t *entry, uint16_t idx, void *ctx);
@@ -184,7 +185,7 @@ static void entry_to_name(const uint8_t *entry, char *out)
  * Copy a directory entry into its raw blank-padded base and extension
  * fields.  Matching follows real CP/M: the FDOS compares all 11 bytes,
  * where '?' matches any character (including blanks) and blanks match
- * only blanks.  No trimming — padding participates in the comparison.
+ * only blanks.  No trimming — Padding participates in the comparison.
  */
 static void entry_fields(const uint8_t *entry, char *base, char *ext)
 {
@@ -196,7 +197,7 @@ static void entry_fields(const uint8_t *entry, char *base, char *ext)
 
 static Volume *vol_for(int8_t vol_id)
 {
-    return (vol_id < 0 || vol_id >= VOL_MAX) ? NULL : &g_bd.vol[vol_id];
+    return (vol_id < 0 || vol_id >= MAX_VOLUMES) ? NULL : &g_bd.vol[vol_id];
 }
 
 static Volume *vol_checked(int8_t vol_id)
@@ -681,7 +682,7 @@ int bd_bind(int8_t vol_id)
     if (rc != EOK)
         return rc;
 
-    uint16_t stride = v->total_blocks / VOL_MAX;
+    uint16_t stride = v->total_blocks / MAX_VOLUMES;
     v->alloc_next = stride ? ((uint16_t)vol_id * stride) % v->total_blocks : 1;
 
     if (v->alloc_next == BD_RESERVED_BLOCK)
@@ -916,7 +917,7 @@ int bd_sync(void)
     if (rc != EOK)
         return rc;
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         Volume *vol = &g_bd.vol[v];
 
@@ -1234,7 +1235,7 @@ int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos)
 
     /* Callers must supply the padded 8.3 form (see make_name83):
      * base at pat[0..7], extension at pat[8..10].  Fields are compared
-     * raw — '?' matches any byte, blanks only blanks — so an ambiguous
+     * raw — '?' matches any byte, blanks only blanks — So an ambiguous
      * reference never crosses the '.' boundary. */
     char base_pat[NAME83_BASE + 1], ext_pat[NAME83_EXT + 1];
 
@@ -1539,7 +1540,7 @@ int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib)
 {
     CHECK_VOL(v, ctx.vol_id);
 
-    /* extent_idx is a uint8_t on disk, so at most 256 extents exist. */
+    /* The extent index is a uint8_t on disk, so at most 256 extents exist. */
     int rc = ENOENT;
 
     for (uint16_t ei = 0; ei <= UINT8_MAX; ei++)

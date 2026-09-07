@@ -1,6 +1,6 @@
 /*
  * libc/string.h
- * CP/M Neo — string and memory utilities (software only)
+ * CP/M Neo — String and memory utilities (software only)
  *
  * Prototypes here must match the definitions in string.c exactly.
  * Because these names collide with compiler-recognized builtins
@@ -23,7 +23,7 @@ void   *memmove(void *dst, const void *src, size_t n);
 void   *memset(void *dst, int val, size_t n);
 int     memcmp(const void *a, const void *b, size_t n);
 
-/* Strings — copy, concatenate, and compare */
+/* Strings — Copy, concatenate, and compare */
 size_t  strlen(const char *s);
 int     strcmp(const char *a, const char *b);
 int     strncmp(const char *a, const char *b, size_t n);
@@ -34,8 +34,8 @@ char   *strchr(const char *s, int c);
 char   *strrchr(const char *s, int c);
 
 /* Case-insensitive comparison */
-void    strupr(char *s);                                   /* uppercase in place      */
-int     strcasecmp(const char *a, const char *b);          /* case-insensitive compare */
-int     strncasecmp(const char *a, const char *b, size_t n); /* first n chars           */
+void    strupr(char *s);                                   /* Uppercase in place      */
+int     strcasecmp(const char *a, const char *b);          /* Case-insensitive compare */
+int     strncasecmp(const char *a, const char *b, size_t n); /* First n chars           */
 
 #endif /* STRING_H */

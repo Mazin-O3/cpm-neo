@@ -68,7 +68,7 @@ be permanently unreachable. The maximum grid size is:
 
 ```text
 BD_VOL_MAX_BLOCKS
-= 2048 blocks
+= 2048 blocks   (= BD_BLOCK_MAP_BYTES × 8, at the 256-byte default)
 ```
 
 ## Volume record

@@ -3,12 +3,7 @@
  * CP/M Neo 32-bit RISC-V Bootloader
  */
 
-#include "s0_layout.h"
-
-.equ DISK_MAGIC,      0x4350
-.equ BOOT_SIG,        0xAA55
-.equ BOOT_MAGIC,      DISK_MAGIC
-.equ SECTOR_SIZE,     512
+#include "disk_format.h"
 
 .extern bios_init
 .extern bios_read
@@ -63,7 +58,7 @@ _boot_start:
     jal  ra, print_str
     la   a0, msg_kernel_ok
     jal  ra, print_str
-    jalr zero, t0, 0           /* Take off to the XIP entry — no return */
+    jalr zero, t0, 0           /* Take off to the XIP entry — No return */
 
 .Lno_xip:
 
@@ -71,15 +66,15 @@ _boot_start:
     lhu  s1, S0_KERN_LOAD(s7)
     lhu  t0, (S0_KERN_LOAD + 2)(s7)
     slli t0, t0, 16
-    or   s1, s1, t0            /* s1 = 32-bit load address */
+    or   s1, s1, t0            /* 32-bit load address in s1 */
 
     lhu  s2, S0_KERN_SECTORS(s7)
     lhu  s6, S0_KERN_SEC(s7)
     beqz s2, err_disk
 
     /* Validate memory bounds to protect bootloader RAM and physical RAM */
-    slli t0, s2, 9             /* t0 = total kernel bytes (sectors * 512) */
-    add  t1, s1, t0            /* t1 = end of loaded kernel */
+    slli t0, s2, 9             /* Total kernel bytes (sectors * 512) in t0 */
+    add  t1, s1, t0            /* End of loaded kernel in t1 */
 
     la   t2, __boot_stack_top
     bltu s1, t2, err_disk      /* Err: Start address clobbers boot RAM */
@@ -101,7 +96,7 @@ _boot_start:
     jal  ra, bios_read
     bltz a0, err_disk          /* Err: Bios read failure */
     
-    addi s3, s3, SECTOR_SIZE
+    addi s3, s3, DISK_SECTOR_SIZE
     addi s4, s4, 1
     addi s5, s5, -1
     bnez s5, .Lload_kern
@@ -121,7 +116,7 @@ _boot_start:
 
 /* ── Helper Routines ─────────────────────────────────────── */
 
-/* print_str: Prints null-terminated string pointed to by a0 */
+/* Print the null-terminated string pointed to by a0 (print_str). */
 print_str:
     addi sp, sp, -16           /* Maintain 16-byte stack alignment */
     sw   ra, 12(sp)

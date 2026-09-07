@@ -69,8 +69,12 @@ SECTIONS {
      * handlers, so a private kernel stack is only ever needed during the
      * initial boot — which runs on this same stack (growing down into the
      * then-empty TPA).  These symbols are owned here, in the kernel
-     * link, and flow to the CCP/apps via --just-symbols. */
-    __stack_size = 0x1000;
+     * link, and flow to the CCP/apps via --just-symbols.
+     *
+     * The default below mirrors core/config.h's CONFIG_STACK_SIZE; a port
+     * may set a different value by passing --defsym=__stack_size=<val>
+     * to the kernel link (build_disk.sh extracts it from config.h). */
+    PROVIDE(__stack_size = 0x1000);
     __stack_top  = ORIGIN(RAM);
     _stack_top   = __stack_top;
 

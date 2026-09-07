@@ -266,7 +266,7 @@ int main(int argc, char **argv)
                 break;
             }
             /* Save to disk, then resume editing at the top of the
-             * (now clean) buffer. Never just drop the flag — that
+             * (now clean) buffer. Never just drop the flag — That
              * lost all unsaved work on a following Q. */
 
             if (ed_save(&e) != 0)

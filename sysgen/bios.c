@@ -4,7 +4,6 @@
  */
 
 #include "bios.h"
-#include "kernel_abi.h"
 #include "sysgen.h"
 
 #include <stdio.h>

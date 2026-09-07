@@ -86,7 +86,7 @@ See the [User Guide](docs/user-guide.md) for the full build and execution walkth
 | `stat` | Show volume usage and metadata |
 
 Platforms are defined in `platform/<name>/`: `config.sh` plus `bios.c`
-implementing the console and storage functions from `core/kernel/bios.h`.
+implementing the console and storage functions from `core/bios.h`.
 
 See the [Developer Guide](docs/developer-guide.md) to add your own.
 

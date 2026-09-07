@@ -12,9 +12,9 @@
 
 typedef struct
 {
-    int8_t vol_id;    /* volume the error refers to, or VOL_INVALID */
+    int8_t vol_id;    /* Volume the error refers to, or VOL_INVALID */
     int err_code;
-    const char *token; /* offending token for CMDERR_SYNTAX */
+    const char *token; /* Offending token for CMDERR_SYNTAX */
 } CmdErr;
 
 static inline CmdErr cmderr_ok(void)
@@ -39,7 +39,7 @@ static inline CmdErr cmderr_bdos(int8_t v, int r)
 
 /* Print a CmdErr to stderr: "<token>?" for syntax errors; otherwise the
  * strerror() text, prefixed as "Bdos Err On <vol>: " when a volume is
- * attached — except ENOENT/EEXIST, which always print plain ("No File",
+ * attached — Except ENOENT/EEXIST, which always print plain ("No File",
  * "File Exists").  err_code is recorded in ENV_RETURN_CODE (CCP-only;
  * transient apps propagate it via exit() instead). */
 void cmderr_print(CmdErr se);

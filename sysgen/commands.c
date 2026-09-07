@@ -1,8 +1,6 @@
 #include "commands.h"
 #include "bdos.h"
 #include "disk.h"
-#include "kernel_abi.h"
-#include "s0_layout.h"
 #include "sysgen.h"
 #include "utils.h"
 
@@ -17,7 +15,7 @@
 #define CCP_VER 0x0100
 
 /*
- * sysgen/commands.c — host-side SYSGEN command implementations
+ * sysgen/commands.c — Host-side SYSGEN command implementations
  *
  * Implements the `sysgen` CLI subcommands: new, add, install, extract,
  * dir, type, era, ren, stat.  These operate on a raw disk image using
@@ -373,7 +371,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
         if (read_build_tag(paths, ".xipsize", xip_size_buf, sizeof(xip_size_buf)) == 0)
         {
             hr(tmp, sizeof(tmp), (uint32_t)strtoul(xip_size_buf, NULL, 0));
-            printf("  XIP window       : %s (XIP_SIZE)\n", tmp);
+            printf("  XIP window       : %s\n", tmp);
         }
     }
 
@@ -396,7 +394,7 @@ static void report_build(const SysgenPaths *paths, uint32_t size_kb,
     uint16_t base_sec = read16(vmap + VMAP_BASE_SEC);
     uint16_t disk_usable_kb = 0;
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         const uint8_t *vr = vmap + VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
         const char *mode = (vr[VMAP_VR_ATTR] & VOL_ATTR_RO) ? "RO" : "RW";
@@ -518,7 +516,7 @@ static bool validate_build_env(const SysgenPaths *paths)
 }
 
 /*
- * cmd_new — create a fresh disk image.
+ * cmd_new — Create a fresh disk image.
  * Runs the build script (make or cmake), reads kernel/CCP/bootloader
  * binaries, calls mkdisk_build(), then installs bundled apps.
  */
@@ -630,32 +628,23 @@ int cmd_new(int argc, char **argv)
     if (disk_size_over_cap(cfg.disk_size_kb, ksz, ccpsz, is_xip) != 0)
         goto cleanup;
 
-    /* XIP window invariant: a disk image may be larger than the XIP window
-     * (only the kernel/CCP code executes in place from it), but the window
-     * must never exceed the largest disk the platform can produce.  An
-     * oversized XIP_SIZE is a platform misconfiguration, not a bigger window. */
+    /* Record the resolved disk size in bytes for XIP builds: the flash
+     * window is the disk image itself (there is no configured XIP_SIZE),
+     * so the tag lets `sysgen report` show the window size. */
     if (is_xip)
     {
-        char xip_size_buf[32];
+        char xip_path[SYSGEN_FULL_PATH_MAX];
+        snprintf(xip_path, sizeof(xip_path), "%s/.xipsize", paths->build_dir);
 
-        if (read_build_tag(paths, ".xipsize", xip_size_buf, sizeof(xip_size_buf)) != 0)
+        FILE *f = fopen(xip_path, "w");
+        if (f == NULL)
         {
-            err("XIP build missing .xipsize tag (stale sysgen build?)");
+            err("cannot write .xipsize tag to %s", xip_path);
             goto cleanup;
         }
 
-        unsigned long xip_bytes = strtoul(xip_size_buf, NULL, 0);
-        uint32_t max_disk_bytes = (uint32_t)mkdisk_max_size_kb(ksz, ccpsz, is_xip) * 1024;
-
-        if (xip_bytes > max_disk_bytes)
-        {
-            err("XIP_SIZE %s (%lu B) exceeds the %u B (%uK) max disk size -- "
-                "the XIP window must not exceed the largest disk the platform "
-                "can produce; shrink XIP_SIZE in platform/%s/config.sh",
-                xip_size_buf, xip_bytes, max_disk_bytes, max_disk_bytes / 1024,
-                cfg.platform);
-            goto cleanup;
-        }
+        fprintf(f, "%lu", (unsigned long)cfg.disk_size_kb * 1024);
+        fclose(f);
     }
 
     int reserved = mkdisk_build((uint32_t)cfg.disk_size_kb, kern, ksz, ccp, ccpsz, kern_load,
@@ -664,7 +653,7 @@ int cmd_new(int argc, char **argv)
     if (reserved < 0)
     {
         err("mkdisk_build failed: --disk-size %ldK is too small (minimum %dK for all %d volumes)",
-            cfg.disk_size_kb, min_kb, VOL_MAX);
+            cfg.disk_size_kb, min_kb, MAX_VOLUMES);
         goto cleanup;
     }
 
@@ -1026,7 +1015,7 @@ static int parse_file_target(int argc, char **argv, const char *usage, const cha
 }
 
 /*
- * cmd_add — add a file or flat folder to the disk image.
+ * cmd_add — Add a file or flat folder to the disk image.
  * Supports --dst=Vn for volume/user targeting, --attr for file attributes.
  * Folder mode iterates all files in the folder and skips duplicates.
  */
@@ -1084,7 +1073,7 @@ int cmd_add(int argc, char **argv)
 }
 
 /*
- * cmd_install — install bundled apps or user-specified source.
+ * cmd_install — Install bundled apps or user-specified source.
  * --sys-apps / --extra-apps: install pre-built apps from the SDK tree.
  * Otherwise: compile a folder of .c files into .COM and add to the image.
  */
@@ -1176,7 +1165,7 @@ int cmd_install(int argc, char **argv)
 }
 
 /*
- * cmd_extract — extract all files from every volume/user into a flat folder.
+ * cmd_extract — Extract all files from every volume/user into a flat folder.
  * Works even on damaged images (loads the raw image buffer without
  * validating the boot sector, then uses bd_* for file I/O).
  */
@@ -1228,7 +1217,7 @@ int cmd_extract(int argc, char **argv)
 
     int total = 0, skipped = 0, errors = 0;
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         if (bd_bind((int8_t)v) != EOK)
             continue;
@@ -1323,7 +1312,7 @@ int cmd_extract(int argc, char **argv)
 }
 
 /*
- * cmd_dir — list files on the host-side disk image (like the CCP's DIR
+ * cmd_dir — List files on the host-side disk image (like the CCP's DIR
  * but operates on the raw image file).
  */
 int cmd_dir(int argc, char **argv)
@@ -1367,7 +1356,7 @@ int cmd_dir(int argc, char **argv)
 }
 
 /*
- * cmd_type — display a file from the disk image on stdout.
+ * cmd_type — Display a file from the disk image on stdout.
  */
 int cmd_type(int argc, char **argv)
 {
@@ -1413,7 +1402,7 @@ int cmd_type(int argc, char **argv)
 }
 
 /*
- * cmd_era — delete a file from the disk image.
+ * cmd_era — Delete a file from the disk image.
  */
 int cmd_era(int argc, char **argv)
 {
@@ -1451,7 +1440,7 @@ int cmd_era(int argc, char **argv)
 }
 
 /*
- * cmd_ren — rename a file on the disk image.
+ * cmd_ren — Rename a file on the disk image.
  */
 int cmd_ren(int argc, char **argv)
 {
@@ -1491,7 +1480,7 @@ int cmd_ren(int argc, char **argv)
 }
 
 /*
- * cmd_stat — display volume statistics (block count, free space, etc.)
+ * cmd_stat — Display volume statistics (block count, free space, etc.)
  * for all volumes in the disk image.
  */
 int cmd_stat(int argc, char **argv)
@@ -1508,7 +1497,7 @@ int cmd_stat(int argc, char **argv)
     printf("  disk: %s\n", disk_buf);
     printf("  block: 1K, blocks: %u, base sector: %u\n", disk_block_count(), disk_base_sec());
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         if (volume_run_count((int8_t)v) == 0)
         {

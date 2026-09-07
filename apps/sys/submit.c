@@ -14,7 +14,7 @@ static int sub_resolve_ext(char *name)
 
     int len = strlen(name);
 
-    if (len > 0 && name[len - 1] == '.') /* trailing dot = no extension */
+    if (len > 0 && name[len - 1] == '.') /* Trailing dot = no extension */
         name[--len] = '\0';
 
     strcpy(name + len, ".SUB");

@@ -180,5 +180,5 @@ For application development, see the [Developer Guide](developer-guide.md).
 The usual workflow is:
 
 ```text
-write source → build/install with sysgen → run from CP/M Neo
+write source -> build/install with sysgen -> run from CP/M Neo
 ```

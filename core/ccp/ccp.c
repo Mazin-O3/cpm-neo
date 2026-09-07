@@ -22,7 +22,7 @@ typedef struct
 static FsContext g_ctx;
 static CcpBuf g_buf;
 
-/* Resident commands — everything else falls through to try_implicit_run(). */
+/* Resident commands — Everything else falls through to try_implicit_run(). */
 static const CmdEntry g_cmds[] = {{.name = "DIR", .fn = cmd_dir},
                                   {.name = "DIRS", .fn = cmd_dirs},
                                   {.name = "ERA", .fn = cmd_era},
@@ -45,7 +45,7 @@ int ccp_setuser(FsContext *ctx, uint8_t ua)
 
 /*
  * The CCP's input buffer is reused across dispatches, so splitting
- * in-place avoids a separate allocation — argv pointers alias into
+ * in-place avoids a separate allocation — Argv pointers alias into
  * the same buffer that gets NUL-terminated on each space.
  */
 static int tokenise(char *line, char *argv[], int max)
@@ -92,7 +92,7 @@ static CmdErr try_ctx_switch(const char *tok)
 
         int8_t idx = (int8_t)(toupper((unsigned char)tok[0]) - 'A');
 
-        if (idx >= VOL_MAX)
+        if (idx >= MAX_VOLUMES)
             return cmderr_bdos(idx, EINVAL);
 
         g_ctx.vol_id = idx;
@@ -122,7 +122,7 @@ static CmdErr try_ctx_switch(const char *tok)
 
         if (ep != tok + cp || ua < 0 || ua > USER_AREA_MAX)
         {
-            g_ctx.vol_id = old_vol; /* undo the vol_id set above, if any */
+            g_ctx.vol_id = old_vol; /* Undo the vol_id set above, if any */
             return cmderr_syntax(tok);
         }
 

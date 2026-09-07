@@ -1,14 +1,14 @@
 /*
  * apps/sys/set.c — SET command implementation
  *
- * SET B: RO         — set volume attribute (read-only)
- * SET B: RW         — clear volume attribute
- * SET B: MT         — mount (format + bind) a volume
- * SET B: UM         — unmount a volume (must be empty)
- * SET B: RZ +n      — grow a volume by n KB
- * SET B: RZ -n      — shrink a volume by n KB
- * SET FOO.TXT RO    — set file attribute
- * SET FOO.TXT SYS   — mark as system file
+ * SET B: RO         — Set volume attribute (read-only)
+ * SET B: RW         — Clear volume attribute
+ * SET B: MT         — Mount (format + bind) a volume
+ * SET B: UM         — Unmount a volume (must be empty)
+ * SET B: RZ +n      — Grow a volume by n KB
+ * SET B: RZ -n      — Shrink a volume by n KB
+ * SET FOO.TXT RO    — Set file attribute
+ * SET FOO.TXT SYS   — Mark as system file
  *
  * Volume vs file is disambiguated by parse_fileref: if name[0] is '\0'
  * after parsing, the argument was a bare volume+colon (volume command).

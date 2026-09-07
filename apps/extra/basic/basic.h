@@ -10,7 +10,7 @@
 #define STR_SZ    64
 #define BASIC_LINE_SZ   96
 #define ARR_MAX   16
-#define DIM_MAX   (ARR_MAX - 1)  /* largest subscript accepted by DIM */
+#define DIM_MAX   (ARR_MAX - 1)  /* Largest subscript accepted by DIM */
 #define TOK_BASE  0x80
 
 enum
@@ -99,7 +99,7 @@ typedef struct
 typedef struct
 {
     int param[NVARS];
-    char text[NVARS][BASIC_LINE_SZ]; /* owned copy of each body (stable across line edits) */
+    char text[NVARS][BASIC_LINE_SZ]; /* Owned copy of each body (stable across line edits) */
     char *body[NVARS];
 } BasicFn;
 

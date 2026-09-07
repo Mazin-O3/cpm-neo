@@ -169,9 +169,9 @@ static char *fmt_uint(char *end, uint32_t val, int base, int upper)
 typedef struct
 {
     char *buf;
-    int pos;     /* characters currently buffered (flush pointer) */
-    int limit;   /* buffer capacity */
-    int total;   /* characters produced so far */
+    int pos;     /* Characters currently buffered (flush pointer) */
+    int limit;   /* Buffer capacity */
+    int total;   /* Characters produced so far */
     int bounded; /* 1 = stop at limit-1; 0 = flush to stdout at limit */
 } Writer;
 
@@ -190,7 +190,7 @@ static void w_putc(Writer *w, char c)
 
     if (w->bounded)
     {
-        /* count-only when buf is NULL (snprintf(NULL, 0, ...)) */
+        /* Count-only when buf is NULL (snprintf(NULL, 0, ...)) */
         if (w->buf && w->pos < w->limit - 1)
             w->buf[w->pos] = c;
 

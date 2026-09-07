@@ -1,10 +1,10 @@
 /*
- * sdk/include/syscall.h — raw syscall wrappers
+ * sdk/include/syscall.h — Raw syscall wrappers
  *
  * System calls are plain kernel functions (sys_open, sys_read, ...) that
  * user programs call directly.  Applications and the CCP resolve them at
  * link time against kernel.elf (--just-symbols), so a call site is a
- * direct jump to the kernel's function — there is no jump table, trap,
+ * direct jump to the kernel's function — There is no jump table, trap,
  * or ecall.  Prefer the fs.h wrappers for filesystem operations; this
  * header is the low-level escape hatch.
  */
@@ -12,7 +12,7 @@
 #ifndef SYSCALL_H
 #define SYSCALL_H
 
-#include "../kernel/kernel_abi.h"
+#include "abi.h"
 
 /* Open name83 for reading or writing.  Returns fd or negative errno. */
 int sys_open(const char *name, uint8_t writable);
@@ -67,11 +67,8 @@ int sys_vstat(int8_t vol_id, VolStat *stat);
 void sys_exit(int rc) __attribute__((noreturn));
 
 /* Load and execute name.  Returns 0 on success, or negative errno
- * (does not return on success — the current program is replaced). */
+ * (does not return on success — The current program is replaced). */
 int sys_exec(const char *name, int argc, char **argv);
-
-/* Read/write a memory-mapped I/O register via cmd encoding. */
-int sys_dev(uint32_t reg, uint32_t cmd, uint32_t *data);
 
 /* Set attributes on all extents of a file.  Returns 0 or neg errno. */
 int sys_fsetattr(const char *name, uint8_t attrib);

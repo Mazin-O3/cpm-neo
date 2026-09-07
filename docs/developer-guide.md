@@ -30,8 +30,10 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 - `syscall.h`: plain `sys_open`/`sys_read`/… declarations — the kernel
   functions themselves, called directly (see
   [Syscall Reference](syscall-reference.md)).
-- `kernel_abi.h`: shared ABI: `SysInfo`, disk constants (VMAP/block
-  layout), env slot layout, `FD_*` handles.
+- `abi.h`: the user-facing ABI: `SysInfo`, `FsContext`, `VolStat`,
+  env slot layout, `FD_*` handles, `DISK_SECTOR_SIZE` (sourced from
+  `disk_format.h`). Tunables live in `core/config.h`; on-disk layout
+  constants in `core/kernel/disk_format.h`.
 - `bios.h`: BIOS interface (see below).
 
 ## The BIOS layer
@@ -47,11 +49,33 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 | `int bios_write(uint16_t sec, const uint8_t *buf)` | Write one sector |
 | `uint32_t bios_time(void)` | platform-defined time service |
 
-To touch hardware directly, the SDK provides `sys_dev()`, which reads/writes
-a 32-bit memory-mapped I/O register in the window at `__io_base` (the
-platform's MMIO base from `platform/<name>/config.sh`). Register/command
-offsets are the `IOCTL_*` macros in `kernel_abi.h`; the `data` pointer
-carries the value and is required.
+## Configuring the system
+
+Resource usage is tuned in a single header, `core/config.h`. A port edits
+the values there; they are picked up by the kernel, the disk layer, the
+SDK ABI (`abi.h`), and sysgen, so the whole system tunes from one place.
+
+| Knob | Default | Kernel RAM cost (roughly) |
+|------|---------|---------------------------|
+| `CONFIG_VOL_MAX` | 4 | `MAX_VOLUMES`-backed arrays and `SysInfo.vol_mounted[]` |
+| `CONFIG_BLOCK_MAP_BYTES` | 256 | alloc bitmap bytes per volume; block cap `BD_VOL_MAX_BLOCKS` derives ×8 (2048) |
+| `CONFIG_FCB_MAX` | 4 | `CONFIG_FCB_MAX` open-file control blocks |
+| `CONFIG_STACK_SIZE` | 0x1000 | single shared kernel/CCP/app stack (top of TPA) |
+
+`CONFIG_VOL_MAX` and `CONFIG_BLOCK_MAP_BYTES` (per-volume block cap derives
+`×8`) are also on-disk *format* parameters, so changing them must be paired
+with a fresh image: `sysgen new --platform=<name>`. `CONFIG_STACK_SIZE` is
+consumed by the linker (linker scripts cannot include C headers);
+`build_disk.sh` extracts it from `config.h` and passes it to the kernel
+links as `--defsym=__stack_size`, with the `PROVIDE` default in
+`linker_kernel_common.ld` mirroring `config.h`.
+
+A small-RAM port (for example a 32 KB ROM / ~2.5 KB SRAM target) shrinks
+the data footprint by dropping the disk layer's big arrays: `CONFIG_FCB_MAX 2`,
+`CONFIG_VOL_MAX 2`, `CONFIG_BLOCK_MAP_BYTES 64`, and a tighter
+`CONFIG_STACK_SIZE`. The v1 pattern is to keep one tuned `config.h`
+checked in per port; a generated-header or `-D` override path can layer on
+later.
 
 ## Adding a platform
 
@@ -64,17 +88,16 @@ A platform is a self-contained `platform/<name>/` directory:
    - `RAM_SIZE` — total RAM in bytes (hex), e.g. `0x10000` = 64 KB
    - `RAM_BASE` — base address of the RAM region holding CP/M Neo
    - `IO_BASE` — base address of the peripheral MMIO window
-   - `XIP_BASE`, `XIP_SIZE` — consulted only when the build passes `--xip`
-     (see below); under `--xip` both are required; a platform declaring only
-     one is a build error. `XIP_BASE` declares the execute-in-place window
-     base and `XIP_SIZE` its size (see [Architecture](architecture.md#execute-in-place-xip)),
-     which must not exceed the max disk size the platform can produce (the
-     disk image itself may be larger than the window); `sysgen` rejects
-     oversized windows at build time.
+- `XIP_BASE` — consulted only when the build passes `--xip` (see below);
+      there is no configured window size. Under `--xip`, `XIP_BASE` is the
+      base of the execute-in-place window, which extends over the disk image
+      itself (see [Architecture](architecture.md#execute-in-place-xip)); the
+      kernel/CCP run in place from it and whether they fit the produced disk
+      is validated at build time.
 2. `bios.c` implements the functions in `bios.h`.
 3. Build with `sysgen new ... --platform=<id> [--xip]` — `--xip` selects an
    XIP disk; omit it for a plain (RAM-loading) disk. The flag alone selects
-   the mode: a plain build ignores `XIP_BASE`/`XIP_SIZE` entirely.
+   the mode: a plain build ignores `XIP_BASE` entirely.
 
 ### Platform lookup
 
@@ -88,7 +111,7 @@ A platform is a self-contained `platform/<name>/` directory:
 
 ### The BIOS contract
 
-Each platform implements the functions declared in `core/kernel/bios.h`
+Each platform implements the functions declared in `core/bios.h`
 (console: `bios_conout`, `bios_conin`, `bios_constat`, `bios_consize`,
 `bios_init`; storage: `bios_read`, `bios_write`, `bios_sync`; time:
 `bios_time`) directly in `bios.c`.
@@ -98,7 +121,7 @@ Storage semantics follow a write-back contract:
 the persistence barrier that commits all previously accepted writes to durable
 storage and must return success only once they are durable. `bios_read` must
 observe all prior successful writes (read-after-write). The disk layer and
-`SYNC` command drive this chain via `bd_sync` → `disk_sync` → `bios_sync`.
+`SYNC` command drive this chain via `bd_sync` -> `disk_sync` -> `bios_sync`.
 
 A platform that supports several storage devices can select one at build time
 inside the storage functions:
@@ -166,7 +189,7 @@ target another ISA, edit these here before running `sysgen new`.
 `boot.S` uses the platform BIOS (`bios_read`, `bios_conout`) to load the kernel.
 `bios_init()` must successfully initialize the required BIOS services before they
 are used; failure halts silently. Sector-0 field offsets are shared by the
-bootloader, kernel, and sysgen via `core/kernel/s0_layout.h`. The toolchain must
+bootloader, kernel, and sysgen via `core/kernel/disk_format.h`. The toolchain must
 produce images with `ld -m $LD_EMULATION`, as used by `build_disk.sh` and
 `app_build.sh`.
 

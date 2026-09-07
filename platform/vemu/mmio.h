@@ -1,6 +1,6 @@
 /*
  * bios/mmio.h
- * CP/M Neo — memory-mapped I/O register definitions
+ * CP/M Neo — Memory-mapped I/O register definitions
  *
  * Shared by the kernel, libc, and BIOS. Never include from user programs.
  */
@@ -9,7 +9,6 @@
 #define MMIO_H
 
 #include <stdint.h>
-#include "kernel_abi.h"
 
 /* MMIO access macros */
 
@@ -131,7 +130,7 @@ extern char __io_base[];
 #define DMA_CSTR_START_STREAM (DMA_CSTR_START | DMA_CSTR_STREAM)
 
 /*
- * DMA transfer flags — used by bios_dma_transfer() / SYS_DMA.
+ * DMA transfer flags — Used by bios_dma_transfer() / SYS_DMA.
  * These are the public API flags, independent of register layout.
  * bios_dma_transfer() packs them into DMA_CSTR format.
  *

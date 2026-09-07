@@ -143,7 +143,7 @@ CmdErr cmd_user(FsContext *ctx, int argc, char **argv)
 }
 
 /*
- * exec_if_sys — if the $SYS-marked .COM at |path| exists, execute it.
+ * exec_if_sys — If the $SYS-marked .COM at |path| exists, execute it.
  * Returns 1 if the file was found (exec attempted, *out_rc set), 0 otherwise.
  */
 static int exec_if_sys(const char *path, int argc, char **argv, int *out_rc)
@@ -162,7 +162,7 @@ static int exec_if_sys(const char *path, int argc, char **argv, int *out_rc)
 }
 
 /*
- * try_implicit_run — attempt to execute a transient command.
+ * try_implicit_run — Attempt to execute a transient command.
  * If the name has no extension, ".COM" is tried implicitly.
  * Bare commands (no explicit prefix) search in this order:
  *   1. current drive / current user area (any file)
@@ -239,7 +239,7 @@ CmdErr cmd_echo(FsContext *ctx, int argc, char **argv)
 }
 
 /*
- * SYNC — enforce durability of all pending writes. Falls through to the
+ * SYNC — Enforce durability of all pending writes. Falls through to the
  * kernel sync chain (sys_sync -> bd_sync -> disk_sync -> bios_sync), which
  * commits the disk-layer cache and requests a platform persistence barrier.
  */

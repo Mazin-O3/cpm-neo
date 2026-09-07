@@ -106,15 +106,13 @@ ID=${ID:?"$PLATFORM_ID: ID not set in platform/$PLATFORM_DIR/config.sh (8-char O
 # solely to support --xip builds).  Under --xip the disk is XIP-formatted and
 # the kernel and CCP are linked into the XIP region at XIP_BASE; .data/.bss
 # still live in RAM. User .com files are always RAM-loaded (TPA) regardless
-# of XIP. XIP requires BOTH XIP_BASE and XIP_SIZE — a missing one under --xip
-# is a build error, never a silent non-XIP image.
+# of XIP. XIP requires XIP_BASE — a missing one under --xip is a build error,
+# never a silent non-XIP image.  There is no XIP window size: the window
+# starts at XIP_BASE and extends over the produced disk image, so sysgen
+# sizes everything against the actual linked contents.
 if [ "$FORCE_XIP" = "1" ]; then
     if [ -z "${XIP_BASE+x}" ] || [ -z "$XIP_BASE" ]; then
         echo "ERROR: --xip build requires XIP_BASE — declare XIP_BASE in platform/$PLATFORM_DIR/config.sh" >&2
-        exit 1
-    fi
-    if [ -z "${XIP_SIZE+x}" ] || [ -z "$XIP_SIZE" ]; then
-        echo "ERROR: --xip build (XIP_BASE=$XIP_BASE) but XIP_SIZE is not set — declare XIP_SIZE in platform/$PLATFORM_DIR/config.sh" >&2
         exit 1
     fi
     IS_XIP=1
@@ -129,22 +127,25 @@ else
     XIP_DEFSYM="--defsym=XIP_BASE=0"
 fi
 
-# XIP window geometry.  All XIP code and disk images must live in
-# [XIP_BASE, XIP_BASE + XIP_SIZE); __xip_top is that exclusive end and is
-# what the linker regions, the boot target, and the kernel's runtime XIP
-# checks are bounded by.  On non-XIP builds the window is empty (__xip_top =
-# 0, XIP_BASE = 0).
-DISK_SECTOR_SIZE=512   # core/kernel/kernel_abi.h: DISK_SECTOR_SIZE
-KERN_START_SEC=2       # core/kernel/kernel_abi.h: KERN_START_SEC (boot+VMAP)
-XIP_TOP=0x0000
+# XIP placement geometry.  The kernel's in-place code starts at
+# __kernel_xip_base = XIP_BASE + KERN_START_SEC*512 (right past the boot and
+# VMAP sectors on the disk); __kernel_xip_end is defined by the kernel link
+# itself (sector-aligned end of the kernel's XIP footprint) and flows to the
+# CCP link, which is placed immediately after it.  The XIP code therefore
+# sizes its own window — there is no externally configured XIP size.  On
+# non-XIP builds the window is empty (XIP_BASE = 0).
+# Sector I/O byte count and kernel start sector both come from the single
+# on-disk format header (core/kernel/disk_format.h), which boot.S, the
+# kernel, sysgen, and user programs all read.
+DISK_SECTOR_SIZE=$(awk '/^#define[[:space:]]+DISK_SECTOR_SIZE/{print $3; exit}' \
+    core/kernel/disk_format.h)
+DISK_SECTOR_SIZE=${DISK_SECTOR_SIZE:-512}
+KERN_START_SEC=2       # core/kernel/disk_format.h: KERN_START_SEC (boot+VMAP)
 KERN_XIP_BASE=0x0000
 if [ "$IS_XIP" = "1" ]; then
-    XIP_TOP_DEC=$((XIP_BASE + XIP_SIZE))
-    XIP_TOP=$(printf '0x%X' "$XIP_TOP_DEC")
     KERN_XIP_BASE_DEC=$((XIP_BASE + KERN_START_SEC * DISK_SECTOR_SIZE))
     KERN_XIP_BASE=$(printf '0x%X' "$KERN_XIP_BASE_DEC")
 fi
-XIP_TOPSYM="--defsym=__xip_top=$XIP_TOP"
 KERN_XIP_SYM=
 if [ "$IS_XIP" = "1" ]; then
     KERN_XIP_SYM="--defsym=__kernel_xip_base=$KERN_XIP_BASE"
@@ -218,6 +219,13 @@ KERNEL_INC="-I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
 CCP_INC="-I core/ccp/ -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
 SDK_INC="-I sdk/include -I core/kernel/ -I core/ -I ./ $PLATFORM_INC"
 
+# Shared stack size comes from the single config surface (core/config.h).
+# Linker scripts cannot include C headers, so build_disk.sh extracts the
+# value and passes it to the kernel links as --defsym; the PROVIDE fallback
+# in linker_kernel_common.ld mirrors the default here.
+CONFIG_STACK=$(awk '/^#define[[:space:]]+CONFIG_STACK_SIZE/{print $3; exit}' core/config.h)
+CONFIG_STACK=${CONFIG_STACK:-0x1000}
+
 compile() {
     mkdir -p "$(dirname "$3")"
     $CC $1 -c "$2" -o "$3"
@@ -227,9 +235,9 @@ mkdir -p "$BUILD" "$INT" "$SDK_LIB"
 
 # ── Bootloader ─────────────────────────────────────────────
 echo "  Building bootloader..."
-$CC $CFLAGS $PLATFORM_INC -I core/kernel/ \
+$CC $CFLAGS $PLATFORM_INC -I core/kernel/ -I core/ -I sdk/include \
     -c "platform/$PLATFORM_DIR/bios.c" -o "$INT/boot_plat.o"
-$CC $CFLAGS -I arch/$ARCH/ -I core/kernel/ \
+$CC $CFLAGS -I arch/$ARCH/ -I core/kernel/ -I core/ \
     -Wl,--gc-sections -Wl,--strip-debug -Wl,--no-warn-rwx-segments \
     -Wl,--defsym=__io_base="$IO_BASE_HEX" \
     -Wl,--defsym=__ram_top="$RAM_TOP_HEX" \
@@ -271,7 +279,8 @@ $LD $LDFLAGS \
     --defsym=__io_base="$IO_BASE_HEX" \
     --defsym=__ram_top="$RAM_TOP_HEX" \
     --defsym=__tpa_base="$TPA_BASE_HEX" \
-    $XIP_DEFSYM $XIP_TOPSYM $KERN_XIP_SYM \
+    --defsym=__stack_size="$CONFIG_STACK" \
+    $XIP_DEFSYM $KERN_XIP_SYM \
     -T $KERN_LD \
     $KERNEL_OBJS "$LIBGCC" -o "$INT/kernel_pass1.elf"
 
@@ -285,7 +294,8 @@ $LD $LDFLAGS \
     --defsym=__io_base="$IO_BASE_HEX" \
     --defsym=__ram_top="$RAM_TOP_HEX" \
     --defsym=__tpa_base="$TPA_BASE_HEX" \
-    $XIP_DEFSYM $XIP_TOPSYM $KERN_XIP_SYM \
+    --defsym=__stack_size="$CONFIG_STACK" \
+    $XIP_DEFSYM $KERN_XIP_SYM \
     -T $KERN_LD \
     $KERNEL_OBJS "$LIBGCC" -o "$INT/kernel.elf"
 
@@ -335,7 +345,7 @@ for src in $CCP_C; do
 done
 $LD $LDFLAGS -T $SDK_LD \
     $CCP_OBJS "$SDK_OBJ/crt0.o" "$LIBGCC" \
-    --just-symbols="$INT/kernel.elf" $XIP_DEFSYM $XIP_TOPSYM $SDK_GEOM -o "$INT/ccp.elf"
+    --just-symbols="$INT/kernel.elf" $XIP_DEFSYM $SDK_GEOM -o "$INT/ccp.elf"
 $OBJCOPY -O binary "$INT/ccp.elf" "$INT/ccp.bin"
 
 printf '%s' "$PLATFORM_DIR" > "$BUILD/.platform_dir"
@@ -343,13 +353,3 @@ printf '%s' "$ID" > "$BUILD/.platform_id"
 printf '%s' "$ARCH" > "$BUILD/.arch"
 printf '%s' "$ARCH_CFLAGS" > "$BUILD/.archflags"
 printf '%s' "$IS_XIP" > "$BUILD/.xip"
-
-# XIP window size in bytes (0 on non-XIP).  sysgen validates that it never
-# exceeds the max disk size the platform can produce.  The disk image itself
-# may be larger than the window -- only the kernel/CCP code runs in place
-# from it -- but the window must not outgrow the disk capacity.
-XIP_SIZE_BYTES=0
-if [ "$IS_XIP" = "1" ]; then
-    XIP_SIZE_BYTES=$((XIP_SIZE))
-fi
-printf '%s' "$XIP_SIZE_BYTES" > "$BUILD/.xipsize"

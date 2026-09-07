@@ -1,7 +1,7 @@
 #ifndef _LIBC_STDLIB_H
 #define _LIBC_STDLIB_H
 
-#include "../kernel/kernel_abi.h"
+#include "abi.h"
 #include <stdint.h>
 
 void exit(int status) __attribute__((noreturn));

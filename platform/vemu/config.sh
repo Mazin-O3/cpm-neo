@@ -12,8 +12,9 @@
 #   XIP_BASE  — flash/XIP window base; used only by `sysgen new --xip`
 #               builds (the kernel/CCP run in place from this window).
 #               Plain builds (no --xip) ignore it and are always non-XIP.
-#   XIP_SIZE  — XIP window size in bytes; the platform's max disk size
-#               (the XIP image is an alternate disk of that same size).
+#               The XIP window has no configured size: it extends from
+#               XIP_BASE to the end of the on-disk kernel/CCP contents, and
+#               the flash simply maps the XIP disk image.
 
 ID="vemu"
 ARCH=riscv32
@@ -21,4 +22,3 @@ RAM_SIZE=0x10000
 RAM_BASE=0x0000
 IO_BASE=0xFF00
 XIP_BASE=0x10000
-XIP_SIZE=0x207C00

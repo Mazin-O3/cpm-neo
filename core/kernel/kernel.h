@@ -4,7 +4,8 @@
 #include <errno.h>
 #include "bdos.h"
 #include "bios.h"
-#include "kernel_abi.h"
+#include "abi.h"
+#include "disk_format.h"
 #include <stdio.h>
 #include <stdint.h>
 
@@ -17,11 +18,6 @@ extern char __tpa_base[];
  * array like __kernel_base so that (uintptr_t)XIP_BASE yields the link
  * constant (the flash-mapped window base), not a read of that memory. */
 extern char XIP_BASE[];
-
-/* Exclusive end of the XIP window [XIP_BASE, __xip_top) for XIP
- * execution (XIP_BASE + XIP_SIZE). Defined by the linker via --defsym;
- * zero on non-XIP platforms. Char-array form: the address is the constant. */
-extern char __xip_top[];
 
 int      kernel_init(void);
 void     kexec_ccp(void) __attribute__((noreturn));

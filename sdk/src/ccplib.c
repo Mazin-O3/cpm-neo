@@ -41,7 +41,7 @@ int parse_fileref(FsContext *ctx, const char *arg, FileRef *out)
         {
             out->fs_ctx.vol_id = toupper((unsigned char)arg[0]) - 'A';
 
-            if (out->fs_ctx.vol_id >= VOL_MAX)
+            if (out->fs_ctx.vol_id >= MAX_VOLUMES)
                 return 0;
 
             if (cp > 1)
@@ -100,20 +100,20 @@ int parse_fileref(FsContext *ctx, const char *arg, FileRef *out)
 
 typedef enum
 {
-    TOK_LIT,  /* exact match against lit (case-insensitive) */
-    TOK_VOL,  /* bare volume: V: */
-    TOK_PATH, /* general path: V:, VU:, U:, or bare filename */
-    TOK_FILE, /* file ref, VU: prefix optional */
+    TOK_LIT,  /* Exact match against lit (case-insensitive) */
+    TOK_VOL,  /* Bare volume: V: */
+    TOK_PATH, /* General path: V:, VU:, U:, or bare filename */
+    TOK_FILE, /* File ref, VU: prefix optional */
     TOK_ATTR, /* RO RW SYS DIR MT UM RZ */
-    TOK_NUM,  /* integer */
+    TOK_NUM,  /* Integer */
     MAX_FMT_TOKS,
 } TokKind;
 
 typedef struct
 {
     TokKind kind;
-    const char *lit; /* only used for TOK_LIT */
-    int allow_wild;  /* only meaningful for TOK_VOL/TOK_PATH/TOK_FILE */
+    const char *lit; /* Only used for TOK_LIT */
+    int allow_wild;  /* Only meaningful for TOK_VOL/TOK_PATH/TOK_FILE */
 } FTok;
 
 /* Length of the VU: prefix (including colon), or 0 if none.
@@ -318,7 +318,7 @@ SplitName split_name83(const char *name)
         sn.ext_len = 0;
     }
 
-    if (sn.ext_len > NAME83_EXT) /* keep "%.*s" within 8.3 field width */
+    if (sn.ext_len > NAME83_EXT) /* Keep "%.*s" within 8.3 field width */
         sn.ext_len = NAME83_EXT;
 
     return sn;

@@ -31,7 +31,7 @@ static CmdErr cmd_sys(FsContext *ctx, int argc, char **argv)
     printf("%-16s : %uK\n", "TPA", si.tpa);
     printf("%-16s : [", "Volumes");
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         if (!si.vol_mounted[v])
             continue;

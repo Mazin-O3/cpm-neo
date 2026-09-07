@@ -1,45 +1,46 @@
 /*
- * kernel/disk.c — block/run volume-map disk layer
+ * kernel/disk.c — Block/run volume-map disk layer
  *
  * Manages on-disk volume records (VolRec[4]) and the block grid geometry.
  * No free bitmap is kept: free runs are computed on demand from the
- * (at most VOL_MAX * VOL_MAX_RUN = 16) volume runs.
+ * (at most MAX_VOLUMES * VOL_MAX_RUN = 16) volume runs.
  */
 
 #include "disk.h"
 #include "bdos.h"
 #include "bios.h"
-#include "kernel_abi.h"
+#include "abi.h"
+#include "disk_format.h"
 #include "string.h"
 
 #define DISK_DEFAULT_MOUNT_BLOCKS 64
 
 typedef struct
 {
-    uint16_t start; /* first block index */
-    uint16_t count; /* number of blocks  */
+    uint16_t start; /* First block index */
+    uint16_t count; /* Number of blocks  */
 } BlockRun;         /* 4 bytes */
 
 typedef struct
 {
-    BlockRun run[VOL_MAX_RUNS]; /* ordered; run[0] = head */
+    BlockRun run[VOL_MAX_RUNS]; /* Ordered; run[0] = head */
     uint8_t run_count;          /* 0 = unmounted              */
     uint8_t attr;               /* VOL_ATTR_RW / VOL_ATTR_RO  */
 } VolRec;                       /* 18 bytes               */
 
 typedef struct
 {
-    VolRec volumes[VOL_MAX];
+    VolRec volumes[MAX_VOLUMES];
     uint16_t num_blocks;
     uint16_t base_sec;
     uint8_t initialized;
-    uint8_t xip;                     /* cached S0_XIP flag */
+    uint8_t xip;                     /* Cached S0_XIP flag */
 
     /* Single-sector write-back correctness cache. Exists to guarantee
      * read-after-write (read-your-own-writes) regardless of the platform's
      * storage behavior. */
     uint8_t wb_buf[DISK_SECTOR_SIZE];
-    uint16_t wb_sec; /* physical sector, post-translation */
+    uint16_t wb_sec; /* Physical sector, post-translation */
     uint8_t wb_valid;
 } DiskState;
 
@@ -70,7 +71,7 @@ static int collect_used_runs(uint16_t *rstart, uint16_t *rend, int cap)
 {
     int n = 0;
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         const VolRec *vr = &g_disk.volumes[v];
 
@@ -122,9 +123,9 @@ static int collect_used_runs(uint16_t *rstart, uint16_t *rend, int cap)
  * Returns 0 on success, -1 on a layout error. */
 static int validate_layout(void)
 {
-    uint16_t s[VOL_MAX * VOL_MAX_RUNS];
-    uint16_t e[VOL_MAX * VOL_MAX_RUNS];
-    int n = collect_used_runs(s, e, VOL_MAX * VOL_MAX_RUNS);
+    uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
+    uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
+    int n = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (n < 0)
         return -1;
@@ -132,7 +133,7 @@ static int validate_layout(void)
     for (int i = 1; i < n; i++)
     {
         if (s[i] < e[i - 1])
-            return -1; /* overlapping / duplicate */
+            return -1; /* Overlapping / duplicate */
     }
 
     return 0;
@@ -141,9 +142,9 @@ static int validate_layout(void)
 /* Find n contiguous free blocks; returns 0 and sets *start, or -1. */
 static int find_free_run(uint16_t n, uint16_t *start)
 {
-    uint16_t s[VOL_MAX * VOL_MAX_RUNS];
-    uint16_t e[VOL_MAX * VOL_MAX_RUNS];
-    int nruns = collect_used_runs(s, e, VOL_MAX * VOL_MAX_RUNS);
+    uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
+    uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
+    int nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (nruns < 0)
         return -1;
@@ -174,9 +175,9 @@ static int find_free_run(uint16_t n, uint16_t *start)
 /* Total free blocks in the grid: the gaps between the used runs. */
 uint16_t disk_free_blocks(void)
 {
-    uint16_t s[VOL_MAX * VOL_MAX_RUNS];
-    uint16_t e[VOL_MAX * VOL_MAX_RUNS];
-    int nruns = collect_used_runs(s, e, VOL_MAX * VOL_MAX_RUNS);
+    uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
+    uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
+    int nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (nruns < 0)
         return 0;
@@ -200,9 +201,9 @@ uint16_t disk_free_blocks(void)
 /* Test whether the block range [start, start+n) is entirely free. */
 static int range_is_free(uint16_t start, uint16_t n)
 {
-    uint16_t s[VOL_MAX * VOL_MAX_RUNS];
-    uint16_t e[VOL_MAX * VOL_MAX_RUNS];
-    int nruns = collect_used_runs(s, e, VOL_MAX * VOL_MAX_RUNS);
+    uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
+    uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
+    int nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (nruns < 0)
         return 0;
@@ -223,7 +224,7 @@ static int range_is_free(uint16_t start, uint16_t n)
  * into a physical disk sector. */
 int disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX || !g_disk.initialized)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES || !g_disk.initialized)
         return -1;
 
     VolRec *vr = &g_disk.volumes[vol_id];
@@ -374,7 +375,7 @@ int disk_sync(void)
 
 int volume_mount(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     if (!g_disk.initialized)
@@ -412,7 +413,7 @@ int volume_mount(int8_t vol_id)
 
 static int vol_extend(int8_t vol_id, uint16_t n)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     if (!g_disk.initialized)
@@ -479,7 +480,7 @@ static int vol_extend(int8_t vol_id, uint16_t n)
 
 static int vol_shrink(int8_t vol_id, uint16_t n)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     if (!g_disk.initialized)
@@ -552,7 +553,7 @@ int volume_resize(int8_t vol_id, int16_t delta)
 
 int volume_unmount(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     if (!g_disk.initialized)
@@ -577,7 +578,7 @@ int volume_unmount(int8_t vol_id)
 
 uint32_t volume_sectors(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX || !g_disk.initialized)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES || !g_disk.initialized)
         return 0;
 
     return (uint32_t)vol_blocks(&g_disk.volumes[vol_id]) * BD_BLOCK_SECS;
@@ -585,7 +586,7 @@ uint32_t volume_sectors(int8_t vol_id)
 
 uint8_t volume_run_count(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return 0;
 
     return g_disk.volumes[vol_id].run_count;
@@ -593,7 +594,7 @@ uint8_t volume_run_count(int8_t vol_id)
 
 int volume_getattr(int8_t vol_id, uint8_t *attr)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX || !attr)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES || !attr)
         return EINVAL;
 
     if (!g_disk.initialized)
@@ -605,7 +606,7 @@ int volume_getattr(int8_t vol_id, uint8_t *attr)
 
 int volume_setattr(int8_t vol_id, uint8_t attr)
 {
-    if (vol_id < 0 || vol_id >= VOL_MAX)
+    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
         return EINVAL;
 
     if (!g_disk.initialized)

@@ -1,6 +1,6 @@
 /*
  * sysgen/mkdisk.c
- * CP/M Neo SYSGEN — disk image assembly
+ * CP/M Neo SYSGEN — Disk image assembly
  *
  * Writes sector 0 (geometry), the VMAP at sector 1 (block grid + VolRec[4]),
  * the kernel image (with BOOT_MAGIC trailer), the raw CCP binary, and a
@@ -29,7 +29,7 @@ static uint32_t min_viable_blocks(void)
  * sector.  On non-XIP disks one more sector is reserved when the padding is
  * under 4 bytes, to carry the BOOT_MAGIC trailer the RAM-loading bootloader
  * validates.  On XIP disks the bootloader jumps straight into the kernel from
- * flash and never validates the magic, so no trailer sector is taken — the
+ * flash and never validates the magic, so no trailer sector is taken — The
  * CCP then starts immediately after the kernel's own footprint. */
 static uint32_t kernel_sectors(uint32_t kern_size, int xip)
 {
@@ -75,7 +75,7 @@ static void write32(uint8_t *p, uint32_t v)
 }
 
 /*
- * elf32_symbol — look up a symbol value in a 32-bit ELF binary.
+ * elf32_symbol — Look up a symbol value in a 32-bit ELF binary.
  * Returns 0 on success (value written to *value), -1 on failure.
  * Used by sysgen to find __kernel_base from the kernel ELF.
  */
@@ -150,7 +150,7 @@ int elf32_symbol(const uint8_t *e, size_t n, const char *name, uint32_t *value)
 }
 
 /*
- * to_name83 — convert a filename string to padded 8.3 format.
+ * to_name83 — Convert a filename string to padded 8.3 format.
  * If no extension is present, ".COM" is assumed.
  *
  * Mirrors the kernel's make_name83() (core/kernel/kernel.c) for the
@@ -265,7 +265,7 @@ int write_file(const char *path, const uint8_t *data, uint32_t len)
 }
 
 /*
- * mkdisk_build — assemble a complete disk image in memory.
+ * mkdisk_build — Assemble a complete disk image in memory.
  * Writes sector 0 (geometry), the VMAP at sector 1, the kernel image
  * (with BOOT_MAGIC trailer), the raw CCP binary, and a formatted
  * filesystem header + empty root for every volume.
@@ -353,19 +353,19 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
      * volume span up to BD_VOL_MAX_BLOCKS blocks -- including nearly
      * the entire disk -- if it's later grown with SET RZ +N after the
      * other volumes are shrunk or unmounted. */
-    uint32_t base = num_blocks / VOL_MAX;
-    uint32_t rem = num_blocks % VOL_MAX;
+    uint32_t base = num_blocks / MAX_VOLUMES;
+    uint32_t rem = num_blocks % MAX_VOLUMES;
     uint32_t min_blocks = min_viable_blocks();
 
     if (base < min_blocks)
-        return -1; /* disk too small to give every volume a viable block count */
+        return -1; /* Disk too small to give every volume a viable block count */
 
     uint8_t *vmap = disk + VMAP_SEC * DISK_SECTOR_SIZE;
     write16(vmap + VMAP_NUM_BLOCKS, (uint16_t)num_blocks);
     write16(vmap + VMAP_BASE_SEC, base_sec);
     write16(vmap + VMAP_MAGIC_OFF, VMAP_MAGIC);
 
-    for (uint32_t v = 0; v < VOL_MAX; v++)
+    for (uint32_t v = 0; v < MAX_VOLUMES; v++)
     {
         uint32_t start = v * base + (v < rem ? v : rem);
         uint32_t count = base + (v < rem ? 1 : 0);
@@ -381,13 +381,13 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
 
         write16(vmap + vr + VMAP_VR_RUN0_START, (uint16_t)start);
         write16(vmap + vr + VMAP_VR_RUN0_COUNT, (uint16_t)count);
-        vmap[vr + VMAP_VR_RUN_COUNT] = 1;      /* run_count */
-        vmap[vr + VMAP_VR_ATTR] = VOL_ATTR_RW; /* attr */
+        vmap[vr + VMAP_VR_RUN_COUNT] = 1;      /* Run count */
+        vmap[vr + VMAP_VR_ATTR] = VOL_ATTR_RW; /* Attr */
 
         /* ── Formatted filesystem: header + (already-zeroed) empty root ── */
         uint16_t v_secs = (uint16_t)(count * BD_BLOCK_SECS);
         uint16_t num_data = (uint16_t)((v_secs - BD_DATA_START) / BD_BLOCK_SECS);
-        /* count is already <= BD_VOL_MAX_BLOCKS above, and num_data <=
+        /* Count is already <= BD_VOL_MAX_BLOCKS above, and num_data <=
          * count after subtracting the header/root overhead, so this can
          * no longer fire -- kept as a defensive backstop only. */
 
@@ -411,13 +411,13 @@ int mkdisk_build(uint32_t size_kb, const uint8_t *kern, uint32_t kern_size, cons
 }
 
 /* Minimum disk size (KB) for which every volume can hold at least
- * min-viable blocks (so all VOL_MAX volumes can be mounted at boot). */
+ * min-viable blocks (so all MAX_VOLUMES volumes can be mounted at boot). */
 int mkdisk_min_size_kb(uint32_t kern_size, uint32_t ccp_size, int xip)
 {
     uint32_t reserved = reserve_kernel_ccp(kern_size, ccp_size, xip);
 
     uint32_t min_secs = (uint32_t)KERN_START_SEC + reserved +
-                        (uint32_t)VOL_MAX * min_viable_blocks() * BD_BLOCK_SECS;
+                        (uint32_t)MAX_VOLUMES * min_viable_blocks() * BD_BLOCK_SECS;
     return (int)((min_secs + 1) / 2);
 }
 

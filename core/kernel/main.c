@@ -1,6 +1,6 @@
 /*
  * kernel/main.c
- * CP/M Neo — kernel C entry point
+ * CP/M Neo — Kernel C entry point
  */
 
 #include "kernel.h"

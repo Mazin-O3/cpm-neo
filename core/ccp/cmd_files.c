@@ -33,7 +33,7 @@ typedef struct
 } RenMatch;
 
 /*
- * ren_pattern_match — match a source wildcard pattern (e.g. "F*.C")
+ * ren_pattern_match — Match a source wildcard pattern (e.g. "F*.C")
  * against a concrete filename, capturing '*' and '?' segments into rm.
  * Used by REN to extract the variable parts of the matched name.
  */
@@ -103,7 +103,7 @@ static void ren_pattern_match(const char *src_pat, const char *matched, RenMatch
 }
 
 /*
- * ren_pattern_format — substitute captured segments back into a
+ * ren_pattern_format — Substitute captured segments back into a
  * destination wildcard pattern to produce the new filename.
  * E.g. matched="FOO.C" with dst="X*" produces "XOO.C".
  */

@@ -20,12 +20,15 @@
  *   __tpa_base        — CP/M TPA load address
  *   XIP_BASE          — XIP window base (set by the build; also a runtime symbol)
  *   __kernel_xip_base — kernel's XIP entry/placement address
- *   __xip_top         — exclusive end of the XIP window
- *                       (XIP_BASE + XIP_SIZE)                        */
+ *
+ * The XIP region has no configured size: LENGTH is a never-binding
+ * placeholder (its only job is to satisfy GNU ld's MEMORY grammar).  The
+ * kernel's real XIP footprint ends at __kernel_xip_end (below), and whether
+ * that footprint fits the disk is enforced later by sysgen/mkdisk, not by a
+ * link-time window.                                             */
 
 MEMORY {
-    XIP_REGION (rx) : ORIGIN = __kernel_xip_base,
-                      LENGTH = __xip_top - __kernel_xip_base
+    XIP_REGION (rx) : ORIGIN = __kernel_xip_base, LENGTH = 0x80000000
     KRAM      (rwx) : ORIGIN = __KERN_START, LENGTH = __ram_top - __KERN_START
 }
 
@@ -42,6 +45,3 @@ INCLUDE core/kernel/linker_kernel_common.ld
  * equal its on-disk placement — the CCP then runs in place at Δ=0.
  * User .com files are always RAM-loaded and never consume this region. */
 __kernel_xip_end = ALIGN(_text_end + SIZEOF(.data), 512);
-
-ASSERT(__kernel_xip_end <= __xip_top,
-       "ERROR: kernel XIP footprint exceeds XIP region size")

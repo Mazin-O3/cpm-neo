@@ -26,7 +26,7 @@ This page describes how CP/M Neo is laid out in memory, how it boots, and how it
 2. It prints the banner, reads sector 0 into a scratch buffer, and verifies
    the `0xAA55` boot signature.
 3. Reads the kernel load address and size from the sector-0 header (offsets
-   in `core/kernel/s0_layout.h`).
+   in `core/kernel/disk_format.h`).
 4. **Validates the kernel load range** before reading anything: the
    destination must start at or above the bootloader's runtime RAM
    (`__boot_stack_top`) and stay within usable RAM (`__ram_top`), so a corrupt
@@ -89,26 +89,23 @@ offset `0x026`) and in which linker scripts were used.
 XIP is enabled per build by the `--xip` flag of `sysgen new` (or
 `mksysgen`/`mkvemu`), and `--xip` alone selects the mode: without it the build
 is a plain non-XIP disk, even if the platform declares a window. Under `--xip`,
-the platform must declare both `XIP_BASE` and `XIP_SIZE` in
-`platform/<name>/config.sh`; a platform declaring only one is a build error:
+the platform must declare `XIP_BASE` in `platform/<name>/config.sh`:
 
 ```sh
 XIP_BASE=0x10000
-XIP_SIZE=0x207C00
 ```
 
-All in-place code must live in `[XIP_BASE, XIP_BASE + XIP_SIZE)`. The disk
-image itself may be larger than the window — only the kernel and CCP execute
-from it; everything else on the disk is read through the storage controller.
-The window must never exceed the largest disk the platform can produce:
-`sysgen` computes that ceiling (`mkdisk_max_size_kb`) and rejects an oversized
-`XIP_SIZE` at build time. On `vemu`, `XIP_SIZE` equals the max disk size —
-the window covers the whole alternate (XIP) disk. `build_disk.sh` derives
-`__xip_top = XIP_BASE + XIP_SIZE`, sizes the kernel and CCP `XIP_REGION` linker
-regions from it via `ASSERT`, and stamps `IS_XIP=1` into `sysgen/build/.xip`;
-`sysgen new` writes `S0_XIP=1` and prints `XIP: Yes` in the build report. The
-kernel enforces `__xip_top` at runtime (below). XIP requires a memory-mapped
-storage window; platforms without one do not declare it.
+There is no configured XIP window size: the window starts at `XIP_BASE` and
+extends exactly over the XIP disk image — the kernel and CCP code live in the
+disk's reserved sectors right past the boot and VMAP sectors;
+`build_disk.sh` sizes the kernel's `XIP_REGION` at `__kernel_xip_base` and
+`__kernel_xip_end` (the sector-aligned end of the kernel's in-place code,
+defined by the kernel link itself), and the CCP is linked immediately after.
+Whether the code fits the produced disk is validated by `sysgen`/`mkdisk` at
+build time against the actual binary sizes. `build_disk.sh` stamps `IS_XIP=1`
+into `sysgen/build/.xip`; `sysgen new` writes `S0_XIP=1` and prints `XIP: Yes`
+in the build report. XIP requires a memory-mapped storage window; platforms
+without one do not declare it.
 
 ### Who runs in place
 
@@ -135,8 +132,9 @@ construction for exactly two components:
 User `.com` files occupy arbitrary, often fragmented data blocks, so no link
 origin can match their on-disk placement; they are always RAM-loaded. For the
 same reason there is no RAM "fallback" for XIP components — a fallback would
-execute XIP-origin code from the wrong address, so the kernel refuses to run a
-CCP that crosses `__xip_top`.
+execute XIP-origin code from the wrong address. On an XIP disk the kernel
+always jumps to the CCP at its in-place flash address, which sysgen guarantees
+matches the CCP's link origin.
 
 ### Layout differences
 
@@ -148,7 +146,7 @@ CCP that crosses `__xip_top`.
 | `.data` VMA | RAM | RAM |
 | `.data` LMA | == VMA (no-op) | XIP, right after `.text` |
 | `.bss` | RAM (NOLOAD) | RAM (NOLOAD) |
-| `.data` copy in crt0 | self-copy no-op | XIP → RAM |
+| `.data` copy in crt0 | self-copy no-op | XIP -> RAM |
 
 The CCP starts at `__kernel_xip_end` (sector-aligned end of the kernel's
 `.text` + `.data` image), so it never overlaps the kernel in the XIP region.
@@ -157,8 +155,8 @@ On boot, `S0_XIP` picks the path: non-XIP loads the kernel into RAM at
 `S0_KERN_LOAD`; XIP skips the load and jumps to `XIP_BASE +
 KERN_START_SEC*512` (the first byte of `kernel.bin`, equal to the kernel's
 `_entry`). After each program exits, the kernel reloads the CCP to run it in
-place from flash. Link-time `ASSERT`s in both XIP scripts catch an overfull
-window at build time.
+place from flash. Whether the kernel and CCP fit the produced disk is verified
+at build time by `sysgen`/`mkdisk`, not by the linker.
 
 ### TPA sizing
 

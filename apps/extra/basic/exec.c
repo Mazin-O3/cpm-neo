@@ -193,7 +193,7 @@ static void exec_poke(BasicState *s)
     if (s->ctl.stopped)
         return;
 
-    *((volatile uint8_t *)a) = (uint8_t)v; /* byte-width, matches PEEK */
+    *((volatile uint8_t *)a) = (uint8_t)v; /* Byte-width, matches PEEK */
 }
 
 static void exec_print(BasicState *s)

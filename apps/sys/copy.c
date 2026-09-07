@@ -15,7 +15,7 @@
 #include <string.h>
 
 /*
- * copy_one — copy a single file from src to dst.
+ * copy_one — Copy a single file from src to dst.
  * Preserves the source file's attributes on the destination.
  * Sets *err_vol to the volume where the error occurred (for error reporting).
  * Returns EOK on success, or a negative error code.

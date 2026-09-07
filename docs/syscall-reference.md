@@ -38,18 +38,17 @@ on failure. File handles are non-negative values; standard handles such as
 | 13 | `resize` | Resize a mounted volume | `volid`, `delta` | `0`, or negative errno |
 | 14 | `vstat` | Get volume information | `volid`, `out*` | `0`, or negative errno |
 | 15 | `exec` | Load and execute a program | `path*`, `argc`, `argv*` | Never returns on success; errno on failure |
-| 16 | `dev` | Access a memory-mapped I/O register | `reg`, `cmd`, `data*` | `0`, or negative errno |
-| 17 | `fsetattr` | Get or set file attributes | `name*`, `attr` | `0`, or negative errno |
-| 18 | `info` | Get system information | `out*` | `0`, or negative errno |
-| 19 | `seek` | Set file position | `fh`, `pos` | `0`, or negative errno |
-| 20 | `getctx` | Get filesystem context | `out*` | `0` |
-| 21 | `setctx` | Restore filesystem context | `ctx` | `0`, or negative errno |
-| 22 | `getenv` | Read an environment slot | `slot` | Slot value, or `-1` if invalid |
-| 23 | `setenv` | Write an environment slot | `slot`, `value` | `0`, or `-1` if invalid or protected |
-| 24 | `vsetattr` | Get or set volume attributes | `volid`, `attr` | `0`, or negative errno |
-| 25 | `time` | Get platform-specific time | - | Platform-defined |
-| 26 | `sync` | Flush filesystem changes | - | `0`, or negative errno |
-| 27 | `consize` | Get console dimensions | `cw*`, `ch*` | `0` |
+| 16 | `fsetattr` | Get or set file attributes | `name*`, `attr` | `0`, or negative errno |
+| 17 | `info` | Get system information | `out*` | `0`, or negative errno |
+| 18 | `seek` | Set file position | `fh`, `pos` | `0`, or negative errno |
+| 19 | `getctx` | Get filesystem context | `out*` | `0` |
+| 20 | `setctx` | Restore filesystem context | `ctx` | `0`, or negative errno |
+| 21 | `getenv` | Read an environment slot | `slot` | Slot value, or `-1` if invalid |
+| 22 | `setenv` | Write an environment slot | `slot`, `value` | `0`, or `-1` if invalid or protected |
+| 23 | `vsetattr` | Get or set volume attributes | `volid`, `attr` | `0`, or negative errno |
+| 24 | `time` | Get platform-specific time | - | Platform-defined |
+| 25 | `sync` | Flush filesystem changes | - | `0`, or negative errno |
+| 26 | `consize` | Get console dimensions | `cw*`, `ch*` | `0` |
 
 ## Volume operations
 

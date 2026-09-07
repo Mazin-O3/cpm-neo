@@ -49,7 +49,7 @@ int lex_next(BasicState *s)
             int d = s->lex.p[i] - '0';
 
             if (v > (INT_MAX - d) / 10)
-                v = INT_MAX; /* saturate rather than overflow */
+                v = INT_MAX; /* Saturate rather than overflow */
             else
                 v = v * 10 + d;
             i++;

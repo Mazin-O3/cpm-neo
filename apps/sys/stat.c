@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *stat_vol_fmt = "v";   /* STAT B: — volume stats, no user digits */
-static const char *stat_file_fmt = "f*"; /* STAT FOO.TXT — file stats */
+static const char *stat_vol_fmt = "v";   /* STAT B: — Volume stats, no user digits */
+static const char *stat_file_fmt = "f*"; /* STAT FOO.TXT — File stats */
 
 static CmdErr stat_vol_single(int8_t vol)
 {
@@ -58,7 +58,7 @@ static void stat_file(int8_t vol_id, FileInfo *di)
     SplitName sn = split_name83(di->name);
 
     char base[NAME83_BASE + 1], ext[NAME83_EXT + 1];
-    pad_field(base, sn.base, sn.base_len, NAME83_BASE); /* left-justified in 8 */
+    pad_field(base, sn.base, sn.base_len, NAME83_BASE); /* Left-justified in 8 */
     pad_field(ext, sn.ext, sn.ext_len, sn.ext_len);     /* NUL-copy only      */
 
     printf(" %4u%6uK%5u %s %-2s         %c:%s.%s\n", secs, kb, di->extents, cls, acc, 'A' + vol_id,
@@ -72,12 +72,12 @@ static CmdErr stat_dsk(void)
     if (sys_info(&si) != EOK)
         return cmderr_bdos(0, EIO);
 
-    VolStat vs[VOL_MAX];
-    uint8_t vol_stat_ok[VOL_MAX] = {0};
+    VolStat vs[MAX_VOLUMES];
+    uint8_t vol_stat_ok[MAX_VOLUMES] = {0};
 
     uint16_t disk_usable_k = 0;
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         if (!si.vol_mounted[v])
             continue;
@@ -98,7 +98,7 @@ static CmdErr stat_dsk(void)
     
     printf("Volume  Mode  Used  Total\n");
 
-    for (int8_t v = 0; v < VOL_MAX; v++)
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
         if (!si.vol_mounted[v] || !vol_stat_ok[v])
             continue;

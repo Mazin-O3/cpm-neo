@@ -1,37 +1,41 @@
 /*
- * kernel/bdos.h — BDOS filesystem layer
+ * core/kernel/bdos.h — BDOS filesystem layer
  *
  * Extent-based filesystem.  A BDOS block is two disk sectors
  * (1 KB); eight blocks form one extent; the allocation bitmap supports
- * up to 2048 blocks per volume.
+ * up to BD_VOL_MAX_BLOCKS blocks per volume.
+ *
+ * Tunables come from core/config.h; user-facing ABI types from abi.h.
  */
 
 #ifndef BDOS_H
 #define BDOS_H
 
+#include "abi.h"
+#include "config.h"
 #include "errno.h"
-#include "kernel_abi.h"
 #include <stdint.h>
 
-#define BD_MAX_FCBS            4
+#define BD_MAX_FCBS            CONFIG_FCB_MAX
 #define BD_DISK_MAX_SECS       65535
 
 /*
  * BDOS allocation geometry.
  *
  * A BDOS block consists of two disk sectors.  Eight blocks form one
- * extent, and the allocation bitmap supports up to 2048 blocks.
+ * extent, and the allocation bitmap supports up to BD_VOL_MAX_BLOCKS
+ * blocks per volume.
  */
 #define BD_BLOCK_SECS          2
 #define BD_BLOCK_BYTES         (BD_BLOCK_SECS * DISK_SECTOR_SIZE)
 #define BD_BLOCKS_PER_EXTENT   8
-#define BD_BLOCK_MAP_BYTES     256
-#define BD_VOL_MAX_BLOCKS      (BD_BLOCK_MAP_BYTES * 8) /* 2048 blocks max per volume (2 MB) */
+#define BD_BLOCK_MAP_BYTES     CONFIG_BLOCK_MAP_BYTES
+#define BD_VOL_MAX_BLOCKS      (BD_BLOCK_MAP_BYTES * 8) /* Derived: one cap bit per map byte */
 
 #define BD_ENTRY_SIZE          32
 #define BD_ROOT_ENTRIES        256
 
-/* extent_idx is a uint8_t on disk, so at most 256 extents (2 MB) are
+/* The extent index is a uint8_t on disk, so at most 256 extents (2 MB) are
  * representable per file; the shared 256-entry root directory bounds
  * this further. */
 #define BD_MAX_EXTENTS         256

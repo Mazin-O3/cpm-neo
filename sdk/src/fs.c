@@ -1,5 +1,5 @@
 /*
- * sdk/src/fs.c — user-space filesystem API
+ * sdk/src/fs.c — User-space filesystem API
  *
  * Thin wrappers around sys_* kernel calls.  The open() function maps
  * C-style mode strings ("r"/"w"/"a") to the corresponding BDOS flags.
@@ -26,7 +26,7 @@ int fs_setctx(FsContext ctx)
 }
 
 /*
- * open_flags — map a C-style mode string to BDOS open flags.
+ * open_flags — Map a C-style mode string to BDOS open flags.
  * Returns EINVAL for unknown modes (e.g. "r+").
  */
 static int open_flags(const char *mode)
@@ -158,7 +158,7 @@ int fsetattr(const char *path, uint8_t attrib)
 }
 
 /*
- * find — find the first matching file.  Resets on success.
+ * find — Find the first matching file.  Resets on success.
  * Returns EOK if found, ENOENT if not.
  */
 int find(const char *name, FileInfo *out)
@@ -169,7 +169,7 @@ int find(const char *name, FileInfo *out)
 }
 
 /*
- * find_next — continue a directory scan from the previous position.
+ * find_next — Continue a directory scan from the previous position.
  * Advances on success, resets it to 0 on failure.
  * Call find_reset() to start from the beginning.
  */

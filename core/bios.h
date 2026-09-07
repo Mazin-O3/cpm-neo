@@ -1,6 +1,6 @@
 /*
  * kernel/bios.h
- * CP/M Neo — kernel interface to the BIOS layer
+ * CP/M Neo — Kernel interface to the BIOS layer
  */
 
 #ifndef BIOS_H

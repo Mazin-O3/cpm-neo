@@ -1,7 +1,7 @@
 #ifndef FS_H
 #define FS_H
 
-#include "../kernel/kernel_abi.h"
+#include "abi.h"
 #include "errno.h"
 #include "string.h"
 #include "syscall.h"
@@ -79,7 +79,7 @@ static inline int sync(void)
 }
 
 /* One-shot file lookup: does |name| exist?  Always searches from the
- * beginning of the directory.  Safe to call from anywhere — never
+ * beginning of the directory.  Safe to call from anywhere — Never
  * touches internal iteration state.
  *
  *   FileInfo fi;
@@ -96,7 +96,7 @@ int find(const char *name, FileInfo *out);
  *       process(&di);
  *   }
  *
- * NOT safe to call from inside another find/find_next loop — use find()
+ * NOT safe to call from inside another find/find_next loop — Use find()
  * or sys_findfile() for one-shots in callbacks.
  *
  * Returns EOK or ENOENT. */

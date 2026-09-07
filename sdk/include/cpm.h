@@ -1,7 +1,7 @@
 #ifndef CPM_H
 #define CPM_H
 
-#include <kernel_abi.h>
+#include <abi.h>
 #include <syscall.h>
 #include <errno.h>
 #include <stdint.h>

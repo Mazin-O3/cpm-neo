@@ -18,8 +18,6 @@
  *                  kernel.elf, passed back as a --defsym constant by the
  *                  build so GNU ld folds it into the MEMORY geometry
  *                  reliably)
- *   __xip_top        — exclusive end of the XIP window
- *                  (XIP_BASE + XIP_SIZE, from the build as --defsym)
  *   __tpa_base       — CP/M TPA load base (via --just-symbols)
  *   __tpa_len        — TPA length, __kernel_base − __tpa_base (--defsym)
  *   __stack_size / __stack_top — owned by the kernel link */
@@ -28,17 +26,17 @@
  * fold an intermediate script assignment (e.g. X = sym; ORIGIN = X) into
  * MEMORY geometry — it reports "invalid origin for memory region XIP_REGION"
  * and silently sets the origin to 0 — but it reliably folds plain constant
- * expressions over --defsym symbols, the same idiom the kernel scripts use. */
+ * expressions over --defsym symbols, the same idiom the kernel scripts use.
+ * The XIP region has no configured size: LENGTH is a never-binding
+ * placeholder (GNU ld requires a LENGTH token); the CCP footprint is placed
+ * right after the kernel's XIP code and its fit is enforced by
+ * sysgen/mkdisk. */
 
 MEMORY {
-    XIP_REGION (rx) : ORIGIN = __kernel_xip_end,
-                      LENGTH = __xip_top - __kernel_xip_end
+    XIP_REGION (rx) : ORIGIN = __kernel_xip_end, LENGTH = 0x80000000
     RAM        (rwx) : ORIGIN = __tpa_base, LENGTH = __tpa_len
 }
 
 REGION_ALIAS("TEXT", XIP_REGION)
 
 INCLUDE sdk/linker/linker_sdk.ld
-
-ASSERT(__kernel_xip_end < __xip_top,
-       "ERROR: kernel XIP footprint exceeds XIP region size")

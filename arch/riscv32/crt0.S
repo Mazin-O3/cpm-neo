@@ -31,12 +31,12 @@ _entry:
     la   gp, _data_start + 0x800
     .option pop
 
-    /* Source (.data LMA) — a fixed link-time address, absolute. */
+    /* Source (.data LMA) — A fixed link-time address, absolute. */
     lui  t0, %hi(_data_load)
     addi t0, t0, %lo(_data_load)
 
-    la   t1, _data_start           /* t1 = Destination (.data VMA) */
-    la   t2, _data_end             /* t2 = End of .data VMA */
+    la   t1, _data_start           /* Destination (.data VMA) via t1 */
+    la   t2, _data_end             /* End of .data VMA via t2 */
     bgeu t1, t2, .Ldata_done       /* Skip if start >= end */
 
 .Ldata_loop:
@@ -48,8 +48,8 @@ _entry:
 .Ldata_done:
 
     /* Zero out the .bss section */
-    la   t0, _bss_start            /* t0 = Destination (.bss VMA) */
-    la   t1, _bss_end              /* t1 = End of .bss VMA */
+    la   t0, _bss_start            /* Destination (.bss VMA) via t0 */
+    la   t1, _bss_end              /* End of .bss VMA via t1 */
     bgeu t0, t1, .Lbss_done        /* Skip if start >= end */
 
 .Lbss_loop:
