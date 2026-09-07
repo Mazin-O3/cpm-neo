@@ -89,10 +89,10 @@ offset `0x026`) and in which linker scripts were used.
 XIP is enabled per build by the `--xip` flag of `sysgen new` (or
 `mksysgen`/`mkvemu`), and `--xip` alone selects the mode: without it the build
 is a plain non-XIP disk, even if the platform declares a window. Under `--xip`,
-the platform must declare `XIP_BASE` in `platform/<name>/config.sh`:
+the platform must declare `CONFIG_XIP_BASE` in `platform/<name>/config.sh`:
 
 ```sh
-XIP_BASE=0x10000
+CONFIG_XIP_BASE=0x10000
 ```
 
 There is no configured XIP window size: the window starts at `XIP_BASE` and
@@ -163,11 +163,11 @@ at build time by `sysgen`/`mkdisk`, not by the linker.
 The TPA — where user programs run and (on non-XIP) load — spans
 `[__tpa_base, __kernel_base)`:
 
-- `__tpa_base` is fixed at `RAM_BASE + 0x100`.
+- `__tpa_base` is fixed at `CONFIG_RAM_BASE + 0x100`.
 - `__kernel_base` (the TPA ceiling) is packed at the top of RAM:
   `__kernel_base = (RAM_TOP − __kernel_total) & ~3`, where `RAM_TOP` is
-  `min(RAM_BASE + RAM_SIZE, IO_BASE)` and `__kernel_total` is the kernel's
-  RAM footprint from the two-pass link.
+  `min(CONFIG_RAM_BASE + CONFIG_RAM_SIZE, CONFIG_IO_BASE)` and `__kernel_total`
+  is the kernel's RAM footprint from the two-pass link.
 
 Only `__kernel_total` differs between modes: non-XIP keeps `.text` in RAM
 (the whole image); XIP counts only `.data` + `.bss`, so the kernel takes
@@ -185,31 +185,39 @@ corrupted by later deletes/frees/reuse, so no block-pinning is needed.
 ## Building the OS
 
 `sysgen new` runs `sysgen/build_disk.sh` with `--platform=<ID>`. The script
-scans each `platform/*/config.sh` for an `ID=` equal to that argument to find
-the platform's directory, then builds four components in order.
+scans each `platform/*/config.sh` for a `CONFIG_ID=` equal to that argument to
+find the platform's directory, then builds four components in order.
 
 1. **Bootloader**: compiles the platform BIOS + `arch/<isa>/boot.S`, linked
    with `arch/<isa>/linker_boot.ld` into a `bootloader.bin`. Boot code is
-   placed at `BOOT_BASE` (`__boot_base`) and bounded by `BOOT_SIZE`
-   (`__boot_size`); its runtime RAM (scratch + stack + bios `.bss`) occupies a
-   separate `BRAM` region at `RAM_BASE + BOOT_SIZE` (`__ram_base + __boot_size`)
-   of size `BOOT_RAM_SIZE`. All three are arch constants from
+   placed at `CONFIG_BOOT_BASE` (`__boot_base`) and bounded by
+   `CONFIG_BOOT_SIZE` (`__boot_size`); its runtime RAM (scratch + stack +
+   bios `.bss`) occupies a separate `BRAM` region at
+   `CONFIG_RAM_BASE + CONFIG_BOOT_SIZE` (`__ram_base + __boot_size`) of size
+   `CONFIG_BOOT_RAM_SIZE`. All three are arch constants from
    `arch/<isa>/config.sh`, supplied to the boot link via `--defsym`.
 2. **Kernel**: a **two-pass link**:
    - Pass 1 links the kernel at a placeholder address to extract
      `__kernel_total` from the symbol table.
    - The real base `__KERN_START` is computed from
-     `min(RAM_BASE + RAM_SIZE, IO_BASE) - __kernel_total`, then
-     pass 2 re-links with it, producing `kernel.bin`. The platform's
-     `IO_BASE`, `RAM_BASE`, and the derived `__tpa_base`/`__ram_top` are
-     supplied to both passes via `--defsym=`.
+     `min(CONFIG_RAM_BASE + CONFIG_RAM_SIZE, CONFIG_IO_BASE) - __kernel_total`,
+     then pass 2 re-links with it, producing `kernel.bin`. The platform's
+     `CONFIG_IO_BASE`, `CONFIG_RAM_BASE`, and the derived `__tpa_base`/`__ram_top`
+     are supplied to both passes via `--defsym=`.
 3. **SDK libc**: the user-space library, archived to `libc.a`.
 4. **CCP**: linked like a user program (below).
 
-Each build writes the platform id — the `ID=` field of
+Each build writes the platform id — the `CONFIG_ID=` field of
 `platform/<folder>/config.sh`, required and 8 chars max — into sector 0
-(`S0_PLATFORM`, 8 bytes at offset `0x01E`); the build fails if `ID` is
-unset or exceeds 8 characters.
+(`S0_PLATFORM`, 8 bytes at offset `0x01E`); the build fails if `CONFIG_ID` is
+unset or exceeds 8 characters. `build_disk.sh` also reads the four required
+software knobs (`CONFIG_VOL_MAX`, `CONFIG_DISK_SIZE`, `CONFIG_FCB_MAX`,
+`CONFIG_STACK_SIZE`) — every platform must declare them, there are no
+defaults — and writes the effective values to `build/gen/config.h`, which
+every kernel/CCP/SDK build includes.  The effective volume count and
+per-volume cap are stamped as build tags (`.vol_max`, `.disk_size_kb`) that
+`sysgen new` reads back to size and mount the image, validated against the
+host ceilings in `sysgen/include/config.h` (16 volumes, 32 MB).
 
 ### Linking against the kernel
 

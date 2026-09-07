@@ -32,9 +32,9 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
   [Syscall Reference](syscall-reference.md)).
 - `abi.h`: the user-facing ABI: `SysInfo`, `FsContext`, `VolStat`,
   env slot layout, `FD_*` handles, `DISK_SECTOR_SIZE` (sourced from
-  `disk_format.h`). Tunables live in `core/config.h`; on-disk layout
+  `disk_format.h`). Tunable parameters come from `config.h`; on-disk layout
   constants in `core/kernel/disk_format.h`.
-- `bios.h`: BIOS interface (see below).
+- `core/kernel/bios.h`: BIOS interface (see below).
 
 ## The BIOS layer
 
@@ -51,67 +51,75 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 
 ## Configuring the system
 
-Resource usage is tuned in a single header, `core/config.h`. A port edits
-the values there; they are picked up by the kernel, the disk layer, the
-SDK ABI (`abi.h`), and sysgen, so the whole system tunes from one place.
+Resource usage is tuned per-platform in `platform/<ID>/config.sh`, where every
+parameter carries the `CONFIG_` prefix and all four software knobs are
+required (there are no defaults).  `build_disk.sh` reads them and writes the
+effective values to `build/gen/config.h`, which every kernel/CCP/SDK/app
+compile includes.  The sysgen host tool is compiled once and sizes its arrays
+to the *ceilings* in `sysgen/include/config.h` (16 volumes / 32 MB per volume
+/ 8 FCBs — the maximum any platform may declare); it applies each platform's
+active values at runtime and rejects a platform that exceeds them.
 
 | Knob | Default | Kernel RAM cost (roughly) |
 |------|---------|---------------------------|
 | `CONFIG_VOL_MAX` | 4 | `MAX_VOLUMES`-backed arrays and `SysInfo.vol_mounted[]` |
-| `CONFIG_BLOCK_MAP_BYTES` | 256 | alloc bitmap bytes per volume; block cap `BD_VOL_MAX_BLOCKS` derives ×8 (2048) |
+| `CONFIG_DISK_SIZE` | 2048 | alloc bitmap bytes per volume (KB/8); block cap `BD_VOL_MAX_BLOCKS` = KB |
 | `CONFIG_FCB_MAX` | 4 | `CONFIG_FCB_MAX` open-file control blocks |
 | `CONFIG_STACK_SIZE` | 0x1000 | single shared kernel/CCP/app stack (top of TPA) |
 
-`CONFIG_VOL_MAX` and `CONFIG_BLOCK_MAP_BYTES` (per-volume block cap derives
-`×8`) are also on-disk *format* parameters, so changing them must be paired
-with a fresh image: `sysgen new --platform=<name>`. `CONFIG_STACK_SIZE` is
-consumed by the linker (linker scripts cannot include C headers);
-`build_disk.sh` extracts it from `config.h` and passes it to the kernel
-links as `--defsym=__stack_size`, with the `PROVIDE` default in
-`linker_kernel_common.ld` mirroring `config.h`.
+`CONFIG_VOL_MAX` and `CONFIG_DISK_SIZE` (the per-volume block cap) are also
+on-disk *format* parameters, so changing them must be paired with a fresh
+image: `sysgen new --platform=<name>`. `CONFIG_STACK_SIZE` is consumed by the
+linker (linker scripts cannot include C headers); `build_disk.sh` passes the
+platform's value to the kernel links as `--defsym=__stack_size`, with the
+`PROVIDE` in `linker_kernel_common.ld` serving as a hand-link fallback only.
 
 A small-RAM port (for example a 32 KB ROM / ~2.5 KB SRAM target) shrinks
 the data footprint by dropping the disk layer's big arrays: `CONFIG_FCB_MAX 2`,
-`CONFIG_VOL_MAX 2`, `CONFIG_BLOCK_MAP_BYTES 64`, and a tighter
-`CONFIG_STACK_SIZE`. The v1 pattern is to keep one tuned `config.h`
-checked in per port; a generated-header or `-D` override path can layer on
-later.
+`CONFIG_VOL_MAX 2`, `CONFIG_DISK_SIZE 512`, and a tighter
+`CONFIG_STACK_SIZE`. The v1 pattern is to keep one tuned configuration
+checked in per port under `platform/<name>/config.sh`; `sysgen/include/config.h`
+holds the host ceilings a platform must stay within.
 
 ## Adding a platform
 
 A platform is a self-contained `platform/<name>/` directory:
 
 1. `config.sh` declares the platform facts:
-   - `ID` — the 8-char max platform id, required and stamped into sector 0
-     (`S0_PLATFORM`). e.g. `platform/blackpill-411fe/` with `ID="BPF411E"`.
-   - `ARCH` — the ISA directory under `arch/` (selects the toolchain)
-   - `RAM_SIZE` — total RAM in bytes (hex), e.g. `0x10000` = 64 KB
-   - `RAM_BASE` — base address of the RAM region holding CP/M Neo
-   - `IO_BASE` — base address of the peripheral MMIO window
-- `XIP_BASE` — consulted only when the build passes `--xip` (see below);
-      there is no configured window size. Under `--xip`, `XIP_BASE` is the
+   - `CONFIG_ID` — the 8-char max platform id, required and stamped into sector 0
+     (`S0_PLATFORM`). e.g. `platform/blackpill-411fe/` with
+     `CONFIG_ID="BPF411E"`.
+   - `CONFIG_ARCH` — the ISA directory under `arch/` (selects the toolchain)
+   - `CONFIG_RAM_SIZE` — total RAM in bytes (hex), e.g. `0x10000` = 64 KB
+   - `CONFIG_RAM_BASE` — base address of the RAM region holding CP/M Neo
+   - `CONFIG_IO_BASE` — base address of the peripheral MMIO window
+   - `CONFIG_XIP_BASE` — consulted only when the build passes `--xip` (see below);
+      there is no configured window size. Under `--xip`, `CONFIG_XIP_BASE` is the
       base of the execute-in-place window, which extends over the disk image
       itself (see [Architecture](architecture.md#execute-in-place-xip)); the
       kernel/CCP run in place from it and whether they fit the produced disk
       is validated at build time.
+   - the four software knobs `CONFIG_VOL_MAX`, `CONFIG_DISK_SIZE`,
+     `CONFIG_FCB_MAX`, `CONFIG_STACK_SIZE` (all required, no defaults) — see
+     [Configuring the system](#configuring-the-system).
 2. `bios.c` implements the functions in `bios.h`.
 3. Build with `sysgen new ... --platform=<id> [--xip]` — `--xip` selects an
    XIP disk; omit it for a plain (RAM-loading) disk. The flag alone selects
-   the mode: a plain build ignores `XIP_BASE` entirely.
+   the mode: a plain build ignores `CONFIG_XIP_BASE` entirely.
 
 ### Platform lookup
 
-`--platform` addresses a platform purely by its `ID`:
+`--platform` addresses a platform purely by its `CONFIG_ID`:
 
 - `build_disk.sh` scans every `platform/*/config.sh` and a platform matches
-  when its `ID` equals the argument;
-- an `ID` declared by more than one platform is an error
+  when its `CONFIG_ID` equals the argument;
+- a `CONFIG_ID` declared by more than one platform is an error
   (`duplicate platform ID ...`);
 - an unmatched id fails with `unknown platform '<id>'`.
 
 ### The BIOS contract
 
-Each platform implements the functions declared in `core/bios.h`
+Each platform implements the functions declared in `core/kernel/bios.h`
 (console: `bios_conout`, `bios_conin`, `bios_constat`, `bios_consize`,
 `bios_init`; storage: `bios_read`, `bios_write`, `bios_sync`; time:
 `bios_time`) directly in `bios.c`.
@@ -160,29 +168,30 @@ The `arch/<isa>/` directory needs four files:
 
 | Variable | Meaning |
 | --- | --- |
-| `CROSS_COMPILE` | Cross-compiler prefix, e.g. `riscv64-unknown-elf-`. Required; the build fails if unset |
-| `ARCH_CFLAGS` | `-march`/`-mabi` flags for the target, e.g. `-march=rv32im -mabi=ilp32`. Must include the ISA's code-model flag (RISC-V: `-mcmodel=medany`); every binary runs at its fixed link origin — the kernel and CCP in place from flash on XIP disks, apps from the TPA |
-| `LD_EMULATION` | Linker emulation for the target, e.g. `elf32lriscv` |
-| `BOOT_BASE` | Address where the bootloader is placed and executed (reset vector origin) |
-| `BOOT_SIZE` | Maximum bootloader code image bytes. Bounds the boot code `MEMORY` region and the `build_disk.sh` size check |
-| `BOOT_RAM_SIZE` | Boot runtime RAM bytes (scratch buffer + stack + bios `.bss`). Forms the `BRAM` region at `RAM_BASE + BOOT_SIZE` |
+| `CONFIG_CROSS_COMPILE` | Cross-compiler prefix, e.g. `riscv64-unknown-elf-`. Required; the build fails if unset |
+| `CONFIG_ARCH_CFLAGS` | `-march`/`-mabi` flags for the target, e.g. `-march=rv32im -mabi=ilp32`. Must include the ISA's code-model flag (RISC-V: `-mcmodel=medany`); every binary runs at its fixed link origin — the kernel and CCP in place from flash on XIP disks, apps from the TPA |
+| `CONFIG_LD_EMULATION` | Linker emulation for the target, e.g. `elf32lriscv` |
+| `CONFIG_BOOT_BASE` | Address where the bootloader is placed and executed (reset vector origin) |
+| `CONFIG_BOOT_SIZE` | Maximum bootloader code image bytes. Bounds the boot code `MEMORY` region and the `build_disk.sh` size check |
+| `CONFIG_BOOT_RAM_SIZE` | Boot runtime RAM bytes (scratch buffer + stack + bios `.bss`). Forms the `BRAM` region at `CONFIG_RAM_BASE + CONFIG_BOOT_SIZE` |
 
 The RISC-V example (`arch/riscv32/config.sh`):
 
 ```sh
-CROSS_COMPILE=riscv64-unknown-elf-
-ARCH_CFLAGS="-march=rv32im -mabi=ilp32 -mcmodel=medany"
-LD_EMULATION="elf32lriscv"
+CONFIG_CROSS_COMPILE=riscv64-unknown-elf-
+CONFIG_ARCH_CFLAGS="-march=rv32im -mabi=ilp32 -mcmodel=medany"
+CONFIG_LD_EMULATION="elf32lriscv"
 
-BOOT_BASE=0x0000
-BOOT_SIZE=1024
-BOOT_RAM_SIZE=0x400
+CONFIG_BOOT_BASE=0x0000
+CONFIG_BOOT_SIZE=1024
+CONFIG_BOOT_RAM_SIZE=0x400
 ```
 
 Every component (bootloader, kernel, CCP, SDK library, and each app) sources
-this file and compiles with `ARCH_CFLAGS`; `BOOT_BASE`/`BOOT_SIZE`/
-`BOOT_RAM_SIZE` keep boot code and its runtime RAM in separate regions. To
-target another ISA, edit these here before running `sysgen new`.
+this file and compiles with `CONFIG_ARCH_CFLAGS`; `CONFIG_BOOT_BASE`/
+`CONFIG_BOOT_SIZE`/`CONFIG_BOOT_RAM_SIZE` keep boot code and its runtime RAM
+in separate regions. To target another ISA, edit these here before running
+`sysgen new`.
 
 ### Bootloader conventions
 
@@ -190,7 +199,7 @@ target another ISA, edit these here before running `sysgen new`.
 `bios_init()` must successfully initialize the required BIOS services before they
 are used; failure halts silently. Sector-0 field offsets are shared by the
 bootloader, kernel, and sysgen via `core/kernel/disk_format.h`. The toolchain must
-produce images with `ld -m $LD_EMULATION`, as used by `build_disk.sh` and
+produce images with `ld -m $CONFIG_LD_EMULATION`, as used by `build_disk.sh` and
 `app_build.sh`.
 
 ## Building a program with the SDK

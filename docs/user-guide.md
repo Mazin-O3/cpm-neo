@@ -23,7 +23,7 @@ $ make -C sysgen
 
 ## Create a disk image
 
-Create a 2 MB disk image with 64 KB of RAM (`RAM_SIZE=0x10000` in the platform's `config.sh`):
+Create a 2 MB disk image with 64 KB of RAM (`CONFIG_RAM_SIZE=0x10000` in the platform's `config.sh`):
 
 ```sh
 $ ./sysgen/build/sysgen new \
@@ -34,7 +34,7 @@ $ ./sysgen/build/sysgen new \
 | Option | Description |
 |---|---|
 | `--disk-size` | Disk size in KB. Requires a `K` suffix, e.g. `2048K`. Defaults to the maximum useful size |
-| `--platform` | Target platform id: the 8-char max `ID=` declared by a platform's `config.sh` (platforms under `platform/`). `vemu` is included with the repository; its `config.sh` selects the ISA, `RAM_SIZE`, and memory layout |
+| `--platform` | Target platform id: the 8-char max `CONFIG_ID=` declared by a platform's `config.sh` (platforms under `platform/`). `vemu` is included with the repository; its `config.sh` selects the ISA, `CONFIG_RAM_SIZE`, and memory layout |
 | `--no-extra` | Do not install optional apps from `apps/extra` |
 
 `sysgen new` always writes the image to:
@@ -58,22 +58,6 @@ $ sysgen dir
 ```
 
 Lists files on A:.
-
-### Show volume usage
-
-```sh
-$ sysgen stat
-```
-
-Shows volume usage.
-
-### Display a file
-
-```sh
-$ sysgen type HELLO.TXT
-```
-
-Prints a file from A:.
 
 ## Modify an image
 

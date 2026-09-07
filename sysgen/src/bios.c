@@ -1,5 +1,5 @@
 /*
- * sysgen/bios.c
+ * sysgen/src/bios.c
  * CP/M Neo SYSGEN — Host BIOS adapter
  */
 

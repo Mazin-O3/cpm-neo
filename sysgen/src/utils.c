@@ -217,7 +217,7 @@ int parse_vn(const char *s, int *vol, int *user)
 
     char c = (char)toupper((unsigned char)s[0]);
 
-    if (c < 'A' || c > 'D')
+    if (c < 'A' || c > 'A' + MAX_VOLUMES - 1)
         return -1;
 
     *vol = c - 'A';

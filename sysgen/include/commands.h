@@ -6,9 +6,6 @@ int cmd_add(int argc, char **argv);
 int cmd_install(int argc, char **argv);
 int cmd_extract(int argc, char **argv);
 int cmd_dir(int argc, char **argv);
-int cmd_type(int argc, char **argv);
 int cmd_era(int argc, char **argv);
-int cmd_ren(int argc, char **argv);
-int cmd_stat(int argc, char **argv);
 
 #endif

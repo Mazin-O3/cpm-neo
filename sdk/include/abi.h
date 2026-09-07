@@ -6,7 +6,8 @@
  * file descriptors, argument passing, file/volume statistics, and
  * environment slots.
  *
- * Tunable parameters are sourced from core/config.h.  On-disk layout
+ * Tunable parameters come from config.h (the platform's effective values
+ * via the generated build/gen/config.h).  On-disk layout
  * constants (sector size, sector 0, VMAP / volume header) are owned by
  * core/kernel/disk_format.h; user programs reach it only transitively
  * through this header and reference just the disk properties they

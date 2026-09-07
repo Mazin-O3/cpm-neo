@@ -3,15 +3,25 @@
 CC      ?= cc
 CFLAGS  ?= -Os -Wall -Wextra
 
-INC_LOCAL := -I ../core/kernel -I ../core -I .. -iquote ../sdk/include
-INC_BDOS  := -I ../core/kernel -I ../core -I ../sdk/include -I .. -Wno-builtin-declaration-mismatch
+INC_LOCAL := -Iinclude -I ../core/kernel -I ../core -I .. -iquote ../sdk/include
+# Host bdos.c/disk.c: SYSGEN_HOST gives the runtime block-cap override; the
+# ceiling config (sysgen/include/config.h) provides CONFIG_* to the host
+# build, sizing the arrays to the maximum any platform may use.
+INC_BDOS  := -I include -DSYSGEN_HOST -I ../core/kernel -I ../core -I ../sdk/include -I .. -Wno-builtin-declaration-mismatch
+
+# cmd_new.o applies the runtime cap setters, so it sees the SYSGEN_HOST
+# header view too, but keeps INC_LOCAL so the host libc (not the sdk's
+# freestanding headers) resolves <stdio.h>/<stdlib.h>/<string.h>.
+INC_CMD   := $(INC_LOCAL) -DSYSGEN_HOST
 
 BUILD_DIR := build
 OBJ_DIR   := $(BUILD_DIR)/obj
 BIN       := $(BUILD_DIR)/sysgen
 
 OBJS := $(OBJ_DIR)/bios.o $(OBJ_DIR)/mkdisk.o \
-        $(OBJ_DIR)/utils.o $(OBJ_DIR)/commands.o \
+        $(OBJ_DIR)/utils.o \
+        $(OBJ_DIR)/cmd_common.o $(OBJ_DIR)/cmd_new.o \
+        $(OBJ_DIR)/cmd_apps.o $(OBJ_DIR)/cmd_files.o \
         $(OBJ_DIR)/main.o $(OBJ_DIR)/bdos.o $(OBJ_DIR)/disk.o
 
 CROSS_COMPILE ?= $(error CROSS_COMPILE is not set; set it in arch/<isa>/config.sh)
@@ -24,33 +34,45 @@ all: $(BIN)
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(OBJ_DIR)/bios.o: bios.c sysgen.h ../core/bios.h ../sdk/include/abi.h
+$(OBJ_DIR)/bios.o: src/bios.c include/sysgen.h ../core/kernel/bios.h ../sdk/include/abi.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/mkdisk.o: mkdisk.c sysgen.h ../core/kernel/bdos.h ../core/kernel/disk_format.h ../core/config.h
+$(OBJ_DIR)/mkdisk.o: src/mkdisk.c include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk_format.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/utils.o: utils.c utils.h sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h ../core/config.h
+$(OBJ_DIR)/utils.o: src/utils.c include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/commands.o: commands.c commands.h utils.h sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h ../core/config.h
+$(OBJ_DIR)/cmd_common.o: src/cmd_common.c include/cmd.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/main.o: main.c commands.h utils.h
+$(OBJ_DIR)/cmd_new.o: src/cmd_new.c include/cmd.h include/commands.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CFLAGS) $(INC_CMD) -c $< -o $@
+
+$(OBJ_DIR)/cmd_apps.o: src/cmd_apps.c include/cmd.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
+
+$(OBJ_DIR)/cmd_files.o: src/cmd_files.c include/cmd.h include/commands.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+	@mkdir -p $(OBJ_DIR)
+	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
+
+$(OBJ_DIR)/main.o: src/main.c include/commands.h include/utils.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
 $(OBJ_DIR)/bdos.o: ../core/kernel/bdos.c ../core/kernel/bdos.h ../core/kernel/disk.h \
-        ../sdk/include/abi.h ../core/bios.h ../core/config.h
+        ../sdk/include/abi.h ../core/kernel/bios.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_BDOS) -c $< -o $@
 
 $(OBJ_DIR)/disk.o: ../core/kernel/disk.c ../core/kernel/disk.h ../core/kernel/disk_format.h \
-        ../sdk/include/abi.h ../core/bios.h ../core/config.h
+        ../sdk/include/abi.h ../core/kernel/bios.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_BDOS) -c $< -o $@
 

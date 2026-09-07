@@ -105,6 +105,29 @@ typedef struct
 typedef int (*dir_scan_fn)(Volume *v, const uint8_t *entry, uint16_t idx, void *ctx);
 
 static BDState g_bd;
+#ifdef SYSGEN_HOST
+static uint16_t g_vol_max_blocks = BD_VOL_MAX_BLOCKS;
+#endif
+
+/* Per-volume block cap.  The sysgen host overrides it at runtime with the
+ * active platform value; the kernel build folds it to the compile-time
+ * cap. Purely a compile-time constant there. */
+static inline uint16_t bd_block_cap(void)
+{
+#ifdef SYSGEN_HOST
+    return g_vol_max_blocks;
+#else
+    return BD_VOL_MAX_BLOCKS;
+#endif
+}
+
+#ifdef SYSGEN_HOST
+void bd_set_block_cap(uint16_t block_cap)
+{
+    if (block_cap)
+        g_vol_max_blocks = block_cap;
+}
+#endif
 
 static int dir_scan(Volume *v, uint8_t user, dir_scan_fn fn, void *ctx);
 
@@ -668,7 +691,7 @@ int bd_bind(int8_t vol_id)
     v->total_sectors = read16(&hdr[VHDR_SIZE_KB_OFF]) * BD_SECTORS_PER_KB;
     v->total_blocks = read16(&hdr[VHDR_TOT_BLKS_OFF]);
 
-    if (!v->total_blocks || v->total_blocks > BD_VOL_MAX_BLOCKS)
+    if (!v->total_blocks || v->total_blocks > bd_block_cap())
         return EBADFS;
 
     if ((uint32_t)v->total_blocks * BD_BLOCK_SECS > BD_DISK_MAX_SECS)
@@ -716,7 +739,7 @@ int bd_mount(int8_t vol_id)
     uint16_t data_start = (uint16_t)(BD_HEADER_SECS + BD_ROOT_SECS);
     uint16_t num_data = (uint16_t)((n_secs - data_start) / BD_BLOCK_SECS);
 
-    if (num_data == 0 || num_data > BD_VOL_MAX_BLOCKS)
+    if (num_data == 0 || num_data > bd_block_cap())
     {
         volume_unmount(vol_id);
         return EBADFS;
@@ -772,10 +795,10 @@ int bd_resize(int8_t vol_id, int16_t delta)
         uint16_t old_secs = v->total_sectors;
         uint16_t old_blocks = v->total_blocks;
 
-        if (old_blocks >= BD_VOL_MAX_BLOCKS)
+        if (old_blocks >= bd_block_cap())
             return ENOSPC;
 
-        uint16_t max_extra = BD_VOL_MAX_BLOCKS - old_blocks;
+        uint16_t max_extra = bd_block_cap() - old_blocks;
 
         if (n > max_extra)
             n = max_extra;
@@ -788,8 +811,8 @@ int bd_resize(int8_t vol_id, int16_t delta)
         v->total_sectors = (uint16_t)volume_sectors(vol_id);
         v->total_blocks = (uint16_t)((v->total_sectors - v->data_start_sec) / BD_BLOCK_SECS);
 
-        if (v->total_blocks > BD_VOL_MAX_BLOCKS)
-            v->total_blocks = BD_VOL_MAX_BLOCKS;
+        if (v->total_blocks > bd_block_cap())
+            v->total_blocks = bd_block_cap();
 
         rc = bd_write_header(v);
 

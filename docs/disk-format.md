@@ -68,7 +68,9 @@ be permanently unreachable. The maximum grid size is:
 
 ```text
 BD_VOL_MAX_BLOCKS
-= 2048 blocks   (= BD_BLOCK_MAP_BYTES × 8, at the 256-byte default)
+= CONFIG_DISK_SIZE blocks   (= 2048 for vemu; host ceiling 32768 = 32 MB;
+               a single volume is additionally bounded to 32767 blocks by
+               BD_DISK_MAX_SECS, since 1K block = 2 sectors)
 ```
 
 ## Volume record

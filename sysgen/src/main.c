@@ -1,5 +1,5 @@
 /*
- * sysgen/main.c
+ * sysgen/src/main.c
  * CP/M Neo SYSGEN — Entry point & Command routing
  */
 
@@ -23,11 +23,8 @@ static void usage(void)
            "      --extra-apps  Install bundled extra apps (apps/extra)\n"
 "  sysgen add     <file|folder> [opts]  Add a file (or flat folder) to disk\n"
             "  sysgen extract [opts]  Extract every file to <build_dir>/extract/\n"
-            "  sysgen dir     [Vn]     [opts]  List files\n"
-           "  sysgen stat             [opts]  Show disk stats\n"
-           "  sysgen type    <name>   [opts]  Print file contents\n"
-           "  sysgen era     <name>   [opts]  Erase file\n"
-           "  sysgen ren     <old> <new> [opts] Rename file\n\n"
+"  sysgen dir     [Vn]     [opts]  List files\n"
+            "  sysgen era     <name>   [opts]  Erase file\n\n"
            "Options [opts]:\n"
            "  --dst=<Vn>    Volume & user area (e.g., A0) [default: A0]\n"
            "  --attr=<val>  RO, RW, SYS, or SYS+RO [default: RW for add;\n"
@@ -46,8 +43,7 @@ static const SysgenCmd g_cmds[] = {
     {.name = "new", .fn = cmd_new},         {.name = "add", .fn = cmd_add},
     {.name = "install", .fn = cmd_install}, {.name = "extract", .fn = cmd_extract},
     {.name = "dir", .fn = cmd_dir},
-    {.name = "type", .fn = cmd_type},       {.name = "era", .fn = cmd_era},
-    {.name = "ren", .fn = cmd_ren},         {.name = "stat", .fn = cmd_stat},
+    {.name = "era", .fn = cmd_era},
     {0}};
 
 int main(int argc, char **argv)

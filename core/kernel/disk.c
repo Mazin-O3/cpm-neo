@@ -45,6 +45,28 @@ typedef struct
 } DiskState;
 
 static DiskState g_disk;
+#ifdef SYSGEN_HOST
+static uint16_t g_disk_block_cap = BD_VOL_MAX_BLOCKS;
+#endif
+
+/* Total-image block cap.  The sysgen host overrides it at runtime with the
+ * active platform value; the kernel build folds it to the compile-time cap. */
+static inline uint16_t disk_block_cap(void)
+{
+#ifdef SYSGEN_HOST
+    return g_disk_block_cap;
+#else
+    return BD_VOL_MAX_BLOCKS;
+#endif
+}
+
+#ifdef SYSGEN_HOST
+void disk_set_block_cap(uint16_t block_cap)
+{
+    if (block_cap)
+        g_disk_block_cap = block_cap;
+}
+#endif
 
 /* Minimum block count for a viable volume: header(1) + root(16) + reserved
  * block(2) + one usable 1K block(2) = 21 sectors, rounded up to whole 1K
@@ -280,7 +302,7 @@ int disk_init(void)
     if (read16(buf + VMAP_MAGIC_OFF) != VMAP_MAGIC)
         return -1;
 
-    if (g_disk.num_blocks == 0 || g_disk.num_blocks > BD_VOL_MAX_BLOCKS)
+    if (g_disk.num_blocks == 0 || g_disk.num_blocks > disk_block_cap())
         return -1;
 
     if (g_disk.base_sec < VMAP_SEC + 1)

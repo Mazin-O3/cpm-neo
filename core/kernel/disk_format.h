@@ -10,8 +10,10 @@
  *
  * This header contains only preprocessor defines, so it is usable from C,
  * from the GAS boot path (arch/<isa>/boot.S is preprocessed by the C
- * compiler), and from sysgen.  core/config.h is safe to include from
- * assembly too — it contains only preprocessor defines.
+ * compiler), and from sysgen.  It pulls in config.h (the platform's
+ * effective build/gen/config.h, or the sysgen host's include/config.h),
+ * which also contains only preprocessor defines and is safe to include
+ * from assembly too.
  */
 
 #ifndef DISK_FORMAT_H

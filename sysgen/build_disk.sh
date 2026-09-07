@@ -13,8 +13,14 @@
 # compiled by sysgen/app_build.sh and installed into the disk image by
 # 'sysgen new' / 'sysgen install'.
 #
-# The target's memory layout comes from platform/<PLATFORM>/config.sh
-# (ID, ARCH, RAM_SIZE, IO_BASE, RAM_BASE).  Everything else is derived here:
+# The target's configuration comes from platform/<PLATFORM>/config.sh — the
+# hardware facts (CONFIG_ID, CONFIG_ARCH, CONFIG_RAM_SIZE, CONFIG_IO_BASE,
+# CONFIG_RAM_BASE) and the four software knobs (CONFIG_VOL_MAX,
+# CONFIG_DISK_SIZE, CONFIG_FCB_MAX, CONFIG_STACK_SIZE), all required (there
+# are no defaults).  The effective values are written to build/gen/config.h,
+# which every kernel/CCP/SDK/app compile includes (and therefore every user
+# .com build).
+# Everything else is derived here:
 #   RAM_END   = RAM_BASE + RAM_SIZE   (nominal end of the SRAM region)
 #   RAM_TOP   = min(RAM_END, IO_BASE) (top of usable RAM; what the kernel
 #                                      packs below — __ram_top)
@@ -47,13 +53,13 @@ SDK_OBJ="$BUILD/sdk/obj"
 SDK_LIB="$BUILD/sdk/lib"
 
 # ---------------------------------------------------------------------------
-# Platform lookup: --platform=<ID> must match the ID= field of one platform
-# config.sh.  The platform folder is purely a filesystem location derived
-# here; it is never a platform identity.
+# Platform lookup: --platform=<ID> must match the CONFIG_ID= field of one
+# platform config.sh.  The platform folder is purely a filesystem location
+# derived here; it is never a platform identity.
 # ---------------------------------------------------------------------------
 match_id() {
     awk -F= '
-        /^[[:space:]]*ID=/ {
+        /^[[:space:]]*CONFIG_ID=/ {
             v=$2
             gsub(/[ \t\r]/, "", v)
             gsub(/^"+|"+$/, "", v)
@@ -91,34 +97,67 @@ if [ -z "$PLATFORM_DIR" ]; then
     exit 1
 fi
 
-# Platform metadata (ID, ARCH, RAM_SIZE, IO_BASE, RAM_BASE) from platform/$PLATFORM_DIR/config.sh
+# Platform metadata (CONFIG_ID, CONFIG_ARCH, CONFIG_RAM_SIZE, CONFIG_IO_BASE,
+# CONFIG_RAM_BASE) from platform/$PLATFORM_DIR/config.sh
 # shellcheck source=/dev/null
 . "platform/$PLATFORM_DIR/config.sh"
 
-ARCH=${ARCH:?"$PLATFORM_ID: ARCH not set in platform/$PLATFORM_DIR/config.sh"}
-IO_BASE=${IO_BASE:?"$PLATFORM_ID: IO_BASE not set in platform/$PLATFORM_DIR/config.sh"}
-RAM_BASE=${RAM_BASE:?"$PLATFORM_ID: RAM_BASE not set in platform/$PLATFORM_DIR/config.sh"}
-RAM_SIZE=${RAM_SIZE:?"$PLATFORM_ID: RAM_SIZE not set in platform/$PLATFORM_DIR/config.sh"}
-ID=${ID:?"$PLATFORM_ID: ID not set in platform/$PLATFORM_DIR/config.sh (8-char OS platform id)"}
+CONFIG_ARCH=${CONFIG_ARCH:?"$PLATFORM_ID: CONFIG_ARCH not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_IO_BASE=${CONFIG_IO_BASE:?"$PLATFORM_ID: CONFIG_IO_BASE not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_RAM_BASE=${CONFIG_RAM_BASE:?"$PLATFORM_ID: CONFIG_RAM_BASE not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_RAM_SIZE=${CONFIG_RAM_SIZE:?"$PLATFORM_ID: CONFIG_RAM_SIZE not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_ID=${CONFIG_ID:?"$PLATFORM_ID: CONFIG_ID not set in platform/$PLATFORM_DIR/config.sh (8-char OS platform id)"}
+
+# The four software knobs are required: each platform declares them in its
+# config.sh (there are no defaults — a knob left out here is a build error,
+# like the hardware fields above).
+CONFIG_VOL_MAX=${CONFIG_VOL_MAX:?"$PLATFORM_ID: CONFIG_VOL_MAX not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_DISK_SIZE=${CONFIG_DISK_SIZE:?"$PLATFORM_ID: CONFIG_DISK_SIZE not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_FCB_MAX=${CONFIG_FCB_MAX:?"$PLATFORM_ID: CONFIG_FCB_MAX not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_STACK_SIZE=${CONFIG_STACK_SIZE:?"$PLATFORM_ID: CONFIG_STACK_SIZE not set in platform/$PLATFORM_DIR/config.sh"}
+
+# One bitmap byte covers 8 blocks (8 KB), so the per-volume cap must be a
+# multiple of 8 KB to keep the block map exactly sized.
+if [ $((CONFIG_DISK_SIZE % 8)) -ne 0 ]; then
+    echo "ERROR: CONFIG_DISK_SIZE=$CONFIG_DISK_SIZE must be a multiple of 8 (KB)" >&2
+    exit 1
+fi
+
+# Effective config header.  Kernel/CCP/SDK/app compiles include this (see
+# PLATFORM_INC/_INCLUDE lists below), so every source sees the platform's
+# effective values from one generated header — there is no core/config.h.
+GEN_INC="-I $BUILD/gen"
+mkdir -p "$BUILD/gen"
+cat > "$BUILD/gen/config.h" <<EOF
+#ifndef CONFIG_H
+#define CONFIG_H
+#define CONFIG_VOL_MAX        $CONFIG_VOL_MAX
+#define CONFIG_DISK_SIZE      $CONFIG_DISK_SIZE
+#define CONFIG_FCB_MAX        $CONFIG_FCB_MAX
+#define CONFIG_STACK_SIZE     $CONFIG_STACK_SIZE
+#endif /* CONFIG_H */
+EOF
 
 # XIP mode is selected explicitly with --xip; a build without it is always
-# non-XIP, regardless of any XIP_* fields the platform declares (those exist
-# solely to support --xip builds).  Under --xip the disk is XIP-formatted and
-# the kernel and CCP are linked into the XIP region at XIP_BASE; .data/.bss
-# still live in RAM. User .com files are always RAM-loaded (TPA) regardless
-# of XIP. XIP requires XIP_BASE — a missing one under --xip is a build error,
-# never a silent non-XIP image.  There is no XIP window size: the window
-# starts at XIP_BASE and extends over the produced disk image, so sysgen
-# sizes everything against the actual linked contents.
+# non-XIP, regardless of any CONFIG_XIP_BASE the platform declares (that
+# field exists solely to support --xip builds).  Under --xip the disk is
+# XIP-formatted and the kernel and CCP are linked into the XIP region at the
+# XIP base; .data/.bss still live in RAM. User .com files are always
+# RAM-loaded (TPA) regardless of XIP. XIP requires CONFIG_XIP_BASE — a
+# missing one under --xip is a build error, never a silent non-XIP image.
+# There is no XIP window size: the window starts at the XIP base and extends
+# over the produced disk image, so sysgen sizes everything against the
+# actual linked contents.
 if [ "$FORCE_XIP" = "1" ]; then
-    if [ -z "${XIP_BASE+x}" ] || [ -z "$XIP_BASE" ]; then
-        echo "ERROR: --xip build requires XIP_BASE — declare XIP_BASE in platform/$PLATFORM_DIR/config.sh" >&2
+    if [ -z "${CONFIG_XIP_BASE+x}" ] || [ -z "$CONFIG_XIP_BASE" ]; then
+        echo "ERROR: --xip build requires CONFIG_XIP_BASE — declare it in platform/$PLATFORM_DIR/config.sh" >&2
         exit 1
     fi
     IS_XIP=1
     KERN_LD="core/kernel/linker_kernel_xip.ld"
     SDK_LD="core/ccp/linker_ccp_xip.ld"
-    XIP_DEFSYM="--defsym=XIP_BASE=$XIP_BASE"
+    XIP_BASE=$CONFIG_XIP_BASE
+    XIP_DEFSYM="--defsym=XIP_BASE=$CONFIG_XIP_BASE"
 else
     IS_XIP=0
     XIP_BASE=0
@@ -128,12 +167,12 @@ else
 fi
 
 # XIP placement geometry.  The kernel's in-place code starts at
-# __kernel_xip_base = XIP_BASE + KERN_START_SEC*512 (right past the boot and
-# VMAP sectors on the disk); __kernel_xip_end is defined by the kernel link
-# itself (sector-aligned end of the kernel's XIP footprint) and flows to the
-# CCP link, which is placed immediately after it.  The XIP code therefore
-# sizes its own window — there is no externally configured XIP size.  On
-# non-XIP builds the window is empty (XIP_BASE = 0).
+# __kernel_xip_base = CONFIG_XIP_BASE + KERN_START_SEC*512 (right past the
+# boot and VMAP sectors on the disk); __kernel_xip_end is defined by the
+# kernel link itself (sector-aligned end of the kernel's XIP footprint) and
+# flows to the CCP link, which is placed immediately after it.  The XIP code
+# therefore sizes its own window — there is no externally configured XIP
+# size.  On non-XIP builds the window is empty (XIP_BASE = 0).
 # Sector I/O byte count and kernel start sector both come from the single
 # on-disk format header (core/kernel/disk_format.h), which boot.S, the
 # kernel, sysgen, and user programs all read.
@@ -158,24 +197,25 @@ if [ "$IS_XIP" = "1" ]; then
     XIP_TARGET=$KERN_XIP_BASE
 fi
 
-CFG_ID_U=$(printf '%s' "$ID"          | tr '[:lower:]' '[:upper:]')
+CFG_ID_U=$(printf '%s' "$CONFIG_ID"  | tr '[:lower:]' '[:upper:]')
 ARG_ID_U=$(printf '%s' "$PLATFORM_ID" | tr '[:lower:]' '[:upper:]')
 if [ "$CFG_ID_U" != "$ARG_ID_U" ]; then
-    echo "ERROR: platform ID mismatch: config.sh declares '$ID' but --platform=$PLATFORM_ID" >&2
+    echo "ERROR: platform ID mismatch: config.sh declares '$CONFIG_ID' but --platform=$PLATFORM_ID" >&2
     exit 1
 fi
 
-if [ "${#ID}" -gt 8 ]; then
-    echo "ERROR: ID '$ID' exceeds the 8-char S0_PLATFORM limit" >&2
+if [ "${#CONFIG_ID}" -gt 8 ]; then
+    echo "ERROR: CONFIG_ID '$CONFIG_ID' exceeds the 8-char S0_PLATFORM limit" >&2
     exit 1
 fi
 
-# Architecture metadata (toolchain prefix + CFLAGS) from arch/$ARCH/config.sh
+# Architecture metadata (toolchain prefix + CFLAGS) from arch/$CONFIG_ARCH/config.sh
 # shellcheck source=/dev/null
-. "arch/$ARCH/config.sh"
-CROSS_COMPILE=${CROSS_COMPILE:?"$ARCH: CROSS_COMPILE not set in arch/$ARCH/config.sh"}
-ARCH_CFLAGS=${ARCH_CFLAGS:?"$ARCH: ARCH_CFLAGS not set in arch/$ARCH/config.sh"}
-LD_EMULATION=${LD_EMULATION:?"$ARCH: LD_EMULATION not set in arch/$ARCH/config.sh"}
+. "arch/$CONFIG_ARCH/config.sh"
+CONFIG_CROSS_COMPILE=${CONFIG_CROSS_COMPILE:?"$CONFIG_ARCH: CONFIG_CROSS_COMPILE not set in arch/$CONFIG_ARCH/config.sh"}
+CONFIG_ARCH_CFLAGS=${CONFIG_ARCH_CFLAGS:?"$CONFIG_ARCH: CONFIG_ARCH_CFLAGS not set in arch/$CONFIG_ARCH/config.sh"}
+CONFIG_LD_EMULATION=${CONFIG_LD_EMULATION:?"$CONFIG_ARCH: CONFIG_LD_EMULATION not set in arch/$CONFIG_ARCH/config.sh"}
+CONFIG_BOOT_SIZE=${CONFIG_BOOT_SIZE:?"$CONFIG_ARCH: CONFIG_BOOT_SIZE not set in arch/$CONFIG_ARCH/config.sh"}
 
 # Derived layout.  RAM_END is the nominal end of SRAM (RAM_BASE + RAM_SIZE);
 # RAM_TOP is the top of usable RAM and may be lower when an MMIO window lies
@@ -186,45 +226,43 @@ LD_EMULATION=${LD_EMULATION:?"$ARCH: LD_EMULATION not set in arch/$ARCH/config.s
 # scripts below enforce the real invariants: boot scratch/stack, the kernel
 # image, and the CCP/TPA must all fit under __ram_top — a clashing IO_BASE or
 # RAM_BASE therefore fails the link, never producing a broken image.
-RAM_BASE_DEC=$((RAM_BASE))
-RAM_END_DEC=$((RAM_BASE + RAM_SIZE))
-IO_BASE_DEC=$((IO_BASE))
+RAM_BASE_DEC=$((CONFIG_RAM_BASE))
+RAM_END_DEC=$((CONFIG_RAM_BASE + CONFIG_RAM_SIZE))
+IO_BASE_DEC=$((CONFIG_IO_BASE))
 if [ "$RAM_END_DEC" -lt "$IO_BASE_DEC" ]; then
     RAM_TOP_DEC=$RAM_END_DEC
 else
     RAM_TOP_DEC=$IO_BASE_DEC
 fi
-TPA_BASE_DEC=$((RAM_BASE + 0x100))
+TPA_BASE_DEC=$((CONFIG_RAM_BASE + 0x100))
 IO_BASE_HEX=$(printf '0x%X' "$IO_BASE_DEC")
 RAM_TOP_HEX=$(printf '0x%X' "$RAM_TOP_DEC")
 TPA_BASE_HEX=$(printf '0x%X' "$TPA_BASE_DEC")
 
-CC=${CROSS_COMPILE}gcc
-LD=${CROSS_COMPILE}ld
-OBJCOPY=${CROSS_COMPILE}objcopy
-OBJDUMP=${CROSS_COMPILE}objdump
-AR=${CROSS_COMPILE}ar
+CC=${CONFIG_CROSS_COMPILE}gcc
+LD=${CONFIG_CROSS_COMPILE}ld
+OBJCOPY=${CONFIG_CROSS_COMPILE}objcopy
+OBJDUMP=${CONFIG_CROSS_COMPILE}objdump
+AR=${CONFIG_CROSS_COMPILE}ar
 
-ARCH_FLAGS="$ARCH_CFLAGS"
+ARCH_FLAGS="$CONFIG_ARCH_CFLAGS"
 LIBGCC=$($CC $ARCH_FLAGS -print-libgcc-file-name)
 
 CFLAGS="$ARCH_FLAGS -ffreestanding -nostdlib \
         -Os -ffunction-sections -fdata-sections \
         -fno-builtin -fomit-frame-pointer \
         -Wall -Wextra"
-LDFLAGS="--gc-sections --strip-debug --no-warn-rwx-segments -m $LD_EMULATION"
+LDFLAGS="--gc-sections --strip-debug --no-warn-rwx-segments -m $CONFIG_LD_EMULATION"
 
 PLATFORM_INC="-I platform/$PLATFORM_DIR"
-KERNEL_INC="-I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
-CCP_INC="-I core/ccp/ -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
-SDK_INC="-I sdk/include -I core/kernel/ -I core/ -I ./ $PLATFORM_INC"
+BOOT_INC="$GEN_INC -I core/kernel/ -I core/ -I sdk/include $PLATFORM_INC"
+KERNEL_INC="$GEN_INC -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
+CCP_INC="$GEN_INC -I core/ccp/ -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
+SDK_INC="$GEN_INC -I sdk/include -I core/kernel/ -I core/ -I ./ $PLATFORM_INC"
 
-# Shared stack size comes from the single config surface (core/config.h).
-# Linker scripts cannot include C headers, so build_disk.sh extracts the
-# value and passes it to the kernel links as --defsym; the PROVIDE fallback
-# in linker_kernel_common.ld mirrors the default here.
-CONFIG_STACK=$(awk '/^#define[[:space:]]+CONFIG_STACK_SIZE/{print $3; exit}' core/config.h)
-CONFIG_STACK=${CONFIG_STACK:-0x1000}
+# Linker scripts cannot include C headers, so the kernel links receive the
+# platform's CONFIG_STACK_SIZE as --defsym=__stack_size (below); the PROVIDE
+# in linker_kernel_common.ld is only a hand-link safety net.
 
 compile() {
     mkdir -p "$(dirname "$3")"
@@ -235,23 +273,23 @@ mkdir -p "$BUILD" "$INT" "$SDK_LIB"
 
 # ── Bootloader ─────────────────────────────────────────────
 echo "  Building bootloader..."
-$CC $CFLAGS $PLATFORM_INC -I core/kernel/ -I core/ -I sdk/include \
+$CC $CFLAGS $BOOT_INC \
     -c "platform/$PLATFORM_DIR/bios.c" -o "$INT/boot_plat.o"
-$CC $CFLAGS -I arch/$ARCH/ -I core/kernel/ -I core/ \
+$CC $CFLAGS $GEN_INC -I arch/$CONFIG_ARCH/ -I core/kernel/ -I core/ \
     -Wl,--gc-sections -Wl,--strip-debug -Wl,--no-warn-rwx-segments \
     -Wl,--defsym=__io_base="$IO_BASE_HEX" \
     -Wl,--defsym=__ram_top="$RAM_TOP_HEX" \
-    -Wl,--defsym=__ram_base="$RAM_BASE" \
-    -Wl,--defsym=__boot_base="$BOOT_BASE" \
-    -Wl,--defsym=__boot_size="$BOOT_SIZE" \
-    -Wl,--defsym=__boot_ram_size="$BOOT_RAM_SIZE" \
+    -Wl,--defsym=__ram_base="$CONFIG_RAM_BASE" \
+    -Wl,--defsym=__boot_base="$CONFIG_BOOT_BASE" \
+    -Wl,--defsym=__boot_size="$CONFIG_BOOT_SIZE" \
+    -Wl,--defsym=__boot_ram_size="$CONFIG_BOOT_RAM_SIZE" \
     -Wl,--defsym=__xip_base="$XIP_TARGET" \
-    -T arch/$ARCH/linker_boot.ld \
-    arch/$ARCH/boot.S "$INT/boot_plat.o" -o "$INT/bootloader.elf"
+    -T arch/$CONFIG_ARCH/linker_boot.ld \
+    arch/$CONFIG_ARCH/boot.S "$INT/boot_plat.o" -o "$INT/bootloader.elf"
 $OBJCOPY -O binary --only-section=.boot "$INT/bootloader.elf" "$BUILD/bootloader.bin"
 SIZE=$(wc -c < "$BUILD/bootloader.bin")
-if [ "$SIZE" -gt "$BOOT_SIZE" ]; then
-    echo "ERROR: bootloader.bin $SIZE bytes > $BOOT_SIZE (BOOT_SIZE)" >&2
+if [ "$SIZE" -gt "$CONFIG_BOOT_SIZE" ]; then
+    echo "ERROR: bootloader.bin $SIZE bytes > $CONFIG_BOOT_SIZE (CONFIG_BOOT_SIZE)" >&2
     exit 1
 fi
 
@@ -260,7 +298,7 @@ echo "  Building kernel..."
 KERNEL_C="core/kernel/main.c core/kernel/kernel.c core/kernel/bdos.c \
           core/kernel/disk.c platform/$PLATFORM_DIR/bios.c \
           sdk/src/ctype.c sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
-KERNEL_S="arch/$ARCH/crt0.S"
+KERNEL_S="arch/$CONFIG_ARCH/crt0.S"
 
 KERNEL_OBJS=
 for src in $KERNEL_C; do
@@ -279,7 +317,7 @@ $LD $LDFLAGS \
     --defsym=__io_base="$IO_BASE_HEX" \
     --defsym=__ram_top="$RAM_TOP_HEX" \
     --defsym=__tpa_base="$TPA_BASE_HEX" \
-    --defsym=__stack_size="$CONFIG_STACK" \
+    --defsym=__stack_size="$CONFIG_STACK_SIZE" \
     $XIP_DEFSYM $KERN_XIP_SYM \
     -T $KERN_LD \
     $KERNEL_OBJS "$LIBGCC" -o "$INT/kernel_pass1.elf"
@@ -294,7 +332,7 @@ $LD $LDFLAGS \
     --defsym=__io_base="$IO_BASE_HEX" \
     --defsym=__ram_top="$RAM_TOP_HEX" \
     --defsym=__tpa_base="$TPA_BASE_HEX" \
-    --defsym=__stack_size="$CONFIG_STACK" \
+    --defsym=__stack_size="$CONFIG_STACK_SIZE" \
     $XIP_DEFSYM $KERN_XIP_SYM \
     -T $KERN_LD \
     $KERNEL_OBJS "$LIBGCC" -o "$INT/kernel.elf"
@@ -329,7 +367,7 @@ for src in $SDK_LIBC_SRCS; do
     compile "$CFLAGS $SDK_INC" "$src" "$obj"
     SDK_LIBC_OBJS="$SDK_LIBC_OBJS $obj"
 done
-compile "$CFLAGS $SDK_INC" arch/$ARCH/crt0.S "$SDK_OBJ/crt0.o"
+compile "$CFLAGS $SDK_INC" arch/$CONFIG_ARCH/crt0.S "$SDK_OBJ/crt0.o"
 $AR rcs "$SDK_LIB/libc.a" $SDK_LIBC_OBJS
 
 # ── CCP ───────────────────────────────────────────────────
@@ -348,8 +386,11 @@ $LD $LDFLAGS -T $SDK_LD \
     --just-symbols="$INT/kernel.elf" $XIP_DEFSYM $SDK_GEOM -o "$INT/ccp.elf"
 $OBJCOPY -O binary "$INT/ccp.elf" "$INT/ccp.bin"
 
-printf '%s' "$PLATFORM_DIR" > "$BUILD/.platform_dir"
-printf '%s' "$ID" > "$BUILD/.platform_id"
-printf '%s' "$ARCH" > "$BUILD/.arch"
-printf '%s' "$ARCH_CFLAGS" > "$BUILD/.archflags"
-printf '%s' "$IS_XIP" > "$BUILD/.xip"
+printf '%s' "$PLATFORM_DIR"   > "$BUILD/.platform_dir"
+printf '%s' "$CONFIG_ID"      > "$BUILD/.platform_id"
+printf '%s' "$CONFIG_ARCH"    > "$BUILD/.arch"
+printf '%s' "$CONFIG_ARCH_CFLAGS" > "$BUILD/.archflags"
+printf '%s' "$IS_XIP"         > "$BUILD/.xip"
+printf '%s' "$CONFIG_VOL_MAX"   > "$BUILD/.vol_max"
+printf '%s' "$CONFIG_DISK_SIZE" > "$BUILD/.disk_size_kb"
+printf '%s' "$CONFIG_FCB_MAX"   > "$BUILD/.fcb_max"

@@ -63,4 +63,10 @@ uint8_t  volume_run_count(int8_t vol_id);        /* Active runs count (0 = unmou
 int      volume_getattr(int8_t vol_id, uint8_t *attr);
 int      volume_setattr(int8_t vol_id, uint8_t attr);
 
+#ifdef SYSGEN_HOST
+/* Host-only: override the total-image block cap (BD_VOL_MAX_BLOCKS) with the
+ * active platform value, matching bd_set_block_cap(). */
+void disk_set_block_cap(uint16_t block_cap);
+#endif
+
 #endif /* DISK_H */

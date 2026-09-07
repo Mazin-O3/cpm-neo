@@ -5,7 +5,9 @@
  * (1 KB); eight blocks form one extent; the allocation bitmap supports
  * up to BD_VOL_MAX_BLOCKS blocks per volume.
  *
- * Tunables come from core/config.h; user-facing ABI types from abi.h.
+ * Tunables come from config.h (the platform's effective values, via the
+ * generated build/gen/config.h; the sysgen host resolves its own ceiling
+ * include/config.h).  User-facing ABI types come from abi.h.
  */
 
 #ifndef BDOS_H
@@ -24,13 +26,15 @@
  *
  * A BDOS block consists of two disk sectors.  Eight blocks form one
  * extent, and the allocation bitmap supports up to BD_VOL_MAX_BLOCKS
- * blocks per volume.
+ * blocks per volume.  CONFIG_DISK_SIZE is the per-volume disk-size cap in
+ * KB (1 KB per block), so the bitmap needs CONFIG_DISK_SIZE/8 bytes (one
+ * bit per block) and the volume cap is CONFIG_DISK_SIZE blocks.
  */
 #define BD_BLOCK_SECS          2
 #define BD_BLOCK_BYTES         (BD_BLOCK_SECS * DISK_SECTOR_SIZE)
 #define BD_BLOCKS_PER_EXTENT   8
-#define BD_BLOCK_MAP_BYTES     CONFIG_BLOCK_MAP_BYTES
-#define BD_VOL_MAX_BLOCKS      (BD_BLOCK_MAP_BYTES * 8) /* Derived: one cap bit per map byte */
+#define BD_BLOCK_MAP_BYTES     (CONFIG_DISK_SIZE / 8) /* Derived: one bit per 1K block */
+#define BD_VOL_MAX_BLOCKS      CONFIG_DISK_SIZE       /* Per-volume block cap */
 
 #define BD_ENTRY_SIZE          32
 #define BD_ROOT_ENTRIES        256
@@ -149,5 +153,13 @@ int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib);
 
 /* Set the attribute byte on a mounted volume. */
 int bd_vsetattr(int8_t vol_id, uint8_t attr);
+
+#ifdef SYSGEN_HOST
+/* Host-only: override the per-volume block cap (BD_VOL_MAX_BLOCKS) with the
+ * active platform value.  The sysgen tool is compiled once at its ceiling
+ * (sysgen/include/config.h) and applies the platform's runtime cap per build
+ * so mount-time validations produce images the platform can actually read. */
+void bd_set_block_cap(uint16_t block_cap);
+#endif
 
 #endif

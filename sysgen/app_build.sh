@@ -10,7 +10,7 @@
 # binary ready to run from the TPA.  User programs always load into the TPA
 # and run there — only the kernel and CCP execute in place from flash on XIP
 # disks — so every .com is linked with the standard TPA script regardless of
-# the platform's XIP_BASE.  Requires a prior 'sysgen new' build
+# the platform's CONFIG_XIP_BASE.  Requires a prior 'sysgen new' build
 # (sdk/lib/libc.a, sdk/obj/crt0.o, core/int/kernel.elf).  Object files
 # go under build/apps/obj/<appname>/ mirroring the source layout so
 # multi-file apps with repeated filenames never collide.  Runs from
@@ -59,34 +59,37 @@ INT="$BUILD/core/int"
 SDK_OBJ="$BUILD/sdk/obj"
 SDK_LIB="$BUILD/sdk/lib"
 
-# Platform metadata (ARCH, IO_BASE, RAM_BASE, optional XIP_BASE)
-# from platform/$PLATFORM_DIR/config.sh — XIP_BASE is informational here;
-# .com files are never linked against the XIP region.
+# Platform metadata (CONFIG_ARCH, CONFIG_IO_BASE, CONFIG_RAM_BASE, optional
+# CONFIG_XIP_BASE) from platform/$PLATFORM_DIR/config.sh — CONFIG_XIP_BASE
+# is informational here; .com files are never linked against the XIP region.
 # shellcheck source=/dev/null
 . "platform/$PLATFORM_DIR/config.sh"
 
-ARCH=${ARCH:?"$PLATFORM_DIR: ARCH not set in platform/$PLATFORM_DIR/config.sh"}
+CONFIG_ARCH=${CONFIG_ARCH:?"$PLATFORM_DIR: CONFIG_ARCH not set in platform/$PLATFORM_DIR/config.sh"}
 
-# Architecture metadata (toolchain prefix + CFLAGS) from arch/$ARCH/config.sh
+# Architecture metadata (toolchain prefix + CFLAGS) from arch/$CONFIG_ARCH/config.sh
 # shellcheck source=/dev/null
-. "arch/$ARCH/config.sh"
-CROSS_COMPILE=${CROSS_COMPILE:?"$ARCH: CROSS_COMPILE not set in arch/$ARCH/config.sh"}
+. "arch/$CONFIG_ARCH/config.sh"
+CONFIG_CROSS_COMPILE=${CONFIG_CROSS_COMPILE:?"$CONFIG_ARCH: CONFIG_CROSS_COMPILE not set in arch/$CONFIG_ARCH/config.sh"}
 
-CC=${CROSS_COMPILE}gcc
-LD=${CROSS_COMPILE}ld
-OBJCOPY=${CROSS_COMPILE}objcopy
+CC=${CONFIG_CROSS_COMPILE}gcc
+LD=${CONFIG_CROSS_COMPILE}ld
+OBJCOPY=${CONFIG_CROSS_COMPILE}objcopy
 
 SDK_LD=sdk/linker/linker_app.ld
 
-ARCH_FLAGS="$ARCH_CFLAGS"
+ARCH_FLAGS="$CONFIG_ARCH_CFLAGS"
 LIBGCC=$($CC $ARCH_FLAGS -print-libgcc-file-name)
 
 CFLAGS="$ARCH_FLAGS -ffreestanding -nostdlib \
         -Os -ffunction-sections -fdata-sections \
         -fno-builtin -fomit-frame-pointer \
         -Wall -Wextra"
-LDFLAGS="--gc-sections --strip-debug --no-warn-rwx-segments -m $LD_EMULATION"
-SDK_INC="-I sdk/include -I core/kernel/ -I core/ -I ./"
+LDFLAGS="--gc-sections --strip-debug --no-warn-rwx-segments -m $CONFIG_LD_EMULATION"
+
+# Effective platform config from the last build (build/gen/config.h) comes
+# first, so user .com compiles see the same CONFIG_* values as the kernel.
+SDK_INC="-I $BUILD/gen -I sdk/include -I core/kernel/ -I core/ -I ./"
 
 APP_NAME=$(basename "$APP_DIR")
 
