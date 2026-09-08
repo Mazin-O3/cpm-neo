@@ -20,6 +20,13 @@
 # are no defaults).  The effective values are written to build/gen/config.h,
 # which every kernel/CCP/SDK/app compile includes (and therefore every user
 # .com build).
+# Two OPTIONAL app-selection knobs pick the bundled apps 'sysgen new'
+# installs on the disk: CONFIG_SYS_APPS lists apps/sys commands and
+# CONFIG_EXTRA_APPS lists apps/extra apps.  For both, an unset or "*"
+# value means install ALL of them, an empty "" means NONE, and a
+# space-separated list filters down to those apps.  The resolved values
+# are stamped into the build/.sys_apps and build/.extra_apps tags for
+# sysgen to read back.
 # Everything else is derived here:
 #   RAM_END   = RAM_BASE + RAM_SIZE   (nominal end of the SRAM region)
 #   RAM_TOP   = min(RAM_END, IO_BASE) (top of usable RAM; what the kernel
@@ -386,3 +393,17 @@ printf '%s' "$IS_XIP"         > "$BUILD/.xip"
 printf '%s' "$CONFIG_VOL_MAX"   > "$BUILD/.vol_max"
 printf '%s' "$CONFIG_DISK_SIZE" > "$BUILD/.disk_size_kb"
 printf '%s' "$CONFIG_FCB_MAX"   > "$BUILD/.fcb_max"
+# App-selection tags: a knob that is unset means "all" (stamped as '*'),
+# a declared value is stamped verbatim — "*" = all, "" = none, "a b" = filter.
+if [ "${CONFIG_SYS_APPS+x}" = x ]; then
+    SYS_APPS_TAG="$CONFIG_SYS_APPS"
+else
+    SYS_APPS_TAG="*"
+fi
+if [ "${CONFIG_EXTRA_APPS+x}" = x ]; then
+    EXTRA_APPS_TAG="$CONFIG_EXTRA_APPS"
+else
+    EXTRA_APPS_TAG="*"
+fi
+printf '%s' "$SYS_APPS_TAG"   > "$BUILD/.sys_apps"
+printf '%s' "$EXTRA_APPS_TAG" > "$BUILD/.extra_apps"

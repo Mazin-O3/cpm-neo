@@ -219,7 +219,11 @@ every kernel/CCP/SDK build includes.  The effective volume count and total
 image size (`CONFIG_DISK_SIZE`, KB) are stamped as build tags (`.vol_max`,
 `.disk_size_kb`) that `sysgen new` reads back to size and mount the image,
 validated against the host ceilings in `sysgen/include/config.h` (16
-volumes, 32 MB).
+volumes, 32 MB).  The platform's bundled-app selection is stamped the same
+way (`.sys_apps` = the `CONFIG_SYS_APPS` value — `*` = all, `""` = none, a
+list = those; `.extra_apps` = the `CONFIG_EXTRA_APPS` value); `sysgen new`
+filters the installs against them, failing on a name with no matching source
+so a typo can never silently drop an app.
 
 ### Linking against the kernel
 

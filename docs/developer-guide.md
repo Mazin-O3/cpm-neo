@@ -52,8 +52,10 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 ## Configuring the system
 
 Resource usage is tuned per-platform in `platform/<ID>/config.sh`, where every
-parameter carries the `CONFIG_` prefix and all four software knobs are
-required (there are no defaults).  `build_disk.sh` reads them and writes the
+parameter carries the `CONFIG_` prefix and the four software knobs are
+required (there are no defaults; the only optional fields are
+`CONFIG_XIP_BASE` and the app selections `CONFIG_SYS_APPS` /
+`CONFIG_EXTRA_APPS`).  `build_disk.sh` reads them and writes the
 effective values to `build/gen/config.h`, which every kernel/CCP/SDK/app
 compile includes.  The sysgen host tool is compiled once and sizes its arrays
 to the *ceilings* in `sysgen/include/config.h` (16 volumes / 32 MB total disk
@@ -67,6 +69,22 @@ platform's active values at runtime and rejects a platform that exceeds them.
 | `CONFIG_FCB_MAX` | 4 | `CONFIG_FCB_MAX` open-file control blocks |
 | `CONFIG_STACK_SIZE` | 0x1000 | single shared kernel/CCP/app stack (top of TPA) |
 
+Two further knobs are *optional* app selections rather than hardware facts
+(they make no compile-time array, so are exempt from the "all required"
+rule): `CONFIG_SYS_APPS` and `CONFIG_EXTRA_APPS` — space-separated lists of
+the `apps/sys` commands and `apps/extra` tools `sysgen new` installs.  For
+both, unset or `*` = install all of them, empty `""` = install none, and a
+list installs only those.  A tiny-flash port (see below) typically declares
+`CONFIG_EXTRA_APPS=""` plus only the `apps/sys` commands it has room for:
+
+```sh
+CONFIG_SYS_APPS="copy stat set"
+CONFIG_EXTRA_APPS=""
+```
+
+An unknown name in either list is a hard build error (a typo must never
+silently drop an app). See [Bundled Apps](bundled-apps.md).
+
 `CONFIG_VOL_MAX` and `CONFIG_DISK_SIZE` are on-disk *format* parameters (the
 volume count, and the total image size including the kernel/CCP overhead), so
 changing them must be paired with a fresh image:
@@ -78,7 +96,9 @@ platform's value to the kernel links as `--defsym=__stack_size`, with the
 A small-RAM port (for example a 32 KB ROM / ~2.5 KB SRAM target) shrinks
 the data footprint by dropping the disk layer's big arrays: `CONFIG_FCB_MAX 2`,
 `CONFIG_VOL_MAX 2`, `CONFIG_DISK_SIZE 512`, and a tighter
-`CONFIG_STACK_SIZE`. The v1 pattern is to keep one tuned configuration
+`CONFIG_STACK_SIZE`, and by trimming the bundled apps it installs
+(`CONFIG_SYS_APPS` list, `CONFIG_EXTRA_APPS=""`) so the flash budget is
+not spent on `.COM`s that cannot fit. The v1 pattern is to keep one tuned configuration
 checked in per port under `platform/<name>/config.sh`; `sysgen/include/config.h`
 holds the host ceilings a platform must stay within.
 

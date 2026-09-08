@@ -23,13 +23,7 @@
 #define OS_VER 0x0100
 #define KERN_VER 0x0100
 #define CCP_VER 0x0100
-
-/* Parsed arguments for the `sysgen new` command. */
-typedef struct
-{
-    const char *platform;
-    bool no_extra;
-} CmdNewConfig;
+#define SYSGEN_MAX_APP_NAMES 64
 
 static uint32_t get_file_size(const char *path)
 {
@@ -114,7 +108,7 @@ static int run_build_script(const SysgenPaths *paths, const char *platform)
     return spawn_and_wait(argv);
 }
 
-static int report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uint32_t size_kb,
+static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uint32_t size_kb,
                          uint32_t boot_size, uint32_t kern_size,
                          uint32_t ccp_size, uint32_t kern_load, uint32_t tpa_base,
                          uint32_t reserved, const char *out_disk_path)
@@ -208,14 +202,45 @@ static int report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uint
 
 /* Whitelist of flags accepted by `sysgen new` (NULL-terminated). */
 static const char *const FLAGS_NEW[] = {
-    "--platform", "--no-extra", NULL,
+    "--platform", NULL,
 };
 
-static bool parse_cmd_new_args(int argc, char **argv, CmdNewConfig *cfg)
+/* Split a whitespace-separated name list in-place into out[0..n).  Returns
+ * the number of names (0 for an empty string). */
+static size_t split_names(char *buf, const char **out, size_t max_out)
+{
+    size_t n = 0;
+    char *p = buf;
+
+    while (*p)
+    {
+        while (*p == ' ' || *p == '\t')
+            p++;
+
+        if (!*p)
+            break;
+
+        if (n >= max_out)
+            break;
+
+        out[n++] = p;
+
+        while (*p && *p != ' ' && *p != '\t')
+            p++;
+
+        if (*p)
+        {
+            *p = '\0';
+            p++;
+        }
+    }
+
+    return n;
+}
+
+static bool parse_cmd_new_args(int argc, char **argv, const char **platform)
 {
     const char *platform_str = get_str_flag(argc, argv, "--platform");
-
-    cfg->no_extra = get_bool_flag(argc, argv, "--no-extra");
 
     if (!platform_str)
     {
@@ -223,7 +248,7 @@ static bool parse_cmd_new_args(int argc, char **argv, CmdNewConfig *cfg)
         return false;
     }
 
-    cfg->platform = platform_str;
+    *platform = platform_str;
 
     return true;
 }
@@ -253,9 +278,9 @@ int cmd_new(int argc, char **argv)
     if (check_flags(argc, argv, FLAGS_NEW) != 0 || check_positionals(argc, argv, 1, 1) != 0)
         return 1;
 
-    CmdNewConfig cfg;
+    const char *platform;
 
-    if (!parse_cmd_new_args(argc, argv, &cfg))
+    if (!parse_cmd_new_args(argc, argv, &platform))
         return 1;
 
     const SysgenPaths *paths = sysgen_paths();
@@ -264,11 +289,11 @@ int cmd_new(int argc, char **argv)
         return 1;
 
     char path_buf[SYSGEN_FULL_PATH_MAX];
-    if (run_build_script(paths, cfg.platform) != 0)
+    if (run_build_script(paths, platform) != 0)
         return 1;
 
     char os_platform_buf[16];
-    const char *os_platform = cfg.platform;
+    const char *os_platform = platform;
 
     if (read_build_tag(paths, ".platform_id", os_platform_buf, sizeof(os_platform_buf)) == 0)
         os_platform = os_platform_buf;
@@ -433,11 +458,46 @@ int cmd_new(int argc, char **argv)
     AddFileOpts sys_opts = {VOL_A, 0, FILE_ATTR_SYSTEM | FILE_ATTR_READ_ONLY, "installed"};
     AddFileOpts extra_opts = {VOL_A, 0, FILE_ATTR_READ_ONLY, "installed"};
 
-    if (install_sys_apps(paths, &sys_opts) != 0)
-        goto cleanup;
+    /* Per-platform app selection: build_disk.sh stamps CONFIG_SYS_APPS /
+     * CONFIG_EXTRA_APPS into build/.sys_apps / build/.extra_apps.  For each
+     * knob a tag of "*" means install every bundled app, a space-separated
+     * list filters to those apps, and an empty or missing tag means install
+     * none. */
+    char sys_apps_buf[SYSGEN_FULL_PATH_MAX] = "";
+    char extra_apps_buf[SYSGEN_FULL_PATH_MAX] = "";
 
-    if (!cfg.no_extra && install_extra_apps(paths, &extra_opts) != 0)
-        goto cleanup;
+    read_build_tag(paths, ".sys_apps", sys_apps_buf, sizeof(sys_apps_buf));
+    read_build_tag(paths, ".extra_apps", extra_apps_buf, sizeof(extra_apps_buf));
+
+    const char *sys_names[SYSGEN_MAX_APP_NAMES];
+    const char *extra_names[SYSGEN_MAX_APP_NAMES];
+    size_t sys_n = 0, extra_n = 0;
+
+    if (strcmp(sys_apps_buf, "*") == 0)
+    {
+        if (install_sys_apps(paths, &sys_opts, NULL, 0) != 0)
+            goto cleanup;
+    }
+    else
+    {
+        sys_n = split_names(sys_apps_buf, sys_names, SYSGEN_MAX_APP_NAMES);
+
+        if (sys_n > 0 && install_sys_apps(paths, &sys_opts, sys_names, sys_n) != 0)
+            goto cleanup;
+    }
+
+    if (strcmp(extra_apps_buf, "*") == 0)
+    {
+        if (install_extra_apps(paths, &extra_opts, NULL, 0) != 0)
+            goto cleanup;
+    }
+    else
+    {
+        extra_n = split_names(extra_apps_buf, extra_names, SYSGEN_MAX_APP_NAMES);
+
+        if (extra_n > 0 && install_extra_apps(paths, &extra_opts, extra_names, extra_n) != 0)
+            goto cleanup;
+    }
 
     bd_sync();
 

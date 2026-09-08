@@ -1,8 +1,8 @@
 /*
- * sysgen/src/cmd_files.c — File operations: add, install, extract, dir, era
+ * sysgen/src/cmd_files.c — File operations: add, install, extract, dir
  *
- * Implementations of `sysgen add`, `sysgen install`, `sysgen extract`,
- * `sysgen dir` and `sysgen era`, plus the local helpers they share.
+ * Implementations of `sysgen add`, `sysgen install`, `sysgen extract`
+ * and `sysgen dir`, plus the local helpers they share.
  */
 
 #include "cmd.h"
@@ -25,9 +25,6 @@ static const char *const FLAGS_FILE[] = {
     "--attr",
     "--disk",
     NULL,
-};
-static const char *const FLAGS_INSTALL[] = {
-    "--dst", "--attr", "--disk", "--sys-apps", "--extra-apps", NULL,
 };
 static const char *const FLAGS_DISK[] = {
     "--disk",
@@ -166,63 +163,10 @@ int cmd_add(int argc, char **argv)
 }
 
 /*
- * cmd_install — Install bundled apps or user-specified source.
- * --sys-apps / --extra-apps: install pre-built apps from the SDK tree.
- * Otherwise: compile a folder of .c files into .COM and add to the image.
+ * cmd_install — Compile a folder/file.c to .COM and add it to the image.
  */
 int cmd_install(int argc, char **argv)
 {
-    int sys_apps = get_bool_flag(argc, argv, "--sys-apps");
-    int extra_apps = get_bool_flag(argc, argv, "--extra-apps");
-
-    /* Bundled-app mode: install the sys/extra apps from the SDK tree. */
-
-    if (sys_apps || extra_apps)
-    {
-        if (check_flags(argc, argv, FLAGS_INSTALL) != 0 || check_positionals(argc, argv, 1, 1) != 0)
-            return 1;
-
-        char disk_buf[SYSGEN_FULL_PATH_MAX];
-        resolve_disk(argc, argv, disk_buf, sizeof(disk_buf));
-
-        int vol, user;
-
-        if (parse_dst(argc, argv, &vol, &user) != 0)
-            return 1;
-
-        if (open_disk(disk_buf) != 0 || disk_init() != 0 || mount_vol((int8_t)vol) != 0)
-            return 1;
-
-        if (sys_apps)
-        {
-            uint8_t attr;
-
-            if (parse_attr_dflt(argc, argv, &attr, FILE_ATTR_SYSTEM | FILE_ATTR_READ_ONLY) != 0)
-                return 1;
-
-            AddFileOpts afo = {vol, user, attr, "installed"};
-
-            if (install_sys_apps(sysgen_paths(), &afo) != 0)
-                return 1;
-        }
-
-        if (extra_apps)
-        {
-            uint8_t attr;
-
-            if (parse_attr_dflt(argc, argv, &attr, FILE_ATTR_READ_ONLY) != 0)
-                return 1;
-
-            AddFileOpts afo = {vol, user, attr, "installed"};
-
-            if (install_extra_apps(sysgen_paths(), &afo) != 0)
-                return 1;
-        }
-
-        bd_sync();
-        return save_disk(disk_buf);
-    }
-
     const char *src;
     int vol, user;
     uint8_t attr;
@@ -445,43 +389,5 @@ int cmd_dir(int argc, char **argv)
     }
 
     printf("  %d file(s)\n", count);
-    return 0;
-}
-
-/*
- * cmd_era — Delete a file from the disk image.
- */
-int cmd_era(int argc, char **argv)
-{
-    const char *pos[3];
-
-    if (check_flags(argc, argv, FLAGS_DISK) != 0 || check_positionals(argc, argv, 2, 3) != 0)
-        return 1;
-
-    int npos = collect_positional(argc, argv, pos, 3);
-
-    char n83[NAME83_LEN + 1];
-    to_name83(pos[1], n83);
-    n83[NAME83_LEN] = '\0';
-
-    ImageTarget tgt;
-
-    if (setup_disk_target(argc, argv, (npos > 2) ? pos[2] : NULL, &tgt) != 0)
-        return 1;
-
-    int rc = bd_delete(n83, tgt.ctx);
-
-    if (rc != EOK)
-    {
-        err("era: %s (%s)", n83, err_str(rc));
-        return 1;
-    }
-
-    bd_sync();
-
-    if (save_disk(tgt.disk_path) != 0)
-        return 1;
-
-    printf("  deleted %s\n", n83);
     return 0;
 }

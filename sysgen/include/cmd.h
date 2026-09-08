@@ -48,9 +48,14 @@ const char *extract_basename(const char *path);
  * Returns 0 on success, 1 on error, 2 on skip (already exists). */
 int add_data_open(const char *file, const AddFileOpts *opts);
 
-/* Bundled-app build & install (shared by cmd_new and cmd_install) */
+/* Bundled-app build & install (shared by cmd_new and cmd_install).
+ * names/NULL installs every bundled app; a non-NULL names array installs
+ * only the listed apps (matched case-insensitively by app name) and fails
+ * if any listed name has no matching source. */
 int build_folder_com(const SysgenPaths *paths, const char *src, const BuildFolderOpts *opts);
-int install_sys_apps(const SysgenPaths *paths, const AddFileOpts *opts);
-int install_extra_apps(const SysgenPaths *paths, const AddFileOpts *opts);
+int install_sys_apps(const SysgenPaths *paths, const AddFileOpts *opts,
+                     const char *const *names, size_t nnames);
+int install_extra_apps(const SysgenPaths *paths, const AddFileOpts *opts,
+                       const char *const *names, size_t nnames);
 
 #endif /* SYSGEN_CMD_H */

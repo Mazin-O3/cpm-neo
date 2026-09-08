@@ -2,8 +2,9 @@
  * sysgen/src/cmd_apps.c — Bundled-app build & install
  *
  * Compiles a source folder to a .com via app_build.sh and adds it to the
- * disk.  Shared by `sysgen new` (seeds a fresh image) and `sysgen install
- * --sys-apps/--extra-apps` (fills an existing image).
+ * disk.  Shared by `sysgen new` (seeds a fresh image, filtered by the
+ * platform's CONFIG_SYS_APPS / CONFIG_EXTRA_APPS selection) and `sysgen
+ * install <folder|file.c>` (adds one app to an existing image).
  */
 
 #include "cmd.h"
@@ -18,13 +19,45 @@
 #include <string.h>
 #include <strings.h>
 
-/* Walk-state for recursively installing bundled apps. */
+/* Walk-state for installing bundled apps.  `names` selects a subset of the
+ * bundled apps (NULL = install all); each requested name must be found, or
+ * the install fails so a typo can never silently drop an app. */
 typedef struct
 {
     const SysgenPaths *paths;
     const AddFileOpts *opts;
+    const char *const *names;
+    size_t nnames;
+    int *found; /* parallel to names; 1 once a source matched */
+    size_t found_count;
     int failed;
 } BundledScan;
+
+static int want_app(const BundledScan *scan, const char *name)
+{
+    if (!scan->names)
+        return 1;
+
+    for (size_t i = 0; i < scan->nnames; i++)
+        if (strcasecmp(name, scan->names[i]) == 0)
+            return 1;
+
+    return 0;
+}
+
+static void mark_found(BundledScan *scan, const char *name)
+{
+    if (!scan->names)
+        return;
+
+    for (size_t i = 0; i < scan->nnames; i++)
+        if (!scan->found[i] && strcasecmp(name, scan->names[i]) == 0)
+        {
+            scan->found[i] = 1;
+            scan->found_count++;
+            return;
+        }
+}
 
 int build_folder_com(const SysgenPaths *paths, const char *src, const BuildFolderOpts *opts)
 {
@@ -133,11 +166,16 @@ static int install_bundled_app(const char *dir, const char *name, void *ud)
     if (scan->failed)
         return 1;
 
+    if (!want_app(scan, name))
+        return 0;
+
     if (!dir_has_sources(dir))
     {
         printf("  Skip %s (no .c/.s/.S sources)\n", name);
         return 0;
     }
+
+    mark_found(scan, name);
 
     return build_and_add(scan, dir);
 }
@@ -145,45 +183,85 @@ static int install_bundled_app(const char *dir, const char *name, void *ud)
 static int install_bundled_source(const char *path, const char *name, void *ud)
 {
     BundledScan *scan = ud;
-    (void)name;
 
     if (scan->failed)
         return 1;
 
+    /* App name is the file basename minus its extension (mycmd.c -> mycmd). */
+    char base[SYSGEN_FULL_PATH_MAX];
+    snprintf(base, sizeof(base), "%s", name);
+    char *dot = strrchr(base, '.');
+
+    if (dot && dot != base)
+        *dot = '\0';
+
+    if (!want_app(scan, base))
+        return 0;
+
+    mark_found(scan, base);
+
     return build_and_add(scan, path);
 }
 
-int install_sys_apps(const SysgenPaths *paths, const AddFileOpts *opts)
+/* Report every requested name that no bundled source matched.  Returns 1 if
+ * any name is missing, 0 otherwise. */
+static int report_unmatched(const BundledScan *scan, const char *kind)
 {
-    BundledScan scan = {paths, opts, 0};
-    char sys_dir[SYSGEN_FULL_PATH_MAX];
-    snprintf(sys_dir, sizeof(sys_dir), "%s/apps/sys", paths->root_dir);
+    int bad = 0;
 
-    if (!dir_exists(sys_dir))
-    {
-        err("sys apps directory not found at '%s'", sys_dir);
-        return 1;
-    }
+    for (size_t i = 0; i < scan->nnames; i++)
+        if (!scan->found[i])
+        {
+            err("%s app '%s' not found in apps/%s", kind, scan->names[i], kind);
+            bad = 1;
+        }
 
-    printf("  \nInstalling sys apps...\n");
-
-    for_each_source_file(sys_dir, install_bundled_source, &scan);
-
-    return scan.failed ? 1 : 0;
+    return bad;
 }
 
-int install_extra_apps(const SysgenPaths *paths, const AddFileOpts *opts)
+static int run_install(const SysgenPaths *paths, const AddFileOpts *opts,
+                       const char *const *names, size_t nnames,
+                       const char *subdir, int flat, const char *kind)
 {
-    BundledScan scan = {paths, opts, 0};
-    char extra_dir[SYSGEN_FULL_PATH_MAX];
-    snprintf(extra_dir, sizeof(extra_dir), "%s/apps/extra", paths->root_dir);
+    int rc = 0;
+    int *found = NULL;
 
-    if (!dir_exists(extra_dir))
-        return 0;
+    if (nnames == 0)
+        names = NULL;
 
-    printf("  \nInstalling extra apps...\n");
+    if (names)
+        found = calloc(nnames, sizeof(*found));
 
-    for_each_subdir(extra_dir, install_bundled_app, &scan);
+    BundledScan scan = {paths, opts, names, nnames, found, 0, 0};
 
-    return scan.failed ? 1 : 0;
+    char apps_dir[SYSGEN_FULL_PATH_MAX];
+    snprintf(apps_dir, sizeof(apps_dir), "%s/apps/%s", paths->root_dir, subdir);
+
+    if (dir_exists(apps_dir))
+    {
+        printf("  \nInstalling %s apps...\n", kind);
+
+        if (flat)
+            for_each_source_file(apps_dir, install_bundled_source, &scan);
+        else
+            for_each_subdir(apps_dir, install_bundled_app, &scan);
+    }
+
+    if (scan.failed || report_unmatched(&scan, kind) != 0)
+        rc = 1;
+
+    free(found);
+    return rc;
+}
+
+int install_sys_apps(const SysgenPaths *paths, const AddFileOpts *opts,
+                     const char *const *names, size_t nnames)
+{
+    return run_install(paths, opts, names, nnames, "sys", 1, "sys");
+}
+
+int install_extra_apps(const SysgenPaths *paths, const AddFileOpts *opts,
+                       const char *const *names, size_t nnames)
+{
+    return run_install(paths, opts, names, nnames, "extra", 0, "extra");
 }

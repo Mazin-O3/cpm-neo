@@ -2,9 +2,10 @@
 # CP/M Neo platform metadata — sourced by build_disk.sh / app_build.sh.
 #
 # Supplies the platform facts everything else is derived from.  All
-# parameters carry the CONFIG_ prefix; all are required (there are no
-# defaults).  Only CONFIG_XIP_BASE may be absent, and only when plain
-# (non-XIP) builds are used — declaring it selects XIP builds.
+# parameters carry the CONFIG_ prefix; most are required (there are no
+# defaults).  The optional ones may be absent: CONFIG_XIP_BASE (omit for
+# plain non-XIP builds, declare it to select XIP builds) and the two
+# app-selection knobs (see the end of this file).
 #
 #   CONFIG_ID         — 8-char max OS platform id stamped into S0_PLATFORM
 #                     (the platform identity used by --platform)
@@ -18,13 +19,13 @@
 
 #   CONFIG_IO_BASE    — Base address of the peripheral MMIO window
 
-#   CONFIG_XIP_BASE   — Flash/XIP window base; declaring it selects XIP
-#                       builds (the kernel/CCP run in place from this window).
-#                       A platform that omits the field always builds plain
-#                       (RAM-loading) disks.  The XIP window has no configured
-#                       size: it extends from the XIP base to the end of the
-#                       on-disk kernel/CCP contents, and the flash simply maps
-#                       the XIP disk image
+#   CONFIG_XIP_BASE   — Optional.  Flash/XIP window base; declaring it selects
+#                       XIP builds (the kernel/CCP run in place from this
+#                       window).  A platform that omits the field always builds
+#                       plain (RAM-loading) disks.  The XIP window has no
+#                       configured size: it extends from the XIP base to the
+#                       end of the on-disk kernel/CCP contents, and the flash
+#                       simply maps the XIP disk image
 
 #   CONFIG_VOL_MAX    — Volume count, A:..P; required.  Must not exceed
 #                       The sysgen host ceiling of 16
@@ -41,15 +42,31 @@
 
 #   CONFIG_STACK_SIZE — Shared stack bytes (kernel/CCP/apps; linker-only)
 
+#   CONFIG_SYS_APPS   — Optional.  Space-separated list of apps/sys commands
+#                       for 'sysgen new' to install on the disk, e.g.
+#                       'copy stat'.  Unset or '*' = install ALL of them;
+#                       empty "" = install NONE.
+
+#   CONFIG_EXTRA_APPS — Optional.  Space-separated list of apps/extra apps,
+#                       e.g. 'basic ed'.  Unset or '*' = install ALL of them;
+#                       empty "" = install NONE.
+
+# Platform identity and architecture
 CONFIG_ID="vemu"
 CONFIG_ARCH=riscv32
+
+# Memory configuration
 CONFIG_RAM_SIZE=0x10000
 CONFIG_RAM_BASE=0x0000
 CONFIG_IO_BASE=0xFF00
 CONFIG_XIP_BASE=0x10000
 
-# Each platform must declare all four:
+# Disk and volume configuration
 CONFIG_VOL_MAX=4
 CONFIG_DISK_SIZE=2048
 CONFIG_FCB_MAX=4
 CONFIG_STACK_SIZE=0x1000
+
+# Application installation
+CONFIG_SYS_APPS="*"
+CONFIG_EXTRA_APPS="basic ed"

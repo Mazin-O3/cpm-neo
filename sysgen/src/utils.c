@@ -73,30 +73,14 @@ const char *err_str(int rc)
     {
     case EIO:
         return "I/O Error";
-    case EBADFS:
-        return "Bad Filesystem";
-    case ENOVOL:
-        return "No Volume";
-    case ENFILE:
-        return "No Free File Handle";
-    case ENOENT:
-        return "Not Found";
-    case EBADF:
-        return "Bad File Handle";
     case ENOSPC:
         return "Disk Full";
     case EVOLRO:
         return "Volume Read-only";
-    case EEXIST:
-        return "File Exists";
-    case EFILERO:
-        return "File Read-only";
     case EDIRFULL:
         return "Directory Full";
-    case EPERM:
-        return "Permission Denied";
     default:
-        return "Unknown";
+        return "Error";
     }
 }
 

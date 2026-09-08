@@ -2,12 +2,17 @@
 
 ← [README](../README.md)
 
-`sysgen new` installs bundled apps in two groups:
+`sysgen new` installs bundled apps in two groups, selected per platform by
+`CONFIG_SYS_APPS` / `CONFIG_EXTRA_APPS` in `config.sh`:
 
 - `apps/sys`: the transient system commands (`COPY`, `DUMP`, `HELP`, `SET`, `STAT`,
   `SUBMIT`, `SYS`). Each top-level `.c`/`.s`/`.S` file is compiled to a
-  `.COM` and always installed.
-- `apps/extra`: optional tools, installed unless `--no-extra` is given.
+  `.COM`. When `CONFIG_SYS_APPS` is unset or `*` all of them are installed;
+  an empty `""` installs none; otherwise only the named ones are.
+- `apps/extra`: optional tools, named in `CONFIG_EXTRA_APPS`. The rules are
+  the same as above: unset or `*` = install all extras, `""` = install none,
+  a list = only those.  A small-flash platform sets `CONFIG_EXTRA_APPS=""` to
+  ship only its selected `apps/sys` commands.
 
 ### Optional tools (apps/extra)
 
