@@ -1,8 +1,8 @@
 #ifndef SYSGEN_H
 #define SYSGEN_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "abi.h"
 #include "disk_format.h"
@@ -24,11 +24,11 @@ void to_name83(const char *src, char *out83);
  * by build_disk.sh (.vol_max, .disk_size_kb). */
 typedef struct
 {
-    uint16_t vol_count;      /* Active volume count (A:..)               */
-    uint16_t disk_size_kb;   /* CONFIG_DISK_SIZE: total image size in KB, */
-                             /* overhead included.  It is also the whole- */
-                             /* disk block-coverage bound for any one     */
-                             /* volume (its alloc bitmap is /8 bytes)     */
+    uint16_t vol_count;    /* Active volume count (A:..)               */
+    uint16_t disk_size_kb; /* CONFIG_DISK_SIZE: total image size in KB, */
+                           /* overhead included.  It is also the whole- */
+                           /* disk block-coverage bound for any one     */
+                           /* volume (its alloc bitmap is /8 bytes)     */
 } SysgenDiskCfg;
 
 /* Defaults to the host compile-time ceilings; used when build tags are
@@ -43,13 +43,10 @@ SysgenDiskCfg sysgen_disk_cfg_default(void);
  * volume is mounted at boot.  No volume's share can exceed the grid, which
  * is itself smaller than cfg->disk_size_kb, so the coverage clamp is a
  * backstop only. */
-int mkdisk_build(const SysgenDiskCfg *cfg,
-                uint32_t size_kb,
-                const uint8_t *kern, uint32_t kern_size,
-                const uint8_t *ccp, uint32_t ccp_size,
-                uint32_t kern_load,
-                uint16_t os_ver, uint16_t kern_ver, uint16_t ccp_ver,
-                const char *platform, int xip);
+int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern,
+                 uint32_t kern_size, const uint8_t *ccp, uint32_t ccp_size, uint32_t kern_load,
+                 uint16_t os_ver, uint16_t kern_ver, uint16_t ccp_ver, const char *platform,
+                 int xip);
 
 /* Minimum disk size (KB) so every volume can hold min-viable blocks */
 int mkdisk_min_size_kb(const SysgenDiskCfg *cfg, uint32_t kern_size, uint32_t ccp_size, int xip);

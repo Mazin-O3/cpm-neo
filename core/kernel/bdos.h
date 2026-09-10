@@ -18,8 +18,8 @@
 #include "errno.h"
 #include <stdint.h>
 
-#define BD_MAX_FCBS            CONFIG_FCB_MAX
-#define BD_DISK_MAX_SECS       65535
+#define BD_MAX_FCBS CONFIG_FCB_MAX
+#define BD_DISK_MAX_SECS 65535
 
 /*
  * BDOS allocation geometry.
@@ -30,53 +30,53 @@
  * KB (1 KB per block), so the bitmap needs CONFIG_DISK_SIZE/8 bytes (one
  * bit per block) and the volume cap is CONFIG_DISK_SIZE blocks.
  */
-#define BD_BLOCK_SECS          2
-#define BD_BLOCK_BYTES         (BD_BLOCK_SECS * DISK_SECTOR_SIZE)
-#define BD_BLOCKS_PER_EXTENT   8
-#define BD_BLOCK_MAP_BYTES     (CONFIG_DISK_SIZE / 8) /* Derived: one bit per 1K block */
-#define BD_VOL_MAX_BLOCKS      CONFIG_DISK_SIZE       /* Per-volume block cap */
+#define BD_BLOCK_SECS 2
+#define BD_BLOCK_BYTES (BD_BLOCK_SECS * DISK_SECTOR_SIZE)
+#define BD_BLOCKS_PER_EXTENT 8
+#define BD_BLOCK_MAP_BYTES (CONFIG_DISK_SIZE / 8) /* Derived: one bit per 1K block */
+#define BD_VOL_MAX_BLOCKS CONFIG_DISK_SIZE        /* Per-volume block cap */
 
-#define BD_ENTRY_SIZE          32
-#define BD_ROOT_ENTRIES        256
+#define BD_ENTRY_SIZE 32
+#define BD_ROOT_ENTRIES 256
 
 /* The extent index is a uint8_t on disk, so at most 256 extents (2 MB) are
  * representable per file; the shared 256-entry root directory bounds
  * this further. */
-#define BD_MAX_EXTENTS         256
+#define BD_MAX_EXTENTS 256
 
-#define BD_ENTRIES_PER_SEC     (DISK_SECTOR_SIZE / BD_ENTRY_SIZE)
-#define BD_EXTENT_BYTES        (BD_BLOCKS_PER_EXTENT * BD_BLOCK_BYTES)
+#define BD_ENTRIES_PER_SEC (DISK_SECTOR_SIZE / BD_ENTRY_SIZE)
+#define BD_EXTENT_BYTES (BD_BLOCKS_PER_EXTENT * BD_BLOCK_BYTES)
 
 /* Per-volume metadata layout: header sector 0, then the root directory.
  * BD_DATA_START is the first sector of a volume's data blocks. */
-#define BD_HEADER_SECS         1
-#define BD_ROOT_SECS           (BD_ROOT_ENTRIES * BD_ENTRY_SIZE / DISK_SECTOR_SIZE)
-#define BD_DATA_START          (BD_HEADER_SECS + BD_ROOT_SECS)
+#define BD_HEADER_SECS 1
+#define BD_ROOT_SECS (BD_ROOT_ENTRIES * BD_ENTRY_SIZE / DISK_SECTOR_SIZE)
+#define BD_DATA_START (BD_HEADER_SECS + BD_ROOT_SECS)
 
 /* Data block 0 of every volume is unusable: directory extent lists encode
  * an absent slot as 0, so the allocator permanently reserves it. */
-#define BD_RESERVED_BLOCKS     1
+#define BD_RESERVED_BLOCKS 1
 
 /* Minimum volume size: header + root, plus the reserved block and at
  * least one usable data block. */
-#define BD_MIN_VOL_SECS       (BD_DATA_START + (BD_RESERVED_BLOCKS + 1) * BD_BLOCK_SECS)
+#define BD_MIN_VOL_SECS (BD_DATA_START + (BD_RESERVED_BLOCKS + 1) * BD_BLOCK_SECS)
 
-#define BD_DIR_ATTR            11
-#define BD_DIR_USER            12
-#define BD_DIR_EXTENT_IDX      13
-#define BD_DIR_EXTENT_BYTES    14
-#define BD_DIR_BLOCKS          16
+#define BD_DIR_ATTR 11
+#define BD_DIR_USER 12
+#define BD_DIR_EXTENT_IDX 13
+#define BD_DIR_EXTENT_BYTES 14
+#define BD_DIR_BLOCKS 16
 
-#define BD_ENTRY_EMPTY         0x00
-#define BD_ENTRY_DELETED       0xE5
+#define BD_ENTRY_EMPTY 0x00
+#define BD_ENTRY_DELETED 0xE5
 
-#define BD_USER_INVALID        0xFF
-#define BD_HEADER_SECS         1
-#define BD_BITS_PER_BYTE       8
-#define BD_BITMAP_FULL         UINT8_MAX
-#define BD_RESERVED_BLOCK      0
-#define BD_SECTORS_PER_KB      (1024 / DISK_SECTOR_SIZE)
-#define DIR_SCAN_STOP          1
+#define BD_USER_INVALID 0xFF
+#define BD_HEADER_SECS 1
+#define BD_BITS_PER_BYTE 8
+#define BD_BITMAP_FULL UINT8_MAX
+#define BD_RESERVED_BLOCK 0
+#define BD_SECTORS_PER_KB (1024 / DISK_SECTOR_SIZE)
+#define DIR_SCAN_STOP 1
 
 /*
  * Bind an existing formatted volume.  Closes stale FCBs from any
@@ -153,13 +153,5 @@ int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib);
 
 /* Set the attribute byte on a mounted volume. */
 int bd_vsetattr(int8_t vol_id, uint8_t attr);
-
-#ifdef SYSGEN_HOST
-/* Host-only: override the per-volume block cap (BD_VOL_MAX_BLOCKS) with the
- * active platform value.  The sysgen tool is compiled once at its ceiling
- * (sysgen/include/config.h) and applies the platform's runtime cap per build
- * so mount-time validations produce images the platform can actually read. */
-void bd_set_block_cap(uint16_t block_cap);
-#endif
 
 #endif

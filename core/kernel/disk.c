@@ -7,9 +7,9 @@
  */
 
 #include "disk.h"
+#include "abi.h"
 #include "bdos.h"
 #include "bios.h"
-#include "abi.h"
 #include "disk_format.h"
 #include "string.h"
 
@@ -24,49 +24,33 @@ typedef struct
 typedef struct
 {
     BlockRun run[VOL_MAX_RUNS]; /* Ordered; run[0] = head */
-    uint8_t run_count;          /* 0 = unmounted              */
-    uint8_t attr;               /* VOL_ATTR_RW / VOL_ATTR_RO  */
+    uint8_t  run_count;         /* 0 = unmounted              */
+    uint8_t  attr;              /* VOL_ATTR_RW / VOL_ATTR_RO  */
 } VolRec;                       /* 18 bytes               */
 
 typedef struct
 {
-    VolRec volumes[MAX_VOLUMES];
+    VolRec   volumes[MAX_VOLUMES];
     uint16_t num_blocks;
     uint16_t base_sec;
-    uint8_t initialized;
-    uint8_t xip;                     /* Cached S0_XIP flag */
+    uint8_t  initialized;
+    uint8_t  xip; /* Cached S0_XIP flag */
 
     /* Single-sector write-back correctness cache. Exists to guarantee
      * read-after-write (read-your-own-writes) regardless of the platform's
      * storage behavior. */
-    uint8_t wb_buf[DISK_SECTOR_SIZE];
+    uint8_t  wb_buf[DISK_SECTOR_SIZE];
     uint16_t wb_sec; /* Physical sector, post-translation */
-    uint8_t wb_valid;
+    uint8_t  wb_valid;
 } DiskState;
 
 static DiskState g_disk;
-#ifdef SYSGEN_HOST
-static uint16_t g_disk_block_cap = BD_VOL_MAX_BLOCKS;
-#endif
 
-/* Total-image block cap.  The sysgen host overrides it at runtime with the
- * active platform value; the kernel build folds it to the compile-time cap. */
+/* Total-image block cap. */
 static inline uint16_t disk_block_cap(void)
 {
-#ifdef SYSGEN_HOST
-    return g_disk_block_cap;
-#else
     return BD_VOL_MAX_BLOCKS;
-#endif
 }
-
-#ifdef SYSGEN_HOST
-void disk_set_block_cap(uint16_t block_cap)
-{
-    if (block_cap)
-        g_disk_block_cap = block_cap;
-}
-#endif
 
 /* Minimum block count for a viable volume: header(1) + root(16) + reserved
  * block(2) + one usable 1K block(2) = 21 sectors, rounded up to whole 1K
@@ -125,7 +109,7 @@ static int collect_used_runs(uint16_t *rstart, uint16_t *rend, int cap)
     {
         uint16_t s = rstart[i];
         uint16_t e = rend[i];
-        int j = i - 1;
+        int      j = i - 1;
 
         while (j >= 0 && rstart[j] > s)
         {
@@ -147,7 +131,7 @@ static int validate_layout(void)
 {
     uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
     uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
-    int n = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
+    int      n = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (n < 0)
         return -1;
@@ -166,7 +150,7 @@ static int find_free_run(uint16_t n, uint16_t *start)
 {
     uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
     uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
-    int nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
+    int      nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (nruns < 0)
         return -1;
@@ -199,7 +183,7 @@ uint16_t disk_free_blocks(void)
 {
     uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
     uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
-    int nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
+    int      nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (nruns < 0)
         return 0;
@@ -225,7 +209,7 @@ static int range_is_free(uint16_t start, uint16_t n)
 {
     uint16_t s[MAX_VOLUMES * VOL_MAX_RUNS];
     uint16_t e[MAX_VOLUMES * VOL_MAX_RUNS];
-    int nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
+    int      nruns = collect_used_runs(s, e, MAX_VOLUMES * VOL_MAX_RUNS);
 
     if (nruns < 0)
         return 0;
@@ -419,8 +403,8 @@ int volume_mount(int8_t vol_id)
             return ENOSPC;
     }
 
-/* The run must leave room for the reserved block plus at least
- * one usable data block, or the volume would be unusable. */
+    /* The run must leave room for the reserved block plus at least
+     * one usable data block, or the volume would be unusable. */
 
     if ((n * BD_BLOCK_SECS - BD_DATA_START) / BD_BLOCK_SECS <= BD_RESERVED_BLOCKS)
         return ENOSPC;
@@ -460,7 +444,7 @@ static int vol_extend(int8_t vol_id, uint16_t n)
     /* Prefer to extend the last run's tail when the blocks right after it
      * are free and contiguous. */
     BlockRun *last = &vr->run[vr->run_count - 1];
-    uint16_t tail = (uint16_t)(last->start + last->count);
+    uint16_t  tail = (uint16_t)(last->start + last->count);
 
     if (tail + n <= g_disk.num_blocks && range_is_free(tail, n))
     {
@@ -528,7 +512,7 @@ static int vol_shrink(int8_t vol_id, uint16_t n)
         return EINVAL;
 
     /* Trim n blocks from the tail, walking runs backwards. */
-    VolRec save = *vr;
+    VolRec   save = *vr;
     uint16_t todo = n;
 
     while (todo > 0 && vr->run_count > 0)
@@ -638,7 +622,7 @@ int volume_setattr(int8_t vol_id, uint8_t attr)
         return EINVAL;
 
     VolRec *vr = &g_disk.volumes[vol_id];
-    VolRec save = *vr;
+    VolRec  save = *vr;
     vr->attr = attr & VOL_ATTR_RO;
 
     if (vmap_persist() != EOK)

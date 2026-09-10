@@ -27,7 +27,7 @@ int main(int argc, char **argv)
             printf("    %d: *", e.cur + 1);
 
         char cmd[80];
-        int cmdlen = getline(cmd, sizeof(cmd));
+        int  cmdlen = getline(cmd, sizeof(cmd));
 
         if (cmdlen < 0)
             continue;
@@ -213,7 +213,7 @@ int main(int argc, char **argv)
                 break;
             }
 
-            char old[64], new_s[64];
+            char  old[64], new_s[64];
             char *p = strchr(cmd + i, sep);
 
             if (!p || p - (cmd + i) >= (int)sizeof(old))

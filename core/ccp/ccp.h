@@ -1,8 +1,8 @@
 #ifndef CCP_H
 #define CCP_H
 
-#include <cpm.h>
 #include <ccplib.h>
+#include <cpm.h>
 
 /* Limits */
 #define CCP_LINE_MAX 128
@@ -11,10 +11,10 @@
 int main(void);
 
 CmdErr ccp_dispatch(char *line);
-int ccp_setuser(FsContext *ctx, uint8_t ua);
+int    ccp_setuser(FsContext *ctx, uint8_t ua);
 
 CmdErr try_implicit_run(FsContext *ctx, int argc, char **argv);
-void try_run_batch(FsContext *ctx);
+void   try_run_batch(FsContext *ctx);
 
 /* Resident commands */
 CmdErr cmd_era(FsContext *ctx, int argc, char **argv);

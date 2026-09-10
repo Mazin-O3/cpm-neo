@@ -27,7 +27,7 @@ int atoi(const char *s)
 int strtoi(const char *nptr, char **endptr, int base)
 {
     const char *p = nptr;
-    int sign = 1, val = 0;
+    int         sign = 1, val = 0;
 
     while (*p == ' ' || *p == '\t')
         p++;

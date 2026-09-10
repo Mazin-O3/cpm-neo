@@ -20,15 +20,15 @@ static CmdErr cmd_dump(FsContext *ctx, int argc, char **argv)
 
     Pager pg = pager_start();
 
-    uint8_t buf[128];
-    int n, stop = 0;
+    uint8_t  buf[128];
+    int      n, stop = 0;
     uint32_t addr = 0;
 
     while (!stop && (n = read(fd, buf, sizeof(buf))) > 0)
     {
         for (int offset = 0; offset < n && !stop; offset += 16)
         {
-            int chunk_size = (n - offset > 16) ? 16 : (n - offset);
+            int      chunk_size = (n - offset > 16) ? 16 : (n - offset);
             uint8_t *chunk = &buf[offset];
 
             printf("%04X:", addr);

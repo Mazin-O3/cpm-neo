@@ -38,8 +38,7 @@ static uint32_t get_file_size(const char *path)
 /* Read a build tag (file named 'name' in the build dir, stamped by
  * build_disk.sh) into buf.  Returns 0 on success, -1 if the tag is missing
  * or unreadable. */
-static int read_build_tag(const SysgenPaths *paths, const char *name,
-                          char *buf, size_t n)
+static int read_build_tag(const SysgenPaths *paths, const char *name, char *buf, size_t n)
 {
     char path[SYSGEN_FULL_PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", paths->build_dir, name);
@@ -100,9 +99,7 @@ static int run_build_script(const SysgenPaths *paths, const char *platform, int 
     snprintf(plat_flag, sizeof(plat_flag), "--platform=%s", platform);
 
     char *argv[] = {
-        (char *)"sh", script, plat_flag,
-        (char *)(want_xip ? "--xip" : NULL),
-        NULL,
+        (char *)"sh", script, plat_flag, (char *)(want_xip ? "--xip" : NULL), NULL,
     };
 
     printf("Starting disk build for %s\n", platform);
@@ -111,12 +108,12 @@ static int run_build_script(const SysgenPaths *paths, const char *platform, int 
 }
 
 static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uint32_t size_kb,
-                         uint32_t boot_size, uint32_t kern_size,
-                         uint32_t ccp_size, uint32_t kern_load, uint32_t tpa_base,
-                         uint32_t reserved, const char *out_disk_path)
+                         uint32_t boot_size, uint32_t kern_size, uint32_t ccp_size,
+                         uint32_t kern_load, uint32_t tpa_base, uint32_t reserved,
+                         const char *out_disk_path)
 {
     const uint8_t *vmap = sysgen_disk() + (uint32_t)VMAP_SEC * DISK_SECTOR_SIZE;
-    char tmp[32];
+    char           tmp[32];
 
     printf("\n=============================================================\n");
     printf("  CP/M Neo Disk Build Report\n");
@@ -144,7 +141,7 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
     }
 
     char xip_buf[8];
-    int have_xip = read_build_tag(paths, ".xip", xip_buf, sizeof(xip_buf)) == 0;
+    int  have_xip = read_build_tag(paths, ".xip", xip_buf, sizeof(xip_buf)) == 0;
 
     if (have_xip)
         printf("  XIP              : %s\n", (xip_buf[0] == '1') ? "Yes" : "No");
@@ -182,7 +179,7 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
     for (int8_t v = 0; v < (int8_t)cfg->vol_count; v++)
     {
         const uint8_t *vr = vmap + VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
-        const char *mode = (vr[VMAP_VR_ATTR] & VOL_ATTR_RO) ? "RO" : "RW";
+        const char    *mode = (vr[VMAP_VR_ATTR] & VOL_ATTR_RO) ? "RO" : "RW";
 
         uint32_t start = read16(vr + VMAP_VR_RUN0_START);
 
@@ -204,7 +201,9 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
 
 /* Whitelist of flags accepted by `sysgen new` (NULL-terminated). */
 static const char *const FLAGS_NEW[] = {
-    "--platform", "--xip", NULL,
+    "--platform",
+    "--xip",
+    NULL,
 };
 
 /* Split a whitespace-separated name list in-place into out[0..n).  Returns
@@ -212,7 +211,7 @@ static const char *const FLAGS_NEW[] = {
 static size_t split_names(char *buf, const char **out, size_t max_out)
 {
     size_t n = 0;
-    char *p = buf;
+    char  *p = buf;
 
     while (*p)
     {
@@ -282,7 +281,7 @@ int cmd_new(int argc, char **argv)
         return 1;
 
     const char *platform;
-    int want_xip = 0;
+    int         want_xip = 0;
 
     if (!parse_cmd_new_args(argc, argv, &platform, &want_xip))
         return 1;
@@ -293,11 +292,11 @@ int cmd_new(int argc, char **argv)
         return 1;
 
     char path_buf[SYSGEN_FULL_PATH_MAX];
-    
+
     if (run_build_script(paths, platform, want_xip) != 0)
         return 1;
 
-    char os_platform_buf[16];
+    char        os_platform_buf[16];
     const char *os_platform = platform;
 
     if (read_build_tag(paths, ".platform_id", os_platform_buf, sizeof(os_platform_buf)) == 0)
@@ -312,7 +311,7 @@ int cmd_new(int argc, char **argv)
      * compiled once at its ceilings, so the active values are validated
      * against those ceilings before use. */
     SysgenDiskCfg dcfg = sysgen_disk_cfg_default();
-    char tag_buf[32];
+    char          tag_buf[32];
 
     if (read_build_tag(paths, ".vol_max", tag_buf, sizeof(tag_buf)) == 0)
     {
@@ -323,7 +322,8 @@ int cmd_new(int argc, char **argv)
         else
         {
             err("platform '%s' volume count %ld exceeds the host ceiling %d "
-                "or is invalid", os_platform, v, MAX_VOLUMES);
+                "or is invalid",
+                os_platform, v, MAX_VOLUMES);
             return 1;
         }
     }
@@ -337,17 +337,13 @@ int cmd_new(int argc, char **argv)
         else
         {
             err("platform '%s' disk size %ldK exceeds the host ceiling %dK "
-                "or is invalid", os_platform, v, BD_VOL_MAX_BLOCKS);
+                "or is invalid",
+                os_platform, v, BD_VOL_MAX_BLOCKS);
             return 1;
         }
     }
 
-    /* Mount-time caps use the platform's active values so the host validates
-     * images exactly as the platform kernel would. */
-    bd_set_block_cap(dcfg.disk_size_kb);
-    disk_set_block_cap(dcfg.disk_size_kb);
-
-    int ret = 1;
+    int      ret = 1;
     uint8_t *kern = NULL, *elf = NULL, *ccp = NULL;
     uint32_t ksz = 0, esz = 0, ccpsz = 0, bsz = 0;
     uint32_t kern_load = 0, tpa_base = 0;
@@ -429,12 +425,13 @@ int cmd_new(int argc, char **argv)
         fclose(f);
     }
 
-    int reserved = mkdisk_build(&dcfg, dcfg.disk_size_kb, kern, ksz, ccp, ccpsz, kern_load,
-                                OS_VER, KERN_VER, CCP_VER, os_platform, is_xip);
+    int reserved = mkdisk_build(&dcfg, dcfg.disk_size_kb, kern, ksz, ccp, ccpsz, kern_load, OS_VER,
+                                KERN_VER, CCP_VER, os_platform, is_xip);
 
     if (reserved < 0)
     {
-        err("mkdisk_build failed: CONFIG_DISK_SIZE %uK is too small (minimum %dK for all %d volumes)",
+        err("mkdisk_build failed: CONFIG_DISK_SIZE %uK is too small (minimum %dK for all %d "
+            "volumes)",
             dcfg.disk_size_kb, min_kb, dcfg.vol_count);
         goto cleanup;
     }
@@ -476,7 +473,7 @@ int cmd_new(int argc, char **argv)
 
     const char *sys_names[SYSGEN_MAX_APP_NAMES];
     const char *extra_names[SYSGEN_MAX_APP_NAMES];
-    size_t sys_n = 0, extra_n = 0;
+    size_t      sys_n = 0, extra_n = 0;
 
     if (strcmp(sys_apps_buf, "*") == 0)
     {
@@ -513,8 +510,8 @@ int cmd_new(int argc, char **argv)
     if (save_disk(out_disk_path) != 0)
         goto cleanup;
 
-report_build(paths, &dcfg, dcfg.disk_size_kb, bsz, ksz, ccpsz, kern_load,
-             tpa_base, (uint32_t)reserved, out_disk_path);
+    report_build(paths, &dcfg, dcfg.disk_size_kb, bsz, ksz, ccpsz, kern_load, tpa_base,
+                 (uint32_t)reserved, out_disk_path);
     ret = 0;
 
 cleanup:

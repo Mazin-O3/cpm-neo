@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <syscall.h>
 #include <stdlib.h>
+#include <syscall.h>
 
 extern int main();
 
@@ -8,7 +8,7 @@ void __attribute__((used, noinline)) _start(void)
 {
     ArgBlock args;
     getargs(&args);
-  
+
     char *argv[args.argc + 1];
 
     for (int i = 0; i < args.argc; i++)

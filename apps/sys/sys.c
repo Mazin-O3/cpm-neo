@@ -12,7 +12,7 @@ static CmdErr cmd_sys(FsContext *ctx, int argc, char **argv)
 
     if (sys_info(&si) != EOK)
         return cmderr_bdos(ctx->vol_id, EIO);
-    
+
     const char *sep = "------------------------------------";
 
     printf("\nCP/M Neo v%u.%u\n", si.os_version >> 8, si.os_version & 0xFF);

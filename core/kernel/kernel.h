@@ -1,13 +1,13 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include <errno.h>
+#include "abi.h"
 #include "bdos.h"
 #include "bios.h"
-#include "abi.h"
 #include "disk_format.h"
-#include <stdio.h>
+#include <errno.h>
 #include <stdint.h>
+#include <stdio.h>
 
 extern char __kernel_base[];
 extern char __io_base[];
@@ -26,7 +26,7 @@ extern char XIP_BASE[];
  * XIP CCP entry) which are storage origins, not call targets. */
 void kjump(uintptr_t addr);
 
-int      kernel_init(void);
-void     kexec_ccp(void) __attribute__((noreturn));
+int  kernel_init(void);
+void kexec_ccp(void) __attribute__((noreturn));
 
 #endif /* KERNEL_H */

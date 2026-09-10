@@ -95,7 +95,7 @@ static CmdErr stat_dsk(void)
     printf("%-16s : %uK\n", "Unallocated", si.disk_unalloc_kb);
 
     printf("--------------------------\n");
-    
+
     printf("Volume  Mode  Used  Total\n");
 
     for (int8_t v = 0; v < MAX_VOLUMES; v++)
@@ -104,7 +104,7 @@ static CmdErr stat_dsk(void)
             continue;
 
         const char *mode = vs[v].read_only ? "RO" : "RW";
-        uint16_t vol_used_k = vs[v].total_blocks - vs[v].free_blocks;
+        uint16_t    vol_used_k = vs[v].total_blocks - vs[v].free_blocks;
 
         printf("%c:      %s%7uK%6uK\n", 'A' + v, mode, vol_used_k, vs[v].total_blocks);
     }

@@ -11,10 +11,12 @@
 #define SEEK_SET 0
 #define SEEK_END 1
 
-/* Set the filesystem context (volume + user area) for subsequent operations. Returns EOK or negative errno. */
+/* Set the filesystem context (volume + user area) for subsequent operations. Returns EOK or
+ * negative errno. */
 int fs_setctx(FsContext ctx);
 
-/* Open file: "r" -> read, "w" -> write+create+trunc, "a" -> append+create; returns fd or negative errno */
+/* Open file: "r" -> read, "w" -> write+create+trunc, "a" -> append+create; returns fd or negative
+ * errno */
 int open(const char *path, const char *mode);
 
 /* Read up to len bytes into buf; returns bytes read or negative errno */
@@ -24,12 +26,13 @@ int read(int fd, void *buf, uint32_t len);
 int write(int fd, const void *buf, uint32_t len);
 
 /* Close fd */
-int  close(int fd);
+int close(int fd);
 
 /* Read one line (up to '\n' or EOF) into buf; returns total bytes consumed from fd */
 int readline(int fd, char *buf, int sz);
 
-/* Seek: SEEK_SET -> absolute, SEEK_END -> offset from end; returns new position or negative errno */
+/* Seek: SEEK_SET -> absolute, SEEK_END -> offset from end; returns new position or negative errno
+ */
 int lseek(int fd, uint32_t offset, int whence);
 
 /* Delete a file; returns 0 or negative errno */

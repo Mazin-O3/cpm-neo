@@ -7,8 +7,8 @@
  * installer (cmd_apps.c) and system generation (cmd_new.c).
  */
 
-#include "cmd.h"
 #include "bdos.h"
+#include "cmd.h"
 #include "disk.h"
 #include "sysgen.h"
 #include "utils.h"
@@ -74,7 +74,7 @@ static void n83_dot(const char *n83, char *out, size_t n)
 
 int parse_dst(int argc, char **argv, int *vol, int *user)
 {
-    int seen = 0;
+    int         seen = 0;
     const char *v = flag_value(argc, argv, "--dst", &seen);
 
     if (!seen || !v || !*v)
@@ -100,7 +100,7 @@ int parse_dst(int argc, char **argv, int *vol, int *user)
  */
 int parse_attr_dflt(int argc, char **argv, uint8_t *attr, uint8_t dflt)
 {
-    int seen = 0;
+    int         seen = 0;
     const char *v = flag_value(argc, argv, "--attr", &seen);
     *attr = 0;
 
@@ -155,7 +155,7 @@ int setup_disk_target(int argc, char **argv, const char *vn_arg, ImageTarget *tg
 
 const char *get_str_flag(int argc, char **argv, const char *flag_name)
 {
-    int is_present = 0;
+    int         is_present = 0;
     const char *value = flag_value(argc, argv, flag_name, &is_present);
     return (is_present && value && *value != '\0') ? value : NULL;
 }
@@ -175,7 +175,7 @@ int check_flags(int argc, char **argv, const char *const *allowed)
 int check_positionals(int argc, char **argv, int min_pos, int max_pos)
 {
     const char *pos[8];
-    int n = collect_positional(argc, argv, pos, 8);
+    int         n = collect_positional(argc, argv, pos, 8);
 
     if (n < min_pos || n > max_pos)
     {
@@ -204,7 +204,7 @@ int add_data_open(const char *file, const AddFileOpts *opts)
     }
 
     const char *base = extract_basename(file);
-    char n83[NAME83_LEN + 1];
+    char        n83[NAME83_LEN + 1];
     to_name83(base, n83);
     n83[NAME83_LEN] = '\0';
 
@@ -234,7 +234,7 @@ int add_data_open(const char *file, const AddFileOpts *opts)
     }
 
     uint32_t off = 0;
-    int rc = EOK;
+    int      rc = EOK;
 
     while (off < len)
     {
@@ -263,7 +263,7 @@ int add_data_open(const char *file, const AddFileOpts *opts)
     const char *tag = (opts->attr & FILE_ATTR_SYSTEM)      ? "  [SYS]"
                       : (opts->attr & FILE_ATTR_READ_ONLY) ? "  [RO]"
                                                            : "";
-    char h[24];
+    char        h[24];
     hr(h, sizeof(h), len);
     printf("  %s %-13s %9s  -> %c:%u%s\n", opts->verb, dot, h, 'A' + opts->vol, opts->user, tag);
     return 0;
