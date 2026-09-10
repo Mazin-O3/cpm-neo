@@ -1,6 +1,0 @@
-#ifndef PLATFORM_BASE_H
-#define PLATFORM_BASE_H
-
-#define PLATFORM_RAM_BASE 0x02000000
-
-#endif /* PLATFORM_BASE_H */

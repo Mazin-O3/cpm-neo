@@ -6,11 +6,15 @@
  * kernel/disk.c. Includes mmio.h for direct register access.
  *
  * Console is the UART (polled, not interrupt-driven). Disk is a RAM
- * buffer, not a real storage peripheral. TinyMCU has no SPI/SD/flash
- * controller yet (see rtl/peripherals/). It starts empty on every reset:
- * there is no persistence across power cycles until a real storage
- * peripheral exists, or until the SRAM's initial contents are baked into
- * the bitstream the same way the Boot ROM's are.
+ * buffer, not a real storage peripheral. TinyMCU does have an XIP/SPI
+ * flash interface now (rtl/core/tinymcu_imem_xip.vhd, driven from
+ * software via sw/lib/core/xip/), but it is wired up as an
+ * execute-in-place instruction source, not as a block storage backend
+ * behind bios_read()/bios_write() below. The RAM disk starts empty on
+ * every reset: there is no persistence across power cycles until either
+ * a bios_read()/bios_write() backend on top of the XIP flash exists, or
+ * until the SRAM's initial contents are baked into the bitstream the
+ * same way the Boot ROM's are.
  */
 
 #include "bios.h"
@@ -19,9 +23,10 @@
 
 /*
  * Storage backend for bios_read()/bios_write(), selected at compile time.
- * Default: the RAM disk (TinyMCU has no SPI/SD/flash controller yet, see
- * rtl/peripherals/). Once a real controller exists, add its
- * implementation below and build with
+ * Default: the RAM disk. TINYMCU_STORAGE_SPI is reserved for a future
+ * backend built on top of the XIP flash interface's SPI transfer
+ * functions (sw/lib/core/xip/tinymcu_xip.h); no such backend exists yet,
+ * only the stub below. Once it does, build with
  * -DTINYMCU_STORAGE=TINYMCU_STORAGE_SPI to switch -- only one backend is
  * ever compiled in, so there's no risk of the wrong one's bios_read()/
  * bios_write() accidentally getting linked in.
@@ -86,7 +91,7 @@ void bios_conout(int c)
     MMIO_W32(TINYMCU_UART_TX_DATA, (uint8_t)c);
 }
 
-int bios_const(void)
+int bios_constat(void)
 {
     return (MMIO_R32(TINYMCU_UART_STATUS) & TINYMCU_UART_STATUS_RX_READY) ? 0xFF : 0;
 }
@@ -124,6 +129,14 @@ int bios_write(uint16_t lba, const uint8_t *buf)
     uint8_t *dst = (uint8_t *)(uintptr_t)(TINYMCU_RAMDISK_BASE + (uint32_t)lba * TINYMCU_SECTOR_SIZE);
     for (uint32_t i = 0; i < TINYMCU_SECTOR_SIZE; i++)
         dst[i] = buf[i];
+    return 0;
+}
+
+int bios_sync(void)
+{
+    /* bios_write() above stores directly into the RAM disk's SRAM with
+     * no deferred cache in between, so every accepted write is already
+     * durable by the time bios_write() returns. No barrier work needed. */
     return 0;
 }
 

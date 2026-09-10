@@ -21,7 +21,6 @@
 #define MMIO_H
 
 #include <stdint.h>
-#include "kernel_abi.h"
 
 /* MMIO access macros */
 

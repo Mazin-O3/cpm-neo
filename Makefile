@@ -1,21 +1,29 @@
-# CP/M Neo — builds sysgen and generates a disk image + bootloader for a
-# given platform/arch.
+# CP/M Neo — builds sysgen and generates a disk image + bootloader for
+# the TinyMCU platform (platform/tinymcu/config.sh).
 #
 # Usage:
 #   make sysgen - build sysgen/build/sysgen (the disk/bootloader generator)
-#   make disk   - build sysgen, then run "sysgen new" with DISK_SIZE/
-#                 MEM_SIZE/PLATFORM/ARCH. Produces sysgen/build/disk.img
-#                 and sysgen/build/core/int/bootloader.elf
+#   make disk   - build sysgen, then run "sysgen new" for PLATFORM (XIP=1
+#                 to additionally pass --xip). Produces sysgen/build/disk.img,
+#                 sysgen/build/bootloader.bin and sysgen/build/core/int/{kernel,ccp}.bin
 #   make clean  - remove sysgen/build
 #
+# See README.md's "Quick Start" for the underlying sysgen invocation this
+# wraps, and platform/tinymcu/config.sh for every TinyMCU-specific value
+# (RAM/IO base, disk size, ...) sysgen reads instead of a --mem/--disk-size
+# command line flag.
 
 SYSGEN_DIR := sysgen
 SYSGEN_BIN := $(SYSGEN_DIR)/build/sysgen
 
-DISK_SIZE ?= 128K
-MEM_SIZE  ?= 32K
-PLATFORM  ?= tinymcu
-ARCH      ?= tinymcu-riscv32
+PLATFORM ?= tinymcu
+XIP      ?= 0
+
+ifeq ($(XIP),1)
+XIP_FLAG := --xip
+else
+XIP_FLAG :=
+endif
 
 .PHONY: sysgen disk clean
 
@@ -25,10 +33,7 @@ $(SYSGEN_BIN):
 	$(MAKE) -C $(SYSGEN_DIR)
 
 disk: $(SYSGEN_BIN)
-	./$(SYSGEN_BIN) new \
-		--disk-size=$(DISK_SIZE) --mem=$(MEM_SIZE) \
-		--no-sys --no-extra \
-		--platform=$(PLATFORM) --arch=$(ARCH)
+	./$(SYSGEN_BIN) new --platform=$(PLATFORM) $(XIP_FLAG)
 
 clean:
 	rm -rf $(SYSGEN_DIR)/build
