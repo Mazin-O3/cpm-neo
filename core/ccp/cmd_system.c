@@ -254,7 +254,7 @@ CmdErr cmd_sync(FsContext *ctx, int argc, char **argv)
     int rc = sync();
 
     if (rc != EOK)
-        return cmderr_bdos(VOL_INVALID, rc);
+        return cmderr_errno(rc);
 
     printf("OK\n");
     return cmderr_ok();

@@ -91,7 +91,7 @@ static int isa_variant_from_flags(const char *flags, char *out, size_t n)
     return -1;
 }
 
-static int run_build_script(const SysgenPaths *paths, const char *platform)
+static int run_build_script(const SysgenPaths *paths, const char *platform, int want_xip)
 {
     char script[SYSGEN_FULL_PATH_MAX];
     snprintf(script, sizeof(script), "%s/../build_disk.sh", paths->build_dir);
@@ -100,7 +100,9 @@ static int run_build_script(const SysgenPaths *paths, const char *platform)
     snprintf(plat_flag, sizeof(plat_flag), "--platform=%s", platform);
 
     char *argv[] = {
-        (char *)"sh", script, plat_flag, NULL,
+        (char *)"sh", script, plat_flag,
+        (char *)(want_xip ? "--xip" : NULL),
+        NULL,
     };
 
     printf("Starting disk build for %s\n", platform);
@@ -202,7 +204,7 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
 
 /* Whitelist of flags accepted by `sysgen new` (NULL-terminated). */
 static const char *const FLAGS_NEW[] = {
-    "--platform", NULL,
+    "--platform", "--xip", NULL,
 };
 
 /* Split a whitespace-separated name list in-place into out[0..n).  Returns
@@ -238,7 +240,7 @@ static size_t split_names(char *buf, const char **out, size_t max_out)
     return n;
 }
 
-static bool parse_cmd_new_args(int argc, char **argv, const char **platform)
+static bool parse_cmd_new_args(int argc, char **argv, const char **platform, int *want_xip)
 {
     const char *platform_str = get_str_flag(argc, argv, "--platform");
 
@@ -249,6 +251,7 @@ static bool parse_cmd_new_args(int argc, char **argv, const char **platform)
     }
 
     *platform = platform_str;
+    *want_xip = get_bool_flag(argc, argv, "--xip") ? 1 : 0;
 
     return true;
 }
@@ -279,8 +282,9 @@ int cmd_new(int argc, char **argv)
         return 1;
 
     const char *platform;
+    int want_xip = 0;
 
-    if (!parse_cmd_new_args(argc, argv, &platform))
+    if (!parse_cmd_new_args(argc, argv, &platform, &want_xip))
         return 1;
 
     const SysgenPaths *paths = sysgen_paths();
@@ -289,7 +293,8 @@ int cmd_new(int argc, char **argv)
         return 1;
 
     char path_buf[SYSGEN_FULL_PATH_MAX];
-    if (run_build_script(paths, platform) != 0)
+    
+    if (run_build_script(paths, platform, want_xip) != 0)
         return 1;
 
     char os_platform_buf[16];

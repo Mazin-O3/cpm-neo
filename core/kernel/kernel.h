@@ -19,6 +19,13 @@ extern char __tpa_base[];
  * constant (the flash-mapped window base), not a read of that memory. */
 extern char XIP_BASE[];
 
+/* Transfer control to a program loaded at |addr|.  Per-architecture
+ * assembly (arch/$CONFIG_ARCH/kjump.S) owns ISA-specific calling state,
+ * e.g. the ARM Thumb bit.  Mirrors the classic CP/M BIOS jump-to-CCP
+ * convention; matches the OS's multi-boot entry addresses (__tpa_base,
+ * XIP CCP entry) which are storage origins, not call targets. */
+void kjump(uintptr_t addr);
+
 int      kernel_init(void);
 void     kexec_ccp(void) __attribute__((noreturn));
 

@@ -19,13 +19,24 @@
 
 #   CONFIG_IO_BASE    — Base address of the peripheral MMIO window
 
-#   CONFIG_XIP_BASE   — Optional.  Flash/XIP window base; declaring it selects
-#                       XIP builds (the kernel/CCP run in place from this
-#                       window).  A platform that omits the field always builds
-#                       plain (RAM-loading) disks.  The XIP window has no
-#                       configured size: it extends from the XIP base to the
-#                       end of the on-disk kernel/CCP contents, and the flash
-#                       simply maps the XIP disk image
+#   CONFIG_BOOT_BASE  — Address where the bootloader is placed and executed
+#                       (the reset vector origin)
+
+#   CONFIG_BOOT_SIZE  — Optional. Boot code budget override; arch linker script
+#                       provides default via PROVIDE()
+
+#   CONFIG_BOOT_RAM_SIZE — Optional. Boot runtime RAM budget override; arch
+#                       linker script provides default via PROVIDE()
+
+#   CONFIG_XIP_BASE   — Optional.  XIP window base for 'sysgen new --xip'.
+#                       The kernel/CCP run in place from this window once
+#                       --xip enables XIP; when omitted and --xip is given,
+#                       the base is auto-derived as BOOT_BASE + boot size.
+#                       Declare it only when the window is NOT right past
+#                       boot.  The XIP window has no configured size: it
+#                       extends from the XIP base to the end of the on-disk
+#                       kernel/CCP contents, and the flash simply maps the
+#                       XIP disk image
 
 #   CONFIG_VOL_MAX    — Volume count, A:..P; required.  Must not exceed
 #                       The sysgen host ceiling of 16
@@ -59,11 +70,12 @@ CONFIG_ARCH=riscv32
 CONFIG_RAM_SIZE=0x10000
 CONFIG_RAM_BASE=0x0000
 CONFIG_IO_BASE=0xFF00
+CONFIG_BOOT_BASE=0x0000
 CONFIG_XIP_BASE=0x10000
 
 # Disk and volume configuration
-CONFIG_VOL_MAX=4
 CONFIG_DISK_SIZE=2048
+CONFIG_VOL_MAX=4
 CONFIG_FCB_MAX=4
 CONFIG_STACK_SIZE=0x1000
 

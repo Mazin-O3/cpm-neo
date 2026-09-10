@@ -34,6 +34,7 @@ static int dma_transfer(uint16_t dst, uint16_t src, uint32_t count, uint8_t flag
 
 static uint16_t g_time_prev;
 static uint32_t g_time_acc;
+static uint8_t  s_con_last;
 
 int bios_init(void)
 {
@@ -62,7 +63,17 @@ uint32_t bios_time(void)
 
 void bios_conout(int c)
 {
-    MMIO_W8(DSP_DATA, c);
+    uint8_t ch = (uint8_t)c;
+
+    /* Same line discipline as the serial platform: bare LF -> CR-LF. */
+    if (ch == '\n' && s_con_last != '\r')
+    {
+        MMIO_W8(DSP_DATA, '\r');
+        s_con_last = '\r';
+    }
+
+    MMIO_W8(DSP_DATA, ch);
+    s_con_last = ch;
 }
 
 int bios_constat(void)

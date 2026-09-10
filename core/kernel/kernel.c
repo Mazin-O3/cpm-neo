@@ -15,14 +15,16 @@
 
 #include "kernel.h"
 #include "disk.h"
+#include "bios.h"
 #include "stdlib.h"
 #include "string.h"
 #include "ctype.h"
 #include <limits.h>
 #include "syscall.h"
 
-/* JUMP: transfer control to a program at |addr| */
-#define JUMP(addr) ((void (*)(void))(uintptr_t)(addr))()
+/* kjump: transfer control to a program loaded at |addr|.  Per-architecture
+ * assembly (arch/$CONFIG_ARCH/kjump.S) owns any ISA calling-state detail,
+ * e.g. the ARM Thumb bit.  See kernel.h. */
 
 /* Per-kernel-environment slots: indexed by ENV_* constants.
  * is_ccp gates writes so transient programs cannot corrupt CCP state. */
@@ -73,10 +75,12 @@ static FsContext parse_prefix(const char **path_ptr)
         if (colon < 0)
             return ctx;
 
-        ctx.vol_id = toupper((unsigned char)p[0]) - 'A';
+        int8_t vol_id = toupper((unsigned char)p[0]) - 'A';
 
-        if (ctx.vol_id >= MAX_VOLUMES)
+        if (vol_id >= MAX_VOLUMES)
             return ctx;
+
+        ctx.vol_id = vol_id;
 
         if (colon > 1)
         {
@@ -278,7 +282,7 @@ int kexec(const char *name83, int argc, char **argv, FsContext ctx)
 
     g_kstate.kenv.is_ccp = 0;
 
-    JUMP(__tpa_base);
+    kjump((uintptr_t)__tpa_base);
 
     for (;;)
         ;
@@ -317,7 +321,7 @@ void kexec_ccp(void)
 
     if (ccp_entry != 0)
     {
-        JUMP(ccp_entry);
+        kjump(ccp_entry);
 
         for (;;)
             ;
@@ -330,7 +334,7 @@ void kexec_ccp(void)
         if (bios_read(sec + i, (void *)((uintptr_t)__tpa_base + i * DISK_SECTOR_SIZE)))
             goto err;
 
-    JUMP(__tpa_base);
+    kjump((uintptr_t)__tpa_base);
 
 err:
     puts("  CCP ERR");
