@@ -38,9 +38,9 @@
 #define PLL_N 192U
 #define PLL_Q 4U
 
-#define BP_HSE_RDY_MS  5U
-#define BP_PLL_RDY_MS  10U
-#define BP_SWS_MS      2U
+#define BP_HSE_RDY_MS 5U
+#define BP_PLL_RDY_MS 10U
+#define BP_SWS_MS 2U
 
 #define BP_USART_READY_CYCLES (2U * 96000UL)
 
@@ -58,8 +58,7 @@ static int bp_dwt_enable(void)
     return EOK;
 }
 
-static int bp_wait_cycles(volatile uint32_t *reg, uint32_t mask, uint32_t expect,
-                          uint32_t cycles)
+static int bp_wait_cycles(volatile uint32_t *reg, uint32_t mask, uint32_t expect, uint32_t cycles)
 {
     uint32_t start = DWT_CYCCNT;
 
@@ -76,8 +75,7 @@ static int bp_wait_cycles(volatile uint32_t *reg, uint32_t mask, uint32_t expect
 /* ms-budgeted wait at 16 MHz HSI: the clock-ready waits run BEFORE SYSCLK
  * switches away from HSI (see the BP_*_MS budgets above).  Waits that run
  * after the switch (on 96 MHz SYSCLK) must use bp_wait_cycles() instead. */
-static int bp_wait_ms(volatile uint32_t *reg, uint32_t mask, uint32_t expect,
-                      uint32_t ms)
+static int bp_wait_ms(volatile uint32_t *reg, uint32_t mask, uint32_t expect, uint32_t ms)
 {
     return bp_wait_cycles(reg, mask, expect, ms * 16000UL);
 }
@@ -175,7 +173,7 @@ static int dwt_init(void)
 
 typedef struct
 {
-    uint8_t rx[UART_RX_BUF_SIZE];
+    uint8_t  rx[UART_RX_BUF_SIZE];
     uint16_t rx_in;
     uint16_t rx_out;
     uint16_t rx_count;
@@ -213,8 +211,7 @@ static int uart_init(void)
 
     USART1->SR = (uint32_t)~USART_SR_TC;
 
-    if (bp_wait_cycles(&USART1->SR, USART_SR_TC, USART_SR_TC,
-                       BP_USART_READY_CYCLES) != EOK)
+    if (bp_wait_cycles(&USART1->SR, USART_SR_TC, USART_SR_TC, BP_USART_READY_CYCLES) != EOK)
         return EIO;
 
     while (!(USART1->SR & USART_SR_TXE))

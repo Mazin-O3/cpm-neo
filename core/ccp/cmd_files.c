@@ -26,10 +26,10 @@ static const char *type_fmt = "f";    /* TYPE filespec */
 typedef struct
 {
     const char *seg_start[REN_MAX_SEG];
-    int seg_len[REN_MAX_SEG];
-    int nseg;
-    char pos_map[REN_MAX_POS];
-    int npos;
+    int         seg_len[REN_MAX_SEG];
+    int         nseg;
+    char        pos_map[REN_MAX_POS];
+    int         npos;
 } RenMatch;
 
 /*
@@ -117,7 +117,7 @@ static void ren_pattern_format(const char *dst_pat, const RenMatch *rm, char *ou
         {
             if (seg_idx < rm->nseg)
             {
-                int len = rm->seg_len[seg_idx];
+                int         len = rm->seg_len[seg_idx];
                 const char *s = rm->seg_start[seg_idx];
 
                 for (int i = 0; i < len && o < out_sz - 1; i++)
@@ -198,7 +198,7 @@ CmdErr cmd_ren(FsContext *ctx, int argc, char **argv)
             return cmderr_syntax(NULL);
 
         const char *dn = dst.name[0] ? dst.name : src.name;
-        char src_full[FSPATH_MAX], dst_full[FSPATH_MAX];
+        char        src_full[FSPATH_MAX], dst_full[FSPATH_MAX];
         make_path(src_full, src.fs_ctx, src.name);
         make_path(dst_full, dst.fs_ctx, dn);
 
@@ -223,11 +223,11 @@ CmdErr cmd_ren(FsContext *ctx, int argc, char **argv)
         dst.name[0] ? (strchr(argv[2], ':') ? strchr(argv[2], ':') + 1 : argv[2]) : src_pat;
 
     FileInfo di;
-    int total = 0;
+    int      total = 0;
 
     while (find_next(argv[1], &di) == EOK)
     {
-        char new_name[FILENAME_MAX];
+        char     new_name[FILENAME_MAX];
         RenMatch rm;
         ren_pattern_match(src_pat, di.name, &rm);
         ren_pattern_format(dst_pat, &rm, new_name, sizeof(new_name));
@@ -261,7 +261,7 @@ CmdErr cmd_type(FsContext *ctx, int argc, char **argv)
     Pager pg = pager_start();
 
     uint8_t buf[128];
-    int n, col = 0, stop = 0;
+    int     n, col = 0, stop = 0;
 
     while (!stop && (n = read(fd, buf, sizeof(buf))) > 0)
     {

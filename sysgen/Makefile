@@ -4,14 +4,13 @@ CC      ?= cc
 CFLAGS  ?= -Os -Wall -Wextra
 
 INC_LOCAL := -Iinclude -I ../core/kernel -I ../core -I .. -iquote ../sdk/include
-# Host bdos.c/disk.c: SYSGEN_HOST gives the runtime block-cap override; the
-# ceiling config (sysgen/include/config.h) provides CONFIG_* to the host
-# build, sizing the arrays to the maximum any platform may use.
+# Host bdos.c/disk.c: the ceiling config (sysgen/include/config.h) provides
+# CONFIG_* to the host build, sizing the arrays to the maximum any platform
+# may use.
 INC_BDOS  := -I include -DSYSGEN_HOST -I ../core/kernel -I ../core -I ../sdk/include -I .. -Wno-builtin-declaration-mismatch
 
-# cmd_new.o applies the runtime cap setters, so it sees the SYSGEN_HOST
-# header view too, but keeps INC_LOCAL so the host libc (not the sdk's
-# freestanding headers) resolves <stdio.h>/<stdlib.h>/<string.h>.
+# cmd_new.o keeps INC_LOCAL so the host libc (not the sdk's freestanding
+# headers) resolves <stdio.h>/<stdlib.h>/<string.h>.
 INC_CMD   := $(INC_LOCAL) -DSYSGEN_HOST
 
 BUILD_DIR := build

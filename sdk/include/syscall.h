@@ -37,13 +37,11 @@ int sys_findfile(const char *pattern, FileInfo *out, uint16_t start_pos);
 /* Return total size in bytes of the open file (0 if fd is invalid). */
 uint32_t sys_getsize(int fd);
 
-
 /* Create a new empty file.  Returns 0 or negative errno. */
 int sys_create(const char *name);
 
 /* Delete a file.  Returns 0 or negative errno. */
 int sys_delete(const char *name);
-
 
 /* Rename old to new.  Returns 0 or negative errno. */
 int sys_rename(const char *old, const char *new);
@@ -51,11 +49,9 @@ int sys_rename(const char *old, const char *new);
 /* Mount (format + bind) volume.  Returns 0 or negative errno. */
 int sys_mount(int8_t slot);
 
-
 /* Resize volume by delta blocks (+grow / -shrink / 0 = no-op).
  * Returns 0 or negative errno. */
 int sys_resize(int8_t slot, int16_t delta);
-
 
 /* Unmount volume.  Returns 0 or negative errno. */
 int sys_unmount(int8_t slot);
@@ -79,7 +75,6 @@ int sys_vsetattr(int8_t vol_id, uint8_t attr);
 /* Copy system info into out.  Returns 0 or negative errno. */
 int sys_info(SysInfo *out);
 
-
 /* Seek to offset in file.  Returns 0 or negative errno. */
 int sys_seek(int fd, uint32_t offset);
 
@@ -91,7 +86,6 @@ int sys_setctx(FsContext ctx);
 
 /* Read an environment slot.  Returns the slot value. */
 uint32_t sys_getenv(uint8_t slot);
-
 
 /* Write an environment slot.  Returns 0 or negative errno. */
 int sys_setenv(uint8_t slot, uint32_t value);

@@ -7,8 +7,8 @@
  * install <folder|file.c>` (adds one app to an existing image).
  */
 
-#include "cmd.h"
 #include "bdos.h"
+#include "cmd.h"
 #include "disk.h"
 #include "sysgen.h"
 #include "utils.h"
@@ -27,10 +27,10 @@ typedef struct
     const SysgenPaths *paths;
     const AddFileOpts *opts;
     const char *const *names;
-    size_t nnames;
-    int *found; /* parallel to names; 1 once a source matched */
-    size_t found_count;
-    int failed;
+    size_t             nnames;
+    int               *found; /* parallel to names; 1 once a source matched */
+    size_t             found_count;
+    int                failed;
 } BundledScan;
 
 static int want_app(const BundledScan *scan, const char *name)
@@ -102,7 +102,7 @@ int build_folder_com(const SysgenPaths *paths, const char *src, const BuildFolde
     /* App name: folder basename, or a single source file's basename minus
      * its extension (mycmd.c -> mycmd.com -> MYCMD.COM). */
     const char *base;
-    char basebuf[SYSGEN_FULL_PATH_MAX];
+    char        basebuf[SYSGEN_FULL_PATH_MAX];
 
     if (!dir_exists(dirbuf))
     {
@@ -140,8 +140,8 @@ int build_folder_com(const SysgenPaths *paths, const char *src, const BuildFolde
  * the disk.  Returns 1 on failure (also marks the scan failed). */
 static int build_and_add(BundledScan *scan, const char *src)
 {
-    char out_com[SYSGEN_FULL_PATH_MAX + 256];
-    char platform_buf[64];
+    char            out_com[SYSGEN_FULL_PATH_MAX + 256];
+    char            platform_buf[64];
     BuildFolderOpts bfo = {out_com, sizeof(out_com), platform_buf, sizeof(platform_buf)};
 
     if (build_folder_com(scan->paths, src, &bfo) != 0)
@@ -219,11 +219,10 @@ static int report_unmatched(const BundledScan *scan, const char *kind)
     return bad;
 }
 
-static int run_install(const SysgenPaths *paths, const AddFileOpts *opts,
-                       const char *const *names, size_t nnames,
-                       const char *subdir, int flat, const char *kind)
+static int run_install(const SysgenPaths *paths, const AddFileOpts *opts, const char *const *names,
+                       size_t nnames, const char *subdir, int flat, const char *kind)
 {
-    int rc = 0;
+    int  rc = 0;
     int *found = NULL;
 
     if (nnames == 0)
@@ -254,14 +253,14 @@ static int run_install(const SysgenPaths *paths, const AddFileOpts *opts,
     return rc;
 }
 
-int install_sys_apps(const SysgenPaths *paths, const AddFileOpts *opts,
-                     const char *const *names, size_t nnames)
+int install_sys_apps(const SysgenPaths *paths, const AddFileOpts *opts, const char *const *names,
+                     size_t nnames)
 {
     return run_install(paths, opts, names, nnames, "sys", 1, "sys");
 }
 
-int install_extra_apps(const SysgenPaths *paths, const AddFileOpts *opts,
-                       const char *const *names, size_t nnames)
+int install_extra_apps(const SysgenPaths *paths, const AddFileOpts *opts, const char *const *names,
+                       size_t nnames)
 {
     return run_install(paths, opts, names, nnames, "extra", 0, "extra");
 }

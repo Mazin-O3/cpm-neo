@@ -135,8 +135,8 @@ int elf32_symbol(const uint8_t *e, size_t n, const char *name, uint32_t *value)
     for (uint32_t i = 0; i + sym_entsize <= sym_size; i += sym_entsize)
     {
         const uint8_t *sym = e + sym_off + i;
-        uint32_t st_name = read32(sym);
-        uint32_t st_value = read32(sym + 4);
+        uint32_t       st_name = read32(sym);
+        uint32_t       st_value = read32(sym + 4);
 
         if (st_name < str_size)
         {
@@ -165,7 +165,7 @@ int elf32_symbol(const uint8_t *e, size_t n, const char *name, uint32_t *value)
 void to_name83(const char *src, char *out83)
 {
     char tmp[64];
-    int n = 0;
+    int  n = 0;
 
     while (src[n] && n < 63)
     {
@@ -192,7 +192,7 @@ void to_name83(const char *src, char *out83)
         if (b > NAME83_BASE)
             b = NAME83_BASE;
         memcpy(base, tmp, (size_t)b);
-        int e = 0;
+        int         e = 0;
         const char *p = dot + 1;
 
         while (e < NAME83_EXT && *p)
@@ -260,7 +260,7 @@ int write_file(const char *path, const uint8_t *data, uint32_t len)
         return -1;
 
     size_t w = fwrite(data, 1, (size_t)len, f);
-    int rc = fclose(f);
+    int    rc = fclose(f);
 
     if (w != (size_t)len)
         return -1;
@@ -291,9 +291,9 @@ SysgenDiskCfg sysgen_disk_cfg_default(void)
  * or -1 on error (disk too small, invalid parameters, OOM).
  */
 int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern,
-                 uint32_t kern_size, const uint8_t *ccp, uint32_t ccp_size,
-                 uint32_t kern_load, uint16_t os_ver, uint16_t kern_ver,
-                 uint16_t ccp_ver, const char *platform, int xip)
+                 uint32_t kern_size, const uint8_t *ccp, uint32_t ccp_size, uint32_t kern_load,
+                 uint16_t os_ver, uint16_t kern_ver, uint16_t ccp_ver, const char *platform,
+                 int xip)
 {
     if (!kern || kern_size == 0 || size_kb == 0)
         return -1;

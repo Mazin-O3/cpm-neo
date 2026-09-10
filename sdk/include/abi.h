@@ -17,20 +17,20 @@
 #ifndef ABI_H
 #define ABI_H
 
-#include <stdint.h>
 #include "config.h"
 #include "disk_format.h"
+#include <stdint.h>
 
 /* Filename constants */
-#define NAME83_BASE  8
-#define NAME83_EXT   3
-#define NAME83_LEN  (NAME83_BASE + NAME83_EXT)
+#define NAME83_BASE 8
+#define NAME83_EXT 3
+#define NAME83_LEN (NAME83_BASE + NAME83_EXT)
 #define FILENAME_MAX 13 /* 8.3 name + NUL terminator */
 
 /* Console control-key conventions shared by the kernel, SDK and apps. */
 #define CH_BREAK 0x03 /* ^C — Break a running program                  */
-#define CH_EOF   0x1A /* ^Z — End-of-file marker in text files         */
-#define CH_ESC   0x1B /* ESC — Abort listings / quit pager             */
+#define CH_EOF 0x1A   /* ^Z — End-of-file marker in text files         */
+#define CH_ESC 0x1B   /* ESC — Abort listings / quit pager             */
 
 /* Volume names */
 #define VOL_A 0
@@ -43,8 +43,8 @@
 /* Volume/user context */
 typedef struct
 {
-    int8_t vol_id;      /* Current volume (0..MAX_VOLUMES-1, or VOL_INVALID) */
-    uint8_t user_area;  /* Current user area (0..USER_AREA_MAX)       */
+    int8_t  vol_id;    /* Current volume (0..MAX_VOLUMES-1, or VOL_INVALID) */
+    uint8_t user_area; /* Current user area (0..USER_AREA_MAX)       */
 } FsContext;
 
 /* File-descriptor constants */
@@ -70,44 +70,44 @@ static inline int fd_is_stdin(int fd)
 
 typedef struct
 {
-    int argc;                           /* Argument count (0-8) */
-    char argv[ARGS_MAX][ARG_LEN_MAX];  /* Null-terminated arg strings */
+    int  argc;                        /* Argument count (0-8) */
+    char argv[ARGS_MAX][ARG_LEN_MAX]; /* Null-terminated arg strings */
 } ArgBlock;
 
 typedef struct
 {
-    uint32_t size;              /* File size in bytes */
-    char name[FILENAME_MAX];   /* Null-terminated 8.3 name */
-    uint8_t attrib;             /* FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM */
-    uint8_t user_area;          /* User area that owns the file */
-    uint16_t extents;           /* Number of 8 KB extents */
-    uint32_t alloc_bytes;       /* Allocated space in bytes */
+    uint32_t size;               /* File size in bytes */
+    char     name[FILENAME_MAX]; /* Null-terminated 8.3 name */
+    uint8_t  attrib;             /* FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM */
+    uint8_t  user_area;          /* User area that owns the file */
+    uint16_t extents;            /* Number of 8 KB extents */
+    uint32_t alloc_bytes;        /* Allocated space in bytes */
 } FileInfo;
 
 #define FILE_ATTR_READ_ONLY 0x01
-#define FILE_ATTR_SYSTEM    0x02
+#define FILE_ATTR_SYSTEM 0x02
 
 #define VOL_ATTR_RW 0
 #define VOL_ATTR_RO 1
 
 typedef struct
 {
-    uint16_t total_blocks;        /* Usable 1 KB data blocks      */
-    uint16_t free_blocks;         /* Free 1 KB data blocks        */
-    uint8_t read_only;            /* VOL_ATTR_RO or VOL_ATTR_RW  */
+    uint16_t total_blocks; /* Usable 1 KB data blocks      */
+    uint16_t free_blocks;  /* Free 1 KB data blocks        */
+    uint8_t  read_only;    /* VOL_ATTR_RO or VOL_ATTR_RW  */
 } VolStat;
 
 typedef struct
 {
-    uint32_t tpa;                     /* Transient program area base */
-    uint16_t os_version;              /* CP/M Neo version */
-    uint16_t kern_version;            /* Kernel build version */
-    uint16_t ccp_version;             /* CCP build version */
-    uint16_t disk_size_kb;            /* Block grid capacity (KB) */
-    uint16_t disk_unalloc_kb;         /* Unallocated pool (KB) */
-    uint8_t  vol_mounted[MAX_VOLUMES];    /* 1 = mounted                    */
-    char     platform[9];             /* Platform name, NUL-terminated  */
-    uint8_t  xip;                     /* 1 = XIP disk image             */
+    uint32_t tpa;                      /* Transient program area base */
+    uint16_t os_version;               /* CP/M Neo version */
+    uint16_t kern_version;             /* Kernel build version */
+    uint16_t ccp_version;              /* CCP build version */
+    uint16_t disk_size_kb;             /* Block grid capacity (KB) */
+    uint16_t disk_unalloc_kb;          /* Unallocated pool (KB) */
+    uint8_t  vol_mounted[MAX_VOLUMES]; /* 1 = mounted                    */
+    char     platform[9];              /* Platform name, NUL-terminated  */
+    uint8_t  xip;                      /* 1 = XIP disk image             */
 } SysInfo;
 
 /* Sector size is a disk *property* user programs observe (dsk size math);
@@ -131,9 +131,9 @@ static inline void write16(uint8_t *p, uint16_t v)
 
 /* Environment slot indices */
 
-#define ENV_RETURN_CODE  0   /* Return code of last program/command */
-#define ENV_BATCH_OFFSET 1   /* Offset of batch file in CCP */
-#define ENV_USER_DEFINED 2   /* User-defined environment slot */
-#define ENV_SLOTS_MAX    3
+#define ENV_RETURN_CODE 0  /* Return code of last program/command */
+#define ENV_BATCH_OFFSET 1 /* Offset of batch file in CCP */
+#define ENV_USER_DEFINED 2 /* User-defined environment slot */
+#define ENV_SLOTS_MAX 3
 
 #endif /* ABI_H */

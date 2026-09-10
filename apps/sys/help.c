@@ -82,12 +82,12 @@ static const HelpRec g_recs[] = {
      "and mounted volumes."},
 
     {"CLS", "other", "CLS", "Clear screen", "Clears the console screen."},
-    
+
     {"SYNC", "other", "SYNC", "Flush disk writes to storage",
      "Commits all pending disk writes to persistent storage. The platform\n"
      "persistence barrier flushes any write-back cache. Done automatically\n"
      "on program exit."},
-     
+
     {"ECHO", "other", "ECHO [arg ...]", "Display arguments to console",
      "Displays the arguments, separated by a single space character\n"
      "and followed by a newline."},

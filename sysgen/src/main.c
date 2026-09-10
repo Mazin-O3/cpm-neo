@@ -13,19 +13,19 @@ static void usage(void)
 {
     printf("\n*** CP/M Neo SYSGEN Utility ***\n\n"
            "Usage:\n\n"
-"  sysgen new <args> [opts]        Create a new disk image\n"
-            "      --platform=<ID>   Platform id (8-char max; declared by ID= in\n"
-            "                       the platform's config.sh; provides the ISA and RAM_SIZE)\n"
-            "      --xip             Enable XIP (execute-in-place) for kernel/CCP.\n"
-            "                       If the platform omits CONFIG_XIP_BASE, the XIP base\n"
-            "                       is auto-derived as BOOT_BASE + boot_size.\n\n"
+           "  sysgen new <args> [opts]        Create a new disk image\n"
+           "      --platform=<ID>   Platform id (8-char max; declared by ID= in\n"
+           "                       the platform's config.sh; provides the ISA and RAM_SIZE)\n"
+           "      --xip             Enable XIP (execute-in-place) for kernel/CCP.\n"
+           "                       If the platform omits CONFIG_XIP_BASE, the XIP base\n"
+           "                       is auto-derived as BOOT_BASE + boot_size.\n\n"
            "  sysgen install <folder|file.c> [opts]  Compile sources to .com and add to disk\n"
-            "  sysgen add     <file|folder> [opts]  Add a file (or flat folder) to disk\n"
-            "  sysgen extract [opts]  Extract every file to <build_dir>/extract/\n"
-            "  sysgen dir     [Vn]     [opts]  List files\n\n"
+           "  sysgen add     <file|folder> [opts]  Add a file (or flat folder) to disk\n"
+           "  sysgen extract [opts]  Extract every file to <build_dir>/extract/\n"
+           "  sysgen dir     [Vn]     [opts]  List files\n\n"
            "Options [opts]:\n"
-            "  --dst=<Vn>    Volume & user area (e.g., A0) [default: A0]\n"
-            "  --attr=<val>  RO, RW, SYS, or SYS+RO [default: RW for add; RO for install]\n"
+           "  --dst=<Vn>    Volume & user area (e.g., A0) [default: A0]\n"
+           "  --attr=<val>  RO, RW, SYS, or SYS+RO [default: RW for add; RO for install]\n"
            "  --disk=<path>  Target disk (all commands except new; new writes to "
            "<build_dir>/disk.img) [default: <build_dir>/disk.img]\n");
 }
@@ -39,8 +39,7 @@ typedef struct
 static const SysgenCmd g_cmds[] = {
     {.name = "new", .fn = cmd_new},         {.name = "add", .fn = cmd_add},
     {.name = "install", .fn = cmd_install}, {.name = "extract", .fn = cmd_extract},
-    {.name = "dir", .fn = cmd_dir},
-    {0}};
+    {.name = "dir", .fn = cmd_dir},         {0}};
 
 int main(int argc, char **argv)
 {

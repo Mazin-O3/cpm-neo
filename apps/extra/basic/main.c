@@ -174,8 +174,8 @@ static int exec_direct(BasicState *s)
         while (p < s->prog.free)
         {
             char line_buf[256];
-            int pos = 0;
-            int num = (unsigned char)p[0] | ((unsigned char)p[1] << 8);
+            int  pos = 0;
+            int  num = (unsigned char)p[0] | ((unsigned char)p[1] << 8);
             pos += snprintf(line_buf + pos, sizeof(line_buf) - pos, "%d ", num);
             p += 2;
 
@@ -184,7 +184,7 @@ static int exec_direct(BasicState *s)
                 if ((unsigned char)*p >= TOK_BASE)
                 {
                     const char *kw = lex_kw_names[(unsigned char)*p - TOK_BASE];
-                    int klen = strlen(kw);
+                    int         klen = strlen(kw);
 
                     if (pos + klen + 1 < (int)sizeof(line_buf))
                     {

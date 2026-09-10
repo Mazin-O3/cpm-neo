@@ -1,8 +1,8 @@
 #ifndef SYSGEN_UTILS_H
 #define SYSGEN_UTILS_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define SYSGEN_PATH_MAX 1024
 
@@ -28,15 +28,15 @@ int reject_unknown_flags(int argc, char **argv, const char *const *allowed);
 int collect_positional(int argc, char **argv, const char **out, int max_out);
 
 const char *resolve_disk(int argc, char **argv, char *buf, size_t n);
-void sysgen_default_disk(char *buf, size_t n);
+void        sysgen_default_disk(char *buf, size_t n);
 
 int parse_vn(const char *s, int *vol, int *user);
 
-int dir_exists(const char *p);
-int file_exists(const char *p);
+int  dir_exists(const char *p);
+int  file_exists(const char *p);
 void hr(char *out, size_t n, uint32_t bytes);
 
-void err(const char *fmt, ...);
+void        err(const char *fmt, ...);
 const char *err_str(int rc);
 
 int open_disk(const char *path);

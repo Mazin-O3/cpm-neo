@@ -162,7 +162,7 @@ int collect_positional(int argc, char **argv, const char **out, int max_out)
  * re-copy the returned pointer. */
 const char *resolve_disk(int argc, char **argv, char *buf, size_t n)
 {
-    int has = 0;
+    int         has = 0;
     const char *v = flag_value(argc, argv, "--disk", &has);
 
     if (has && v && *v)
@@ -261,8 +261,8 @@ void hr(char *out, size_t n, uint32_t bytes)
 
 typedef struct
 {
-    char path[1024];
-    char name[256];
+    char    path[1024];
+    char    name[256];
     uint8_t is_dir;
 } ComEntry;
 
@@ -281,7 +281,7 @@ static int scan_dir(const char *dir, ComEntry *list, int cap)
     char pat[1024];
     _snprintf(pat, sizeof pat, "%s\\*", dir);
     WIN32_FIND_DATAA fd;
-    HANDLE h = FindFirstFileA(pat, &fd);
+    HANDLE           h = FindFirstFileA(pat, &fd);
 
     if (h == INVALID_HANDLE_VALUE)
         return 0;
@@ -349,7 +349,7 @@ int has_source_ext(const char *name)
 int for_each_subdir(const char *dir, SysgenCallback cb, void *ud)
 {
     ComEntry list[512];
-    int n = scan_dir(dir, list, 512);
+    int      n = scan_dir(dir, list, 512);
 
     for (int i = 0; i < n; i++)
 
@@ -363,7 +363,7 @@ int for_each_subdir(const char *dir, SysgenCallback cb, void *ud)
 int for_each_source_file(const char *dir, SysgenCallback cb, void *ud)
 {
     ComEntry list[512];
-    int n = scan_dir(dir, list, 512);
+    int      n = scan_dir(dir, list, 512);
 
     for (int i = 0; i < n; i++)
 
@@ -376,7 +376,7 @@ int for_each_source_file(const char *dir, SysgenCallback cb, void *ud)
 int dir_has_sources(const char *dir)
 {
     ComEntry list[512];
-    int n = scan_dir(dir, list, 512);
+    int      n = scan_dir(dir, list, 512);
 
     for (int i = 0; i < n; i++)
     {
@@ -398,7 +398,7 @@ int dir_has_sources(const char *dir)
 int dir_has_subdirs(const char *dir)
 {
     ComEntry list[512];
-    int n = scan_dir(dir, list, 512);
+    int      n = scan_dir(dir, list, 512);
 
     for (int i = 0; i < n; i++)
 
@@ -412,7 +412,7 @@ int dir_has_subdirs(const char *dir)
 int for_each_flat_file(const char *dir, SysgenCallback cb, void *ud)
 {
     ComEntry list[512];
-    int n = scan_dir(dir, list, 512);
+    int      n = scan_dir(dir, list, 512);
 
     int files = 0;
 
@@ -573,7 +573,6 @@ static int append_quoted_arg(char *cmdline, size_t cap, const char *arg)
             p++;
         }
 
-
         if (*p == '\0')
         {
             for (size_t i = 0; i < backslashes * 2; i++)
@@ -586,7 +585,6 @@ static int append_quoted_arg(char *cmdline, size_t cap, const char *arg)
             break;
         }
 
-
         if (*p == '"')
         {
             for (size_t i = 0; i < backslashes * 2 + 1; i++)
@@ -595,7 +593,6 @@ static int append_quoted_arg(char *cmdline, size_t cap, const char *arg)
                     return -1;
                 cmdline[pos++] = '\\';
             }
-
 
             if (pos + 1 >= cap)
                 return -1;
@@ -611,13 +608,11 @@ static int append_quoted_arg(char *cmdline, size_t cap, const char *arg)
                 cmdline[pos++] = '\\';
             }
 
-
             if (pos + 1 >= cap)
                 return -1;
             cmdline[pos++] = *p++;
         }
     }
-
 
     if (pos + 2 >= cap)
         return -1;
@@ -640,7 +635,7 @@ int spawn_and_wait(char *const argv[])
         }
     }
 
-    STARTUPINFOA si;
+    STARTUPINFOA        si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof si);
     si.cb = sizeof si;
@@ -672,7 +667,7 @@ int spawn_and_wait(char *const argv[])
 int spawn_and_wait(char *const argv[])
 {
     pid_t pid;
-    int rc = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
+    int   rc = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
 
     if (rc != 0)
     {

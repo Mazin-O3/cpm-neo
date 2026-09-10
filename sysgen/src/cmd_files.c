@@ -35,9 +35,9 @@ static const char *const FLAGS_DISK[] = {
 typedef struct
 {
     const AddFileOpts *opts;
-    int failed;
-    int added;
-    int skipped;
+    int                failed;
+    int                added;
+    int                skipped;
 } AddFolderScan;
 
 /* Parse the shared add/install target options: the source positional, the
@@ -112,9 +112,9 @@ static int add_file(const char *disk, const char *file, const AddFileOpts *opts)
 int cmd_add(int argc, char **argv)
 {
     const char *src;
-    int vol, user;
-    uint8_t attr;
-    char disk_buf[SYSGEN_FULL_PATH_MAX];
+    int         vol, user;
+    uint8_t     attr;
+    char        disk_buf[SYSGEN_FULL_PATH_MAX];
 
     if (parse_file_target(
             argc, argv,
@@ -168,9 +168,9 @@ int cmd_add(int argc, char **argv)
 int cmd_install(int argc, char **argv)
 {
     const char *src;
-    int vol, user;
-    uint8_t attr;
-    char disk_buf[SYSGEN_FULL_PATH_MAX];
+    int         vol, user;
+    uint8_t     attr;
+    char        disk_buf[SYSGEN_FULL_PATH_MAX];
 
     if (parse_file_target(
             argc, argv,
@@ -190,8 +190,8 @@ int cmd_install(int argc, char **argv)
         return 1;
     }
 
-    char out_com[SYSGEN_PATH_MAX + 256];
-    char platform[64];
+    char            out_com[SYSGEN_PATH_MAX + 256];
+    char            platform[64];
     BuildFolderOpts bfo = {out_com, sizeof(out_com), platform, sizeof(platform)};
 
     if (build_folder_com(sysgen_paths(), src, &bfo) != 0)
@@ -242,7 +242,7 @@ int cmd_extract(int argc, char **argv)
     }
 
     const SysgenPaths *paths = sysgen_paths();
-    char out_dir[SYSGEN_FULL_PATH_MAX];
+    char               out_dir[SYSGEN_FULL_PATH_MAX];
     snprintf(out_dir, sizeof(out_dir), "%s/extract", paths->build_dir);
 
     if (mkdir_p(out_dir) != 0)
@@ -262,10 +262,10 @@ int cmd_extract(int argc, char **argv)
         for (uint8_t u = 0; u <= USER_AREA_MAX; u++)
         {
             FsContext ctx = {(int8_t)v, u};
-            FileInfo fi;
-            char allpat[NAME83_LEN + 1] = "***********"; /* 8 base + 3 ext */
-            uint16_t resume = 0;
-            int rc;
+            FileInfo  fi;
+            char      allpat[NAME83_LEN + 1] = "***********"; /* 8 base + 3 ext */
+            uint16_t  resume = 0;
+            int       rc;
 
             while ((rc = bd_find(allpat, ctx, &fi, resume)) > 0)
             {
@@ -296,8 +296,8 @@ int cmd_extract(int argc, char **argv)
 
                 uint8_t *data = NULL;
                 uint32_t size = 0, cap = 0;
-                uint8_t chunk[1024];
-                int r;
+                uint8_t  chunk[1024];
+                int      r;
 
                 while ((r = bd_read(fd, chunk, sizeof(chunk))) > 0)
                 {
@@ -368,14 +368,14 @@ int cmd_dir(int argc, char **argv)
 
     FileInfo fi;
     uint16_t resume = 0;
-    int count = 0;
-    int rc = 0;
-    char allpat[NAME83_LEN + 1] = "***********"; /* 8 base + 3 ext */
+    int      count = 0;
+    int      rc = 0;
+    char     allpat[NAME83_LEN + 1] = "***********"; /* 8 base + 3 ext */
 
     while ((rc = bd_find(allpat, tgt.ctx, &fi, resume)) > 0)
     {
         const char *sys = (fi.attrib & FILE_ATTR_SYSTEM) ? "  [SYS]" : "";
-        char h[24];
+        char        h[24];
         hr(h, sizeof(h), fi.size);
         printf("  %-13s %9s%s\n", fi.name, h, sys);
         count++;

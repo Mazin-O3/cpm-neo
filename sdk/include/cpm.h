@@ -2,16 +2,16 @@
 #define CPM_H
 
 #include <abi.h>
-#include <syscall.h>
+#include <ctype.h>
 #include <errno.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <stdarg.h>
+#include <fs.h>
 #include <limits.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <fs.h>
+#include <syscall.h>
 
 #endif

@@ -8,31 +8,27 @@
  */
 
 #include "ccp.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 typedef struct
 {
-    char input[CCP_LINE_MAX];
+    char  input[CCP_LINE_MAX];
     char *argv[CCP_ARGC_MAX];
 } CcpBuf;
 
 static FsContext g_ctx;
-static CcpBuf g_buf;
+static CcpBuf    g_buf;
 
 /* Resident commands — Everything else falls through to try_implicit_run(). */
-static const CmdEntry g_cmds[] = {{.name = "DIR", .fn = cmd_dir},
-                                  {.name = "DIRS", .fn = cmd_dirs},
-                                  {.name = "ERA", .fn = cmd_era},
-                                  {.name = "REN", .fn = cmd_ren},
-                                  {.name = "TYPE", .fn = cmd_type},
-                                  {.name = "USER", .fn = cmd_user},
-                                  {.name = "ECHO", .fn = cmd_echo},
-                                  {.name = "CLS", .fn = cmd_cls},
-                                  {.name = "SYNC", .fn = cmd_sync},
-                                  {0}};
+static const CmdEntry g_cmds[] = {
+    {.name = "DIR", .fn = cmd_dir},   {.name = "DIRS", .fn = cmd_dirs},
+    {.name = "ERA", .fn = cmd_era},   {.name = "REN", .fn = cmd_ren},
+    {.name = "TYPE", .fn = cmd_type}, {.name = "USER", .fn = cmd_user},
+    {.name = "ECHO", .fn = cmd_echo}, {.name = "CLS", .fn = cmd_cls},
+    {.name = "SYNC", .fn = cmd_sync}, {0}};
 
 int ccp_setuser(FsContext *ctx, uint8_t ua)
 {
@@ -50,7 +46,7 @@ int ccp_setuser(FsContext *ctx, uint8_t ua)
  */
 static int tokenise(char *line, char *argv[], int max)
 {
-    int argc = 0;
+    int   argc = 0;
     char *p = line;
 
     while (*p && argc < max)
@@ -76,9 +72,9 @@ static int tokenise(char *line, char *argv[], int max)
 static CmdErr try_ctx_switch(const char *tok)
 {
     const char *digits = NULL;
-    int cp = 0;
-    int8_t old_vol = g_ctx.vol_id;
-    uint8_t old_ua = g_ctx.user_area;
+    int         cp = 0;
+    int8_t      old_vol = g_ctx.vol_id;
+    uint8_t     old_ua = g_ctx.user_area;
 
     if (isalpha((unsigned char)tok[0]))
     {
@@ -118,7 +114,7 @@ static CmdErr try_ctx_switch(const char *tok)
     if (cp > (digits - tok))
     {
         char *ep;
-        int ua = strtoi(digits, &ep, 10);
+        int   ua = strtoi(digits, &ep, 10);
 
         if (ep != tok + cp || ua < 0 || ua > USER_AREA_MAX)
         {

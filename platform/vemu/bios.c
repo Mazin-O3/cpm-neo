@@ -8,8 +8,8 @@
  */
 
 #include "bios.h"
-#include "mmio.h"
 #include "disk_format.h"
+#include "mmio.h"
 #include <stddef.h>
 
 /* DMA-based sector read/write */

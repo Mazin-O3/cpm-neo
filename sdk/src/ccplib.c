@@ -47,7 +47,7 @@ int parse_fileref(FsContext *ctx, const char *arg, FileRef *out)
             if (cp > 1)
             {
                 char *ep;
-                int ua = strtoi(arg + 1, &ep, 10);
+                int   ua = strtoi(arg + 1, &ep, 10);
 
                 if ((ep == arg + cp) && ua >= 0 && ua <= USER_AREA_MAX)
                     out->fs_ctx.user_area = (uint8_t)ua;
@@ -64,7 +64,7 @@ int parse_fileref(FsContext *ctx, const char *arg, FileRef *out)
     if (isdigit((unsigned char)arg[0]))
     {
         char *ep;
-        int ua = strtoi(arg, &ep, 10);
+        int   ua = strtoi(arg, &ep, 10);
 
         if (ep > arg && *ep == ':')
         {
@@ -111,9 +111,9 @@ typedef enum
 
 typedef struct
 {
-    TokKind kind;
-    const char *lit; /* Only used for TOK_LIT */
-    int allow_wild;  /* Only meaningful for TOK_VOL/TOK_PATH/TOK_FILE */
+    TokKind     kind;
+    const char *lit;        /* Only used for TOK_LIT */
+    int         allow_wild; /* Only meaningful for TOK_VOL/TOK_PATH/TOK_FILE */
 } FTok;
 
 /* Length of the VU: prefix (including colon), or 0 if none.
@@ -160,7 +160,7 @@ static TokKind kw_lookup(const char *t, int len)
 static FTok make_tok(const char *t)
 {
     FTok f = {TOK_LIT, t, 0};
-    int len = strlen(t);
+    int  len = strlen(t);
 
     if (len > 0 && t[len - 1] == '*')
     {
@@ -205,7 +205,7 @@ static int tok_match(const char *arg, const FTok *f)
         if (!f->allow_wild && has_wildcard(arg))
             return 0;
 
-        int plen = vu_prefix_len(arg);
+        int         plen = vu_prefix_len(arg);
         const char *filename = arg + plen;
 
         return *filename != '\0';
@@ -237,9 +237,9 @@ static int tok_match(const char *arg, const FTok *f)
 
 int check_fmt(int argc, char **argv, const char *fmt)
 {
-    char buf[48];
+    char  buf[48];
     char *tok[MAX_FMT_TOKS];
-    int nt = 0;
+    int   nt = 0;
 
     strncpy(buf, fmt, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
@@ -298,7 +298,7 @@ char *make_path(char *buf, FsContext ctx, const char *name)
 
 SplitName split_name83(const char *name)
 {
-    SplitName sn;
+    SplitName   sn;
     const char *dot = strchr(name, '.');
 
     sn.base = name;
@@ -327,7 +327,7 @@ SplitName split_name83(const char *name)
 int parse_int(const char *s, int *out)
 {
     char *ep;
-    int v = strtoi(s, &ep, 10);
+    int   v = strtoi(s, &ep, 10);
 
     if (ep == s || *ep != '\0')
         return 0;

@@ -43,17 +43,17 @@ typedef struct
     uint16_t total_sectors;
     uint16_t total_blocks; /* Capped at BD_VOL_MAX_BLOCKS */
     uint16_t alloc_next;   /* Hint for next free-block scan */
-    int8_t id;
-    uint8_t mounted : 1;                         /* Set by bd_bind/bd_mount, cleared by bd_unbind */
-    uint8_t read_only : 1;                       /* Mirrors VOL_ATTR_RO on the disk */
-    uint8_t block_alloc_map[BD_BLOCK_MAP_BYTES]; /* Rebuilt on mount */
+    int8_t   id;
+    uint8_t  mounted : 1;   /* Set by bd_bind/bd_mount, cleared by bd_unbind */
+    uint8_t  read_only : 1; /* Mirrors VOL_ATTR_RO on the disk */
+    uint8_t  block_alloc_map[BD_BLOCK_MAP_BYTES]; /* Rebuilt on mount */
 } Volume;
 
 /* FileKey: unique identity for a directory entry — Volume + 8.3 name + user. */
 typedef struct
 {
     Volume *v;
-    char name83[NAME83_LEN];
+    char    name83[NAME83_LEN];
     uint8_t user;
 } FileKey;
 
@@ -63,71 +63,54 @@ typedef struct
     uint16_t diridx;
     uint16_t blocks[BD_BLOCKS_PER_EXTENT];
     uint16_t extent_bytes;
-    uint8_t extent_idx;
-    uint8_t attrib;
+    uint8_t  extent_idx;
+    uint8_t  attrib;
 } DirInfo;
 
 /* Runtime state for an open file descriptor. */
 typedef struct
 {
-    uint32_t size; /* Total file size in bytes (tracked on write) */
-    uint32_t position;
-    uint8_t in_use : 1;
-    uint8_t writable : 1;
-    uint8_t name83[NAME83_LEN];
+    uint32_t  size; /* Total file size in bytes (tracked on write) */
+    uint32_t  position;
+    uint8_t   in_use : 1;
+    uint8_t   writable : 1;
+    uint8_t   name83[NAME83_LEN];
     FsContext ctx;
-    DirInfo cur;
+    DirInfo   cur;
 } FCB;
 
 typedef struct
 {
-    Volume vol[MAX_VOLUMES];
-    FCB fcb[BD_MAX_FCBS];
+    Volume  vol[MAX_VOLUMES];
+    FCB     fcb[BD_MAX_FCBS];
     uint8_t sec_buf[DISK_SECTOR_SIZE];
 } BDState;
 
 typedef struct
 {
-    FileKey key;
-    uint8_t extent_idx;
+    FileKey  key;
+    uint8_t  extent_idx;
     DirInfo *out;
 } FindExtentCtx;
 
 typedef struct
 {
-    FileKey key;
+    FileKey   key;
     uint16_t *first_diridx; /* Set to the first extent's dir index */
-    uint16_t n;
-    uint32_t size;  /* Logical size: sum of exact extent byte counts */
-    uint32_t alloc; /* Allocated bytes: sum of block-rounded extent sizes */
+    uint16_t  n;
+    uint32_t  size;  /* Logical size: sum of exact extent byte counts */
+    uint32_t  alloc; /* Allocated bytes: sum of block-rounded extent sizes */
 } ScanExtentsCtx;
 
 typedef int (*dir_scan_fn)(Volume *v, const uint8_t *entry, uint16_t idx, void *ctx);
 
 static BDState g_bd;
-#ifdef SYSGEN_HOST
-static uint16_t g_vol_max_blocks = BD_VOL_MAX_BLOCKS;
-#endif
 
-/* Per-volume block cap.  The sysgen host overrides it at runtime with the
- * active platform value; the kernel build folds it to the compile-time
- * cap. Purely a compile-time constant there. */
+/* Per-volume block cap. */
 static inline uint16_t bd_block_cap(void)
 {
-#ifdef SYSGEN_HOST
-    return g_vol_max_blocks;
-#else
     return BD_VOL_MAX_BLOCKS;
-#endif
 }
-
-#ifdef SYSGEN_HOST
-void bd_set_block_cap(uint16_t block_cap)
-{
-    if (block_cap)
-        g_vol_max_blocks = block_cap;
-}
-#endif
 
 static int dir_scan(Volume *v, uint8_t user, dir_scan_fn fn, void *ctx);
 
@@ -439,8 +422,7 @@ static int bd_vol_has_writable_fcb(int8_t vol_id)
 {
     for (int i = 0; i < BD_MAX_FCBS; i++)
     {
-        if (g_bd.fcb[i].in_use && g_bd.fcb[i].writable &&
-            g_bd.fcb[i].ctx.vol_id == vol_id)
+        if (g_bd.fcb[i].in_use && g_bd.fcb[i].writable && g_bd.fcb[i].ctx.vol_id == vol_id)
             return 1;
     }
 
@@ -633,8 +615,8 @@ static int resolve_extent(FCB *f, Volume *v)
             return -1;
 
         DirInfo di;
-        int rc = find_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
-                             (uint8_t)extent_idx, &di);
+        int     rc = find_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
+                                 (uint8_t)extent_idx, &di);
 
         if (rc != EOK)
             return -1;
@@ -1008,7 +990,7 @@ int bd_open(const char *name83, FsContext ctx, uint8_t writable)
     FCB *f = &g_bd.fcb[fd];
 
     DirInfo di;
-    int rc = find_extent(make_key(v, name83, ctx.user_area), 0, &di);
+    int     rc = find_extent(make_key(v, name83, ctx.user_area), 0, &di);
 
     if (rc != EOK)
     {
@@ -1030,7 +1012,7 @@ int bd_open(const char *name83, FsContext ctx, uint8_t writable)
         memcpy(f->name83, name83, NAME83_LEN);
 
     uint32_t total;
-    int num_extents;
+    int      num_extents;
 
     rc = scan_extents(make_key(v, name83, ctx.user_area), 0, &num_extents, &total, 0);
 
@@ -1135,8 +1117,8 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
 
                 uint16_t ndi;
 
-                int rc = create_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
-                                       &nde, (uint16_t)new_block, &ndi);
+                int rc = create_extent(make_key(v, (const char *)f->name83, f->ctx.user_area), &nde,
+                                       (uint16_t)new_block, &ndi);
 
                 if (rc != EOK)
                 {
@@ -1220,7 +1202,7 @@ int bd_close(int fd)
         return EBADF;
 
     Volume *v = vol_for(f->ctx.vol_id);
-    int rc = EOK;
+    int     rc = EOK;
 
     if (f->writable)
     {
@@ -1310,7 +1292,7 @@ int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos)
             uint8_t match_buf[BD_ENTRY_SIZE];
             memcpy(match_buf, entry, BD_ENTRY_SIZE);
 
-            int file_extents = 0;
+            int      file_extents = 0;
             uint32_t size = 0;
             uint32_t alloc_bytes = 0;
 
@@ -1352,7 +1334,7 @@ int bd_create(const char *n83, FsContext ctx)
         return ENFILE;
 
     FCB *f = &g_bd.fcb[fd];
-    int fidx = -1;
+    int  fidx = -1;
 
     for (uint16_t s = 0; s < BD_ROOT_SECS; s++)
     {

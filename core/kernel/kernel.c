@@ -14,13 +14,13 @@
  */
 
 #include "kernel.h"
-#include "disk.h"
 #include "bios.h"
+#include "ctype.h"
+#include "disk.h"
 #include "stdlib.h"
 #include "string.h"
-#include "ctype.h"
-#include <limits.h>
 #include "syscall.h"
+#include <limits.h>
 
 /* kjump: transfer control to a program loaded at |addr|.  Per-architecture
  * assembly (arch/$CONFIG_ARCH/kjump.S) owns any ISA calling-state detail,
@@ -31,14 +31,14 @@
 typedef struct
 {
     uint32_t env[ENV_SLOTS_MAX];
-    uint8_t is_ccp;
+    uint8_t  is_ccp;
 } KernelEnv;
 
 /* Global kernel state: fd/fs context for the running process plus
  * environment slots. */
 typedef struct
 {
-    ArgBlock args;
+    ArgBlock  args;
     FsContext fs_ctx;
     KernelEnv kenv;
 } KernelState;
@@ -107,7 +107,7 @@ static FsContext parse_prefix(const char **path_ptr)
     if (isdigit((unsigned char)p[0]))
     {
         char *ep;
-        int ua = strtoi(p, &ep, 10);
+        int   ua = strtoi(p, &ep, 10);
 
         if (ep > p && *ep == ':' && ua >= 0 && ua <= USER_AREA_MAX)
         {
@@ -165,7 +165,7 @@ static int make_name83(const char *src, char *out)
     if (dot)
     {
         const char *q = dot + 1;
-        int e = 0;
+        int         e = 0;
 
         while (e < NAME83_EXT && *q && *q != '.' && *q != '*')
         {
@@ -266,7 +266,7 @@ int kexec(const char *name83, int argc, char **argv, FsContext ctx)
     while (remaining > 0)
     {
         uint16_t chunk = (remaining > USHRT_MAX) ? USHRT_MAX : (uint16_t)remaining;
-        int n = bd_read(fd, dest, chunk);
+        int      n = bd_read(fd, dest, chunk);
 
         if (n <= 0)
         {
@@ -346,8 +346,8 @@ err:
 int sys_open(const char *name, uint8_t writable)
 {
     FsContext ctx = parse_prefix(&name);
-    char n83[12];
-    int err = make_name83(name, n83);
+    char      n83[12];
+    int       err = make_name83(name, n83);
 
     if (err != EOK)
         return err;
@@ -375,13 +375,13 @@ int sys_read(int fd, void *buf, uint32_t len)
         return (int)i;
     }
 
-    int kfd = resolve_file_fd(fd);
+    int      kfd = resolve_file_fd(fd);
     uint32_t total = 0;
 
     while (total < len)
     {
         uint16_t chunk = (len - total > 0xFFFFu) ? 0xFFFFu : (uint16_t)(len - total);
-        int r = bd_read(kfd, p + total, chunk);
+        int      r = bd_read(kfd, p + total, chunk);
 
         if (r < 0)
             return total ? (int)total : r;
@@ -409,13 +409,13 @@ int sys_write(int fd, const void *buf, uint32_t len)
         return (int)len;
     }
 
-    int kfd = resolve_file_fd(fd);
+    int      kfd = resolve_file_fd(fd);
     uint32_t total = 0;
 
     while (total < len)
     {
         uint16_t chunk = (len - total > 0xFFFFu) ? 0xFFFFu : (uint16_t)(len - total);
-        int w = bd_write(kfd, p + total, chunk);
+        int      w = bd_write(kfd, p + total, chunk);
 
         if (w < 0)
             return total ? (int)total : w;
@@ -455,8 +455,8 @@ int sys_findfile(const char *pattern, FileInfo *out, uint16_t start_pos)
         return EOK;
 
     FsContext ctx = parse_prefix(&pattern);
-    char n83[12];
-    int err = make_name83(pattern, n83);
+    char      n83[12];
+    int       err = make_name83(pattern, n83);
 
     if (err != EOK)
         return err;
@@ -472,8 +472,8 @@ uint32_t sys_getsize(int fd)
 int sys_create(const char *name)
 {
     FsContext ctx = parse_prefix(&name);
-    char n83[12];
-    int err = make_name83(name, n83);
+    char      n83[12];
+    int       err = make_name83(name, n83);
 
     if (err != EOK)
         return err;
@@ -485,8 +485,8 @@ int sys_create(const char *name)
 int sys_delete(const char *name)
 {
     FsContext ctx = parse_prefix(&name);
-    char n83[12];
-    int err = make_name83(name, n83);
+    char      n83[12];
+    int       err = make_name83(name, n83);
 
     if (err != EOK)
         return err;
@@ -505,7 +505,7 @@ int sys_rename(const char *old, const char *new)
         return EINVAL;
 
     char old83[12], new83[12];
-    int err = make_name83(old, old83);
+    int  err = make_name83(old, old83);
 
     if (err != EOK)
         return err;
@@ -540,7 +540,7 @@ int sys_exec(const char *name, int argc, char **argv)
     FsContext ctx = parse_prefix(&name);
 
     char n83[FILENAME_MAX];
-    int err = make_name83(name, n83);
+    int  err = make_name83(name, n83);
 
     if (err != EOK)
         return err;
@@ -558,8 +558,8 @@ int sys_exec(const char *name, int argc, char **argv)
 int sys_fsetattr(const char *name, uint8_t attrib)
 {
     FsContext ctx = parse_prefix(&name);
-    char n83[12];
-    int err = make_name83(name, n83);
+    char      n83[12];
+    int       err = make_name83(name, n83);
 
     if (err != EOK)
         return err;

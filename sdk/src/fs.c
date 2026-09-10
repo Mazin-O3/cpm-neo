@@ -85,8 +85,8 @@ int open(const char *path, const char *mode)
 
 int readline(int fd, char *buf, int sz)
 {
-    int pos = 0;
-    int consumed = 0;
+    int  pos = 0;
+    int  consumed = 0;
     char ch;
 
     while (read(fd, &ch, 1) == 1)

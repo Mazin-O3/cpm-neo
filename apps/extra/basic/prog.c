@@ -29,7 +29,7 @@ void tokenize_line(char *dst, unsigned max_dst, const char *src)
         if (isalpha(*src))
         {
             char word[64];
-            int i = 0;
+            int  i = 0;
 
             while (i < 63 && src[i] && isalpha(src[i]))
             {

@@ -1,4 +1,3 @@
 sysgen/build/
 /build/
 *.o
-.clang-format

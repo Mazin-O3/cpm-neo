@@ -97,7 +97,7 @@ static CmdErr set_vol_attr(int8_t vol_id, const char *attrarg)
 static CmdErr set_matching_file_attr(FsContext ctx, const char *name, int8_t mask, int set)
 {
     FileInfo di;
-    int any = 0;
+    int      any = 0;
 
     find_reset();
 
@@ -150,7 +150,7 @@ static CmdErr cmd_set(FsContext *ctx, int argc, char **argv)
 
     int8_t vol_id = ref.fs_ctx.vol_id;
     int8_t ua = ref.fs_ctx.user_area;
-    char name[FILENAME_MAX];
+    char   name[FILENAME_MAX];
     name_copy(name, ref.name, sizeof(name) - 1);
 
     if (check_fmt(argc, argv, set_vol_n_fmt) && name[0] == '\0')

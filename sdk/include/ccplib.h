@@ -12,8 +12,8 @@
 
 typedef struct
 {
-    int8_t vol_id;    /* Volume the error refers to, or VOL_INVALID */
-    int err_code;
+    int8_t      vol_id; /* Volume the error refers to, or VOL_INVALID */
+    int         err_code;
     const char *token; /* Offending token for CMDERR_SYNTAX */
 } CmdErr;
 
@@ -51,7 +51,7 @@ typedef CmdErr (*cmd_fn_t)(FsContext *ctx, int argc, char **argv);
 typedef struct
 {
     const char *name;
-    cmd_fn_t fn;
+    cmd_fn_t    fn;
 } CmdEntry;
 
 const CmdEntry *cmd_lookup(const CmdEntry *table, const char *name);
@@ -61,14 +61,14 @@ const CmdEntry *cmd_lookup(const CmdEntry *table, const char *name);
 typedef struct
 {
     FsContext fs_ctx;
-    char name[FILENAME_MAX];
+    char      name[FILENAME_MAX];
 } FileRef;
 
 /* Argument / filespec helpers shared by every command. */
 int8_t vol_from_arg(const char *arg, int8_t def);
-int parse_fileref(FsContext *ctx, const char *arg, FileRef *out);
-char *make_path(char *buf, FsContext ctx, const char *name);
-int check_fmt(int argc, char **argv, const char *fmt);
+int    parse_fileref(FsContext *ctx, const char *arg, FileRef *out);
+char  *make_path(char *buf, FsContext ctx, const char *name);
+int    check_fmt(int argc, char **argv, const char *fmt);
 
 /* Full path buffer size: "V15:" prefix + 8.3 name + NUL. */
 #define FSPATH_MAX (ARG_LEN_MAX + 4)
@@ -88,9 +88,9 @@ int vu_prefix_len(const char *arg);
 typedef struct
 {
     const char *base;
-    int base_len;
+    int         base_len;
     const char *ext; /* "" when the name has no extension */
-    int ext_len;
+    int         ext_len;
 } SplitName;
 
 SplitName split_name83(const char *name);
@@ -119,11 +119,11 @@ typedef struct
 {
     uint8_t cols;
     uint8_t rows;
-    int line_count;
+    int     line_count;
 } Pager;
 
 Pager pager_start(void);
-int pager_line(Pager *p);
+int   pager_line(Pager *p);
 
 /* Standard app entry point: grab the current filesystem context, run the
  * command, print any error, and return the err_code for ENV_RETURN_CODE. */
