@@ -8,7 +8,8 @@
 
 #include <stdint.h>
 
-/* Initialize the BIOS layer. Returns 0 on success. */
+/* Initialize the BIOS layer. Returns EOK (0) on success, negative errno on
+ * failure (the bootloader halts before any console output). */
 int bios_init(void);
 
 /* Output one character to the console. */

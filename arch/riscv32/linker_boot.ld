@@ -1,10 +1,14 @@
 ENTRY(_boot_start)
 
-/* __boot_base and __boot_size (boot code region) are arch constants from
- * arch/<isa>/config.sh.  __ram_base is the platform RAM base, and
- * __boot_ram_size is the arch boot runtime RAM budget.  Boot code and boot
- * runtime RAM are disjoint regions, so code may live in read-only storage
- * while the scratch buffer, stack, and bios .bss run from writable RAM. */
+/* Boot memory budget — override via --defsym if the platform needs
+ * a different allocation. */
+PROVIDE(__boot_size     = 0x400);     /* 1 KB */
+PROVIDE(__boot_ram_size = 0x400);     /* 1 KB */
+
+/* __boot_base and __ram_base come from the platform (board-specific reset
+ * vector origin and SRAM base).  Boot code and boot runtime RAM are disjoint
+ * regions: code lives in read-only storage while the scratch buffer, stack,
+ * and bios .bss run from writable RAM. */
 MEMORY {
     BOOT (rx) : ORIGIN = __boot_base,               LENGTH = __boot_size
     BRAM (rw) : ORIGIN = __ram_base + __boot_size,  LENGTH = __boot_ram_size

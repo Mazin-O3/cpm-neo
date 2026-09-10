@@ -77,6 +77,16 @@ A `.COM` binary is loaded at the TPA base (`__tpa_base`):
 2. `_start` (`sdk/src/start.c`) fetches arguments, calls `main(argc, argv)`,
    then calls `sys_exit()`, returning to the kernel which reloads the CCP.
 
+### Hand-off: `kjump`
+
+All three hand-offs (boot→kernel, kernel→CCP, kernel→`.com`) are unconditional
+jumps into freshly prepared entry points. That step is `void kjump(uintptr_t
+addr)` in `arch/<isa>/kjump.S` (`j a0` on RISC-V, `bx r0` on ARM). It is the
+one ISA-specific transfer primitive in the kernel, because on ARM (Cortex-M)
+the address must carry the Thumb bit (bit0 = 1) or the first branch faults.
+`kjump` is a hard-required arch file — the build compiles the literal
+`arch/$CONFIG_ARCH/kjump.S`, so a missing implementation fails the build.
+
 ## Execute-in-place (XIP)
 
 CP/M Neo can run its kernel and CCP directly from storage instead of loading
@@ -86,11 +96,13 @@ offset `0x026`) and in which linker scripts were used.
 
 ### Enabling XIP
 
-XIP is selected per platform: declaring `CONFIG_XIP_BASE` in
-`platform/<name>/config.sh` makes every `sysgen new` build an XIP disk; a
-platform that omits the field always builds a plain non-XIP (RAM-loaded)
-disk. There is no flag to override this. A XIP platform declares the window
-in `config.sh`:
+XIP is requested per build with `sysgen new --xip`. The window origin is
+taken from `CONFIG_XIP_BASE` when the platform declares it; otherwise it is
+auto-derived as `CONFIG_BOOT_BASE` + boot size (the window sits right past
+the bootloader). Without `--xip` a build is always a plain non-XIP
+(RAM-loaded) disk, and any `CONFIG_XIP_BASE` value is ignored. A platform
+that needs the window somewhere other than right past boot declares it in
+`config.sh`:
 
 ```sh
 CONFIG_XIP_BASE=0x10000
@@ -191,12 +203,13 @@ find the platform's directory, then builds four components in order.
 
 1. **Bootloader**: compiles the platform BIOS + `arch/<isa>/boot.S`, linked
    with `arch/<isa>/linker_boot.ld` into a `bootloader.bin`. Boot code is
-   placed at `CONFIG_BOOT_BASE` (`__boot_base`) and bounded by
-   `CONFIG_BOOT_SIZE` (`__boot_size`); its runtime RAM (scratch + stack +
-   bios `.bss`) occupies a separate `BRAM` region at
-   `CONFIG_RAM_BASE + CONFIG_BOOT_SIZE` (`__ram_base + __boot_size`) of size
-   `CONFIG_BOOT_RAM_SIZE`. All three are arch constants from
-   `arch/<isa>/config.sh`, supplied to the boot link via `--defsym`.
+   placed at `CONFIG_BOOT_BASE` (`__boot_base`, a platform constant); the
+   boot code budget (`__boot_size`) and boot runtime RAM budget
+   (`__boot_ram_size`) default to arch-owned values defined via `PROVIDE()`
+   in the linker script, but a platform may override them by setting
+   `CONFIG_BOOT_SIZE` / `CONFIG_BOOT_RAM_SIZE` in its `config.sh`. The
+   boot runtime RAM (scratch + stack + bios `.bss`) occupies a separate
+   `BRAM` region at `__ram_base + __boot_size`.
 2. **Kernel**: a **two-pass link**:
    - Pass 1 links the kernel at a placeholder address to extract
      `__kernel_total` from the symbol table.

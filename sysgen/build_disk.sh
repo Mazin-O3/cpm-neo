@@ -3,9 +3,10 @@
 #
 #   sh sysgen/build_disk.sh --platform=<PLATFORM>
 #
-# XIP is selected per platform: declaring CONFIG_XIP_BASE in config.sh makes
-# every build XIP (kernel/CCP linked into the flash window); a platform that
-# omits the field always builds non-XIP.
+# XIP is requested explicitly with --xip on the command line: the kernel/CCP
+# are linked into the flash window; a platform that declares CONFIG_XIP_BASE
+# pins the window origin, otherwise it is auto-derived as BOOT_BASE + boot
+# size.  Without --xip builds are non-XIP regardless of CONFIG_XIP_BASE.
 #
 # Builds the bootloader, kernel and CCP into sysgen/build/, next to the
 # tool binary.  Runs from anywhere: it locates the CP/M Neo root relative
@@ -15,11 +16,14 @@
 #
 # The target's configuration comes from platform/<PLATFORM>/config.sh — the
 # hardware facts (CONFIG_ID, CONFIG_ARCH, CONFIG_RAM_SIZE, CONFIG_IO_BASE,
-# CONFIG_RAM_BASE) and the four software knobs (CONFIG_VOL_MAX,
+# CONFIG_RAM_BASE, CONFIG_BOOT_BASE) and the four software knobs
+# (CONFIG_VOL_MAX,
 # CONFIG_DISK_SIZE, CONFIG_FCB_MAX, CONFIG_STACK_SIZE), all required (there
-# are no defaults).  The effective values are written to build/gen/config.h,
-# which every kernel/CCP/SDK/app compile includes (and therefore every user
-# .com build).
+# are no defaults).  CONFIG_BOOT_SIZE and CONFIG_BOOT_RAM_SIZE are optional:
+# the linker script provides defaults via PROVIDE(); a platform that needs a
+# different budget overrides them.  The effective values are written to
+# build/gen/config.h, which every kernel/CCP/SDK/app compile includes (and
+# therefore every user .com build).
 # Two OPTIONAL app-selection knobs pick the bundled apps 'sysgen new'
 # installs on the disk: CONFIG_SYS_APPS lists apps/sys commands and
 # CONFIG_EXTRA_APPS lists apps/extra apps.  For both, an unset or "*"
@@ -36,10 +40,12 @@
 set -eu
 
 PLATFORM_ID=""
+WANT_XIP=0
 
 for arg in "$@"; do
     case "$arg" in
         --platform=*) PLATFORM_ID="${arg#--platform=}" ;;
+        --xip) WANT_XIP=1 ;;
         *) echo "Unknown option: $arg" >&2; exit 1 ;;
     esac
 done
@@ -121,6 +127,12 @@ CONFIG_DISK_SIZE=${CONFIG_DISK_SIZE:?"$PLATFORM_ID: CONFIG_DISK_SIZE not set in 
 CONFIG_FCB_MAX=${CONFIG_FCB_MAX:?"$PLATFORM_ID: CONFIG_FCB_MAX not set in platform/$PLATFORM_DIR/config.sh"}
 CONFIG_STACK_SIZE=${CONFIG_STACK_SIZE:?"$PLATFORM_ID: CONFIG_STACK_SIZE not set in platform/$PLATFORM_DIR/config.sh"}
 
+# Boot base is a platform memory-map constant (the flash/reset vector origin).
+# Boot size and boot RAM size default to arch-owned values defined via PROVIDE
+# in linker_boot.ld; a platform may override them by setting CONFIG_BOOT_SIZE /
+# CONFIG_BOOT_RAM_SIZE in its config.sh.
+CONFIG_BOOT_BASE=${CONFIG_BOOT_BASE:?"$PLATFORM_ID: CONFIG_BOOT_BASE not set in platform/$PLATFORM_DIR/config.sh"}
+
 # One bitmap byte covers 8 blocks (8 KB), so CONFIG_DISK_SIZE — the total
 # image size in KB, overhead included — must be a multiple of 8 to keep the
 # block map exactly sized.
@@ -144,57 +156,35 @@ cat > "$BUILD/gen/config.h" <<EOF
 #endif /* CONFIG_H */
 EOF
 
-# XIP is selected per platform by CONFIG_XIP_BASE in config.sh: declaring it
-# makes every build XIP (the kernel and CCP are linked into the XIP region at
-# the XIP base; .data/.bss still live in RAM, and user .com files are always
-# RAM-loaded from the TPA).  A platform that omits the field always builds
-# non-XIP (RAM-loaded kernel/CCP).  There is no configured XIP window size:
-# the window starts at the XIP base and extends over the produced disk image,
-# so sysgen sizes everything against the actual linked contents.
-if [ -n "${CONFIG_XIP_BASE:-}" ]; then
+# XIP is requested explicitly with --xip: the kernel and CCP are linked into
+# the XIP region at the XIP base (.data/.bss still live in RAM, and user .com
+# files are always RAM-loaded from the TPA).  The platform may declare
+# CONFIG_XIP_BASE as the window origin; when omitted, the XIP base is
+# auto-derived as CONFIG_BOOT_BASE + boot size, resolved after the bootloader
+# link.  Without --xip, XIP is off regardless of whether the platform declares
+# CONFIG_XIP_BASE.  There is no configured XIP window size: the window starts
+# at the XIP base and extends over the produced disk image, so sysgen sizes
+# everything against the actual linked contents.
+if [ "$WANT_XIP" = "1" ]; then
     IS_XIP=1
     KERN_LD="core/kernel/linker_kernel_xip.ld"
     SDK_LD="core/ccp/linker_ccp_xip.ld"
-    XIP_BASE=$CONFIG_XIP_BASE
-    XIP_DEFSYM="--defsym=XIP_BASE=$CONFIG_XIP_BASE"
+    XIP_BASE=${CONFIG_XIP_BASE:-}
 else
     IS_XIP=0
     XIP_BASE=0
     KERN_LD="core/kernel/linker_kernel.ld"
     SDK_LD="sdk/linker/linker_app.ld"
-    XIP_DEFSYM="--defsym=XIP_BASE=0"
 fi
 
-# XIP placement geometry.  The kernel's in-place code starts at
-# __kernel_xip_base = CONFIG_XIP_BASE + KERN_START_SEC*512 (right past the
-# boot and VMAP sectors on the disk); __kernel_xip_end is defined by the
-# kernel link itself (sector-aligned end of the kernel's XIP footprint) and
-# flows to the CCP link, which is placed immediately after it.  The XIP code
-# therefore sizes its own window — there is no externally configured XIP
-# size.  On non-XIP builds the window is empty (XIP_BASE = 0).
-# Sector I/O byte count and kernel start sector both come from the single
-# on-disk format header (core/kernel/disk_format.h), which boot.S, the
-# kernel, sysgen, and user programs all read.
+# Sector I/O byte count and kernel start sector come from the single on-disk
+# format header (core/kernel/disk_format.h), which boot.S, the kernel, sysgen,
+# and user programs all read.  These feed the XIP geometry resolved after the
+# bootloader link below.
 DISK_SECTOR_SIZE=$(awk '/^#define[[:space:]]+DISK_SECTOR_SIZE/{print $3; exit}' \
     core/kernel/disk_format.h)
 DISK_SECTOR_SIZE=${DISK_SECTOR_SIZE:-512}
 KERN_START_SEC=2       # core/kernel/disk_format.h: KERN_START_SEC (boot+VMAP)
-KERN_XIP_BASE=0x0000
-if [ "$IS_XIP" = "1" ]; then
-    KERN_XIP_BASE_DEC=$((XIP_BASE + KERN_START_SEC * DISK_SECTOR_SIZE))
-    KERN_XIP_BASE=$(printf '0x%X' "$KERN_XIP_BASE_DEC")
-fi
-KERN_XIP_SYM=
-if [ "$IS_XIP" = "1" ]; then
-    KERN_XIP_SYM="--defsym=__kernel_xip_base=$KERN_XIP_BASE"
-fi
-# Boot target on XIP disks: the kernel's real XIP placement (first byte of
-# kernel.bin, which sysgen writes at KERN_START_SEC).  Zero on non-XIP so a
-# stray S0_XIP flag traps in the bootloader guard instead of jumping to junk.
-XIP_TARGET=$XIP_BASE
-if [ "$IS_XIP" = "1" ]; then
-    XIP_TARGET=$KERN_XIP_BASE
-fi
 
 CFG_ID_U=$(printf '%s' "$CONFIG_ID"  | tr '[:lower:]' '[:upper:]')
 ARG_ID_U=$(printf '%s' "$PLATFORM_ID" | tr '[:lower:]' '[:upper:]')
@@ -214,7 +204,6 @@ fi
 CONFIG_CROSS_COMPILE=${CONFIG_CROSS_COMPILE:?"$CONFIG_ARCH: CONFIG_CROSS_COMPILE not set in arch/$CONFIG_ARCH/config.sh"}
 CONFIG_ARCH_CFLAGS=${CONFIG_ARCH_CFLAGS:?"$CONFIG_ARCH: CONFIG_ARCH_CFLAGS not set in arch/$CONFIG_ARCH/config.sh"}
 CONFIG_LD_EMULATION=${CONFIG_LD_EMULATION:?"$CONFIG_ARCH: CONFIG_LD_EMULATION not set in arch/$CONFIG_ARCH/config.sh"}
-CONFIG_BOOT_SIZE=${CONFIG_BOOT_SIZE:?"$CONFIG_ARCH: CONFIG_BOOT_SIZE not set in arch/$CONFIG_ARCH/config.sh"}
 
 # Derived layout.  RAM_END is the nominal end of SRAM (RAM_BASE + RAM_SIZE);
 # RAM_TOP is the top of usable RAM and may be lower when an MMIO window lies
@@ -274,21 +263,72 @@ mkdir -p "$BUILD" "$INT" "$SDK_LIB"
 echo "  Building bootloader..."
 $CC $CFLAGS $BOOT_INC \
     -c "platform/$PLATFORM_DIR/bios.c" -o "$INT/boot_plat.o"
+
+# When XIP_BASE must be auto-derived (--xip, no CONFIG_XIP_BASE), the boot
+# jump target (XIP_TARGET) depends on __boot_size, which is only known after
+# the first boot link.  Link once with a zero placeholder, extract the boot
+# size, resolve the XIP geometry, then relink with the real target.  When the
+# XIP base is explicit (or XIP is off), a single link suffices.
+BOOT_RELINK=0
+XIP_TARGET=0
+if [ "$IS_XIP" = "1" ] && [ -n "$XIP_BASE" ]; then
+    KERN_XIP_BASE_DEC=$((XIP_BASE + KERN_START_SEC * DISK_SECTOR_SIZE))
+    XIP_TARGET=$(printf '0x%X' "$KERN_XIP_BASE_DEC")
+fi
+[ "$IS_XIP" = "1" ] && [ -z "$XIP_BASE" ] && BOOT_RELINK=1
+
 $CC $CFLAGS $GEN_INC -I arch/$CONFIG_ARCH/ -I core/kernel/ -I core/ \
     -Wl,--gc-sections -Wl,--strip-debug -Wl,--no-warn-rwx-segments \
     -Wl,--defsym=__io_base="$IO_BASE_HEX" \
     -Wl,--defsym=__ram_top="$RAM_TOP_HEX" \
     -Wl,--defsym=__ram_base="$CONFIG_RAM_BASE" \
     -Wl,--defsym=__boot_base="$CONFIG_BOOT_BASE" \
-    -Wl,--defsym=__boot_size="$CONFIG_BOOT_SIZE" \
-    -Wl,--defsym=__boot_ram_size="$CONFIG_BOOT_RAM_SIZE" \
     -Wl,--defsym=__xip_base="$XIP_TARGET" \
     -T arch/$CONFIG_ARCH/linker_boot.ld \
     arch/$CONFIG_ARCH/boot.S "$INT/boot_plat.o" -o "$INT/bootloader.elf"
+
+# Read __boot_size from the linker (PROVIDE default or platform override).
+BOOT_SIZE_HEX=$($OBJDUMP -t "$INT/bootloader.elf" | awk '/[[:space:]]__boot_size$/{print "0x"$1}')
+BOOT_SIZE_DEC=$(printf '%d' "$BOOT_SIZE_HEX")
+
+# Resolve the XIP base and placement geometry now that the boot size is
+# known.  The kernel's in-place code starts at XIP_BASE + KERN_START_SEC*512
+# (right past the boot and VMAP sectors on the disk); __kernel_xip_end is
+# defined by the kernel link itself and flows to the CCP link.  Zero on
+# non-XIP so a stray S0_XIP flag traps in the bootloader guard instead of
+# jumping to junk.
+if [ "$IS_XIP" = "1" ] && [ -z "$XIP_BASE" ]; then
+    XIP_BASE=$((CONFIG_BOOT_BASE + BOOT_SIZE_DEC))
+fi
+XIP_BASE_HEX=$(printf '0x%X' "$XIP_BASE")
+XIP_DEFSYM="--defsym=XIP_BASE=$XIP_BASE_HEX"
+KERN_XIP_BASE=0x0000
+KERN_XIP_SYM=
+XIP_TARGET=0
+if [ "$IS_XIP" = "1" ]; then
+    KERN_XIP_BASE_DEC=$((XIP_BASE + KERN_START_SEC * DISK_SECTOR_SIZE))
+    KERN_XIP_BASE=$(printf '0x%X' "$KERN_XIP_BASE_DEC")
+    KERN_XIP_SYM="--defsym=__kernel_xip_base=$KERN_XIP_BASE"
+    XIP_TARGET=$KERN_XIP_BASE
+fi
+
+# Relink the bootloader with the real XIP target when auto-derived.
+if [ "$BOOT_RELINK" = "1" ]; then
+    $CC $CFLAGS $GEN_INC -I arch/$CONFIG_ARCH/ -I core/kernel/ -I core/ \
+        -Wl,--gc-sections -Wl,--strip-debug -Wl,--no-warn-rwx-segments \
+        -Wl,--defsym=__io_base="$IO_BASE_HEX" \
+        -Wl,--defsym=__ram_top="$RAM_TOP_HEX" \
+        -Wl,--defsym=__ram_base="$CONFIG_RAM_BASE" \
+        -Wl,--defsym=__boot_base="$CONFIG_BOOT_BASE" \
+        -Wl,--defsym=__xip_base="$XIP_TARGET" \
+        -T arch/$CONFIG_ARCH/linker_boot.ld \
+        arch/$CONFIG_ARCH/boot.S "$INT/boot_plat.o" -o "$INT/bootloader.elf"
+fi
+
 $OBJCOPY -O binary --only-section=.boot "$INT/bootloader.elf" "$BUILD/bootloader.bin"
 SIZE=$(wc -c < "$BUILD/bootloader.bin")
-if [ "$SIZE" -gt "$CONFIG_BOOT_SIZE" ]; then
-    echo "ERROR: bootloader.bin $SIZE bytes > $CONFIG_BOOT_SIZE (CONFIG_BOOT_SIZE)" >&2
+if [ "$SIZE" -gt "$BOOT_SIZE_DEC" ]; then
+    echo "ERROR: bootloader.bin $SIZE bytes > __boot_size $BOOT_SIZE_DEC" >&2
     exit 1
 fi
 
@@ -297,7 +337,10 @@ echo "  Building kernel..."
 KERNEL_C="core/kernel/main.c core/kernel/kernel.c core/kernel/bdos.c \
           core/kernel/disk.c platform/$PLATFORM_DIR/bios.c \
           sdk/src/ctype.c sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
-KERNEL_S="arch/$CONFIG_ARCH/crt0.S"
+# arch/$CONFIG_ARCH/kjump.S is a required per-architecture assembly
+# file that transfers control to a loaded program (see kernel.h); its
+# absence here is a hard build error, exactly like crt0.S.
+KERNEL_S="arch/$CONFIG_ARCH/crt0.S arch/$CONFIG_ARCH/kjump.S"
 
 KERNEL_OBJS=
 for src in $KERNEL_C; do
@@ -393,6 +436,7 @@ printf '%s' "$IS_XIP"         > "$BUILD/.xip"
 printf '%s' "$CONFIG_VOL_MAX"   > "$BUILD/.vol_max"
 printf '%s' "$CONFIG_DISK_SIZE" > "$BUILD/.disk_size_kb"
 printf '%s' "$CONFIG_FCB_MAX"   > "$BUILD/.fcb_max"
+printf '%s' "$BOOT_SIZE_DEC"   > "$BUILD/.boot_size"
 # App-selection tags: a knob that is unset means "all" (stamped as '*'),
 # a declared value is stamped verbatim — "*" = all, "" = none, "a b" = filter.
 if [ "${CONFIG_SYS_APPS+x}" = x ]; then
