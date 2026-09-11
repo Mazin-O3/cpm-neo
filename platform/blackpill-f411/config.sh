@@ -14,7 +14,7 @@
 #
 # Memory layout inside the 512 KB flash:
 #   0x08000000  bootloader (4 KB boot budget from linker PROVIDE default;
-#               pack.sh pads it to that size)
+#               build.sh pads it to that size)
 #   0x08001000  XIP window base (auto-derived as BOOT_BASE + boot size when
 #               'sysgen new --xip' is used): the disk image — VMAP, kernel,
 #               CCP, and all user files are stored here verbatim as the

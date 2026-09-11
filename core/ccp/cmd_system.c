@@ -9,6 +9,7 @@
  * with an automatic fallback to A0: if not found on the current volume.
  */
 
+#include "ansi.h"
 #include "bdos.h"
 #include "ccp.h"
 #include <stdio.h>
@@ -221,7 +222,7 @@ CmdErr cmd_cls(FsContext *ctx, int argc, char **argv)
     if (argc > 1)
         return cmderr_syntax(NULL);
 
-    putchar('\f');
+    printf(CSI_CLS);
 
     return cmderr_ok();
 }

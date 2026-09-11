@@ -13,7 +13,7 @@
 #                           stlink-tools).  The ST-Link must be connected
 #                           and show up as 0483:3748 (or 374b) in lsusb.
 #
-# The image is assembled by pack.sh (running from the platform dir) into
+# The image is assembled by build.sh (running from the platform dir) into
 # <BUILD_DIR>/BPF411.bin, defaulting to sysgen/build.
 
 set -eu
@@ -37,7 +37,7 @@ case "$PROG" in
 esac
 
 if ! [ -f "$IMAGE" ]; then
-    echo "flash.sh: $IMAGE not found (run pack.sh first)" >&2
+    echo "flash.sh: $IMAGE not found (run build.sh first)" >&2
     exit 1
 fi
 
