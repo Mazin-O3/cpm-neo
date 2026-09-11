@@ -80,12 +80,11 @@ A `.COM` binary is loaded at the TPA base (`__tpa_base`):
 ### Hand-off: `kjump`
 
 All three hand-offs (boot→kernel, kernel→CCP, kernel→`.com`) are unconditional
-jumps into freshly prepared entry points. That step is `void kjump(uintptr_t
-addr)` in `arch/<isa>/kjump.S` (`j a0` on RISC-V, `bx r0` on ARM). It is the
-one ISA-specific transfer primitive in the kernel, because on ARM (Cortex-M)
-the address must carry the Thumb bit (bit0 = 1) or the first branch faults.
-`kjump` is a hard-required arch file — the build compiles the literal
-`arch/$CONFIG_ARCH/kjump.S`, so a missing implementation fails the build.
+jumps into freshly prepared entry points via `void kjump(uintptr_t addr)`. The
+default implementation (in `kernel.c`) is a weak C function-pointer call — fine
+on any ISA with plain branchable addresses. ISAs whose addresses encode
+execution-state override it with a strong `arch/<isa>/kjump.S`. The build
+compiles `kjump.S` only when the file exists.
 
 ## Execute-in-place (XIP)
 

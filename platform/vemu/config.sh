@@ -44,9 +44,9 @@
 #   CONFIG_DISK_SIZE  — Total disk image size in KB, overhead included: the
 #                       boot/VMAP and kernel+CCP sectors come out of this
 #                       budget first, and the remaining block grid is divided
-#                       between the CONFIG_VOL_MAX volumes.  Must be a
-#                       multiple of 8 and must not exceed the host ceiling of
-#                       32768 (32 MB)
+#                       between the CONFIG_VOL_MAX volumes.  Any size is
+#                       valid (the alloc bitmap rounds up to whole bytes) and
+#                       it must not exceed the host ceiling of 32768 (32 MB)
 
 #   CONFIG_FCB_MAX    — Open-file control blocks (kernel RAM); must not
 #                       exceed the host ceiling of 8

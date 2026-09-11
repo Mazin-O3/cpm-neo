@@ -28,7 +28,7 @@ typedef struct
     uint16_t disk_size_kb; /* CONFIG_DISK_SIZE: total image size in KB, */
                            /* overhead included.  It is also the whole- */
                            /* disk block-coverage bound for any one     */
-                           /* volume (its alloc bitmap is /8 bytes)     */
+                           /* volume (its alloc bitmap is ceil(/8) B)   */
 } SysgenDiskCfg;
 
 /* Defaults to the host compile-time ceilings; used when build tags are

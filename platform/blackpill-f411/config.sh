@@ -21,9 +21,9 @@
 #               concatenated sysgen disk image, so the kernel and CCP run in
 #               place from flash.
 #
-# CONFIG_DISK_SIZE must be a multiple of 8 (kB) and, together with the
-# boot budget, must fit the flash: 4 (boot) + CONFIG_DISK_SIZE <= 512.
-# 504 is the largest multiple of 8 that leaves the 4 KB boot budget.
+# CONFIG_DISK_SIZE, together with the boot budget, must fit the flash:
+# 4 (boot) + CONFIG_DISK_SIZE <= 512.
+# 508 is the largest size leaving the 4 KB boot budget.
 
 # Platform identity and architecture
 CONFIG_ID="BPF411"
@@ -36,7 +36,7 @@ CONFIG_IO_BASE=0x50000000
 CONFIG_BOOT_BASE=0x08000000
 
 # Disk and volume configuration
-CONFIG_DISK_SIZE=504
+CONFIG_DISK_SIZE=508
 CONFIG_VOL_MAX=4
 CONFIG_FCB_MAX=4
 CONFIG_STACK_SIZE=0x1000

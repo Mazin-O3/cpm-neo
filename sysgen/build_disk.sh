@@ -133,11 +133,10 @@ CONFIG_STACK_SIZE=${CONFIG_STACK_SIZE:?"$PLATFORM_ID: CONFIG_STACK_SIZE not set 
 # CONFIG_BOOT_RAM_SIZE in its config.sh.
 CONFIG_BOOT_BASE=${CONFIG_BOOT_BASE:?"$PLATFORM_ID: CONFIG_BOOT_BASE not set in platform/$PLATFORM_DIR/config.sh"}
 
-# One bitmap byte covers 8 blocks (8 KB), so CONFIG_DISK_SIZE — the total
-# image size in KB, overhead included — must be a multiple of 8 to keep the
-# block map exactly sized.
-if [ $((CONFIG_DISK_SIZE % 8)) -ne 0 ]; then
-    echo "ERROR: CONFIG_DISK_SIZE=$CONFIG_DISK_SIZE must be a multiple of 8 (KB)" >&2
+# One bitmap byte covers 8 blocks (8 KB); its size rounds up to the next
+# whole byte (ceil(CONFIG_DISK_SIZE/8)), so any CONFIG_DISK_SIZE is valid.
+if [ "$CONFIG_DISK_SIZE" -lt 8 ]; then
+    echo "ERROR: CONFIG_DISK_SIZE=$CONFIG_DISK_SIZE is too small (minimum 8 KB)" >&2
     exit 1
 fi
 
@@ -337,10 +336,12 @@ echo "  Building kernel..."
 KERNEL_C="core/kernel/main.c core/kernel/kernel.c core/kernel/bdos.c \
           core/kernel/disk.c platform/$PLATFORM_DIR/bios.c \
           sdk/src/ctype.c sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
-# arch/$CONFIG_ARCH/kjump.S is a required per-architecture assembly
-# file that transfers control to a loaded program (see kernel.h); its
-# absence here is a hard build error, exactly like crt0.S.
-KERNEL_S="arch/$CONFIG_ARCH/crt0.S arch/$CONFIG_ARCH/kjump.S"
+# arch/$CONFIG_ARCH/crt0.S is a required per-architecture C runtime entry.
+# arch/$CONFIG_ARCH/kjump.S is OPTIONAL: an ISA with address-encoded
+# execution-state (e.g. Cortex-M Thumb bit0) provides a strong override of
+# the generic weak kjump() in kernel.c.  Its absence here is not an error.
+KERNEL_S="arch/$CONFIG_ARCH/crt0.S"
+[ -f "arch/$CONFIG_ARCH/kjump.S" ] && KERNEL_S="$KERNEL_S arch/$CONFIG_ARCH/kjump.S"
 
 KERNEL_OBJS=
 for src in $KERNEL_C; do

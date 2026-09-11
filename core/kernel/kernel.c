@@ -22,9 +22,10 @@
 #include "syscall.h"
 #include <limits.h>
 
-/* kjump: transfer control to a program loaded at |addr|.  Per-architecture
- * assembly (arch/$CONFIG_ARCH/kjump.S) owns any ISA calling-state detail,
- * e.g. the ARM Thumb bit.  See kernel.h. */
+__attribute__((weak)) void kjump(uintptr_t addr)
+{
+    ((void (*)(void))addr)();
+}
 
 /* Per-kernel-environment slots: indexed by ENV_* constants.
  * is_ccp gates writes so transient programs cannot corrupt CCP state. */
@@ -234,7 +235,7 @@ int kexec(const char *name83, int argc, char **argv, FsContext ctx)
         return ENOEXEC;
     }
 
-    if (file_size >= (uint32_t)__kernel_base - (uintptr_t)__tpa_base)
+    if (file_size >= (uint32_t)((uintptr_t)__kernel_base - (uintptr_t)__tpa_base))
     {
         bd_close(fd);
         return E2BIG;

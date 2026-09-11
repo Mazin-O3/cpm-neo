@@ -66,7 +66,7 @@ platform's active values at runtime and rejects a platform that exceeds them.
 | Knob | Example (vemu) | Kernel RAM cost (roughly) |
 |------|----------------|---------------------------|
 | `CONFIG_VOL_MAX` | 4 | `MAX_VOLUMES`-backed arrays and `SysInfo.vol_mounted[]` |
-| `CONFIG_DISK_SIZE` | 2048 | alloc bitmap covers the whole grid (KB/8 bytes); total image size in KB, overhead included |
+| `CONFIG_DISK_SIZE` | 2048 | alloc bitmap covers the whole grid (ceil(KB/8) bytes); total image size in KB, overhead included |
 | `CONFIG_FCB_MAX` | 4 | `CONFIG_FCB_MAX` open-file control blocks |
 | `CONFIG_STACK_SIZE` | 0x1000 | single shared kernel/CCP/app stack (top of TPA) |
 
@@ -226,7 +226,7 @@ The `arch/<isa>/` directory needs five files:
 | `boot.S` | Architecture bootloader (initializes the platform BIOS and jumps to the kernel) |
 | `linker_boot.ld` | Bootloader memory layout (boot code region + boot runtime RAM) |
 | `crt0.S` | C runtime startup (kernel, CCP, and apps): sets the stack pointer to the top of the shared stack, copies `.data`, clears `.bss`, and jumps to `_start` |
-| `kjump.S` | `void kjump(uintptr_t addr)` — transfer control to a freshly loaded program. Required; a missing file is a hard build error (the build compiles the explicit literal `arch/$CONFIG_ARCH/kjump.S`) |
+| `kjump.S` | Optional. `void kjump(uintptr_t addr)` — transfer control to a freshly loaded program. Only needed when the ISA encodes execution-state in the address (e.g. the Cortex-M Thumb bit); without it the generic weak C fallback in `kernel.c` is used. The build compiles it only when the file is present |
 
 ### `config.sh` contract
 
@@ -296,21 +296,13 @@ produce images with `ld -m $CONFIG_LD_EMULATION`, as used by `build_disk.sh` and
 
 ### Transferring control: `kjump`
 
-Control never returns across a program load — the kernel hands off to the CCP and
-loaded `.com` files by an unconditional jump, never a `call`. That jump is the
-per-ISA `kjump(uintptr_t addr)` in `arch/<isa>/kjump.S` (`j` to `a0` on
-RISC-V, `bx r0` on ARM). It is arch-absolute because the *address* handed to it
-already encodes the ISA's execution-state convention:
+The kernel hands off to the CCP and loaded `.com` files via `void kjump(uintptr_t
+addr)`. The default implementation (in `kernel.c`) is a weak C function-pointer
+call — fine on any ISA with plain branchable addresses. An ISA whose addresses
+encode execution-state overrides it with a strong `arch/<isa>/kjump.S`.
 
-- **RISC-V** — addresses are plain even addresses; `j a0` lands directly.
-- **ARM (Cortex-M)** — ARMv7-M executes only Thumb-2. A branch target whose bit0
-  is clear raises a UsageFault (INVSTATE). `kjump` sets bit0 (`adds r0, r0, #1;
-  bx r0`) so its callers pass bare addresses. The bootloader's XIP jump and the
-  BIOS's vector-table pointers follow the same rule — every Cortex-M branch
-  address carries bit0 = 1.
-
-The kernel calls `kjump()` directly at its three hand-off sites (two RAM
-`__tpa_base` loads for `.com` programs and the XIP CCP entry).
+`kjump()` is called at the kernel's three hand-off sites (two RAM `__tpa_base`
+loads for `.com` programs and the XIP CCP entry).
 
 
 ## Building a program with the SDK

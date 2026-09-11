@@ -27,13 +27,13 @@
  * A BDOS block consists of two disk sectors.  Eight blocks form one
  * extent, and the allocation bitmap supports up to BD_VOL_MAX_BLOCKS
  * blocks per volume.  CONFIG_DISK_SIZE is the per-volume disk-size cap in
- * KB (1 KB per block), so the bitmap needs CONFIG_DISK_SIZE/8 bytes (one
- * bit per block) and the volume cap is CONFIG_DISK_SIZE blocks.
+ * KB (1 KB per block), so the bitmap is ceil(CONFIG_DISK_SIZE/8) bytes
+ * (one bit per block) and the volume cap is CONFIG_DISK_SIZE blocks.
  */
 #define BD_BLOCK_SECS 2
 #define BD_BLOCK_BYTES (BD_BLOCK_SECS * DISK_SECTOR_SIZE)
 #define BD_BLOCKS_PER_EXTENT 8
-#define BD_BLOCK_MAP_BYTES (CONFIG_DISK_SIZE / 8) /* Derived: one bit per 1K block */
+#define BD_BLOCK_MAP_BYTES ((CONFIG_DISK_SIZE + 7) / 8) /* Ceil: one bit per 1K block */
 #define BD_VOL_MAX_BLOCKS CONFIG_DISK_SIZE        /* Per-volume block cap */
 
 #define BD_ENTRY_SIZE 32

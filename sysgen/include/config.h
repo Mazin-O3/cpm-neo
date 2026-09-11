@@ -24,8 +24,7 @@
  *                             format limit
  *
  *   CONFIG_DISK_SIZE 32768    KB per volume cap / total grid (32 MB); the
- *                             alloc bitmap derives as /8 bytes and must be
- *                             a multiple of 8 seeds the build's guard;
+ *                             alloc bitmap derives as ceil(KB/8) bytes;
  *                             u16 on-disk fields (S0_DISK_SIZE_KB, block
  *                             grid) cap this at 65535
  *
