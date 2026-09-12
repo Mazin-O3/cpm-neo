@@ -18,6 +18,9 @@ int elf32_symbol(const uint8_t *elf, size_t len, const char *name, uint32_t *val
 /* Convert a host name to an 11-char padded 8.3 string */
 void to_name83(const char *src, char *out83);
 
+/* Render an 8.3 name as "BASE.EXT" (ext only when present) */
+void n83_dot(const char *n83, char *out, size_t n);
+
 /* Active disk configuration for the platform being generated.  The sysgen
  * host is compiled once at its ceilings (sysgen/include/config.h); the
  * platform's effective values arrive at runtime from the build tags written

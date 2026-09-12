@@ -40,7 +40,7 @@ const char *extract_basename(const char *path)
     return base;
 }
 
-static void n83_dot(const char *n83, char *out, size_t n)
+void n83_dot(const char *n83, char *out, size_t n)
 {
     int nb = NAME83_BASE;
     int ne = NAME83_EXT;

@@ -21,6 +21,7 @@ static void usage(void)
            "                       is auto-derived as BOOT_BASE + boot_size.\n\n"
            "  sysgen install <folder|file.c> [opts]  Compile sources to .com and add to disk\n"
            "  sysgen add     <file|folder> [opts]  Add a file (or flat folder) to disk\n"
+           "  sysgen era     <file>       [opts]  Delete a file\n"
            "  sysgen extract [opts]  Extract every file to <build_dir>/extract/\n"
            "  sysgen dir     [Vn]     [opts]  List files\n\n"
            "Options [opts]:\n"
@@ -38,8 +39,9 @@ typedef struct
 
 static const SysgenCmd g_cmds[] = {
     {.name = "new", .fn = cmd_new},         {.name = "add", .fn = cmd_add},
-    {.name = "install", .fn = cmd_install}, {.name = "extract", .fn = cmd_extract},
-    {.name = "dir", .fn = cmd_dir},         {0}};
+    {.name = "era", .fn = cmd_era},         {.name = "install", .fn = cmd_install},
+    {.name = "extract", .fn = cmd_extract}, {.name = "dir", .fn = cmd_dir},
+    {0}};
 
 int main(int argc, char **argv)
 {

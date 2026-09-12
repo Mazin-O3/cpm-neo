@@ -1,8 +1,8 @@
 /*
- * sysgen/src/cmd_files.c — File operations: add, install, extract, dir
+ * sysgen/src/cmd_files.c — File operations: add, era, install, extract, dir
  *
- * Implementations of `sysgen add`, `sysgen install`, `sysgen extract`
- * and `sysgen dir`, plus the local helpers they share.
+ * Implementations of `sysgen add`, `sysgen era`, `sysgen install`,
+ * `sysgen extract` and `sysgen dir`, plus the local helpers they share.
  */
 
 #include "cmd.h"
@@ -26,7 +26,14 @@ static const char *const FLAGS_FILE[] = {
     "--disk",
     NULL,
 };
+
 static const char *const FLAGS_DISK[] = {
+    "--disk",
+    NULL,
+};
+
+static const char *const FLAGS_ERA[] = {
+    "--dst",
     "--disk",
     NULL,
 };
@@ -160,6 +167,70 @@ int cmd_add(int argc, char **argv)
     }
 
     return add_file(disk_buf, src, &afo);
+}
+
+/*
+ * cmd_era — Delete a file from the disk image, read-only or not.
+ * Mirrors the CCP's ERA but skips the read-only refusal.
+ */
+int cmd_era(int argc, char **argv)
+{
+    if (check_flags(argc, argv, FLAGS_ERA) != 0 || check_positionals(argc, argv, 2, 2) != 0)
+        return 1;
+
+    const char *pos[3];
+    collect_positional(argc, argv, pos, 3);
+
+    int vol, user;
+
+    if (parse_dst(argc, argv, &vol, &user) != 0)
+        return 1;
+
+    char disk_buf[SYSGEN_FULL_PATH_MAX];
+    resolve_disk(argc, argv, disk_buf, sizeof(disk_buf));
+
+    char n83[NAME83_LEN + 1];
+    to_name83(pos[1], n83);
+    n83[NAME83_LEN] = '\0';
+
+    if (open_disk(disk_buf) != 0 || disk_init() != 0 || mount_vol((int8_t)vol) != 0)
+        return 1;
+
+    FsContext ctx = {(int8_t)vol, (uint8_t)user};
+    FileInfo  fi;
+
+    if (bd_find(n83, ctx, &fi, 0) <= 0)
+    {
+        err("'%s' not found on %c:%u", pos[1], 'A' + vol, user);
+        return 1;
+    }
+
+    if (fi.attrib & FILE_ATTR_READ_ONLY)
+    {
+        if (bd_fsetattr(n83, ctx, (uint8_t)(fi.attrib & ~FILE_ATTR_READ_ONLY)) != EOK)
+        {
+            err("cannot clear RO on '%s'", pos[1]);
+            return 1;
+        }
+    }
+
+    int rc = bd_delete(n83, ctx);
+
+    if (rc != EOK)
+    {
+        err("erase '%s' (%s)", pos[1], err_str(rc));
+        return 1;
+    }
+
+    bd_sync();
+
+    if (save_disk(disk_buf) != 0)
+        return 1;
+
+    char dot[NAME83_LEN + 2];
+    n83_dot(n83, dot, sizeof(dot));
+    printf("  erased %-13s -> %c:%u\n", dot, 'A' + vol, user);
+    return 0;
 }
 
 /*
