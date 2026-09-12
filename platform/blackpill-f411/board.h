@@ -12,6 +12,7 @@
 #ifndef BPF411_BOARD_H
 #define BPF411_BOARD_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* ── Register helpers ─────────────────────────────────────── */
@@ -171,6 +172,9 @@ typedef struct
 
 #define GPIOA_OSPEEDR_PA10_MASK (0x3UL << 20)
 #define GPIOA_OSPEEDR_PA10_FAST (0x1UL << 20)
+
+#define GPIOA_PUPDR_PA9_MASK (0x3UL << 18)
+#define GPIOA_PUPDR_PA9_UP (0x1UL << 18)
 
 #define GPIOA_PUPDR_PA10_MASK (0x3UL << 20)
 #define GPIOA_PUPDR_PA10_UP (0x1UL << 20)

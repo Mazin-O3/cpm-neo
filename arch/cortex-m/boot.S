@@ -251,7 +251,7 @@ err_disk:
 /* ── Strings ──────────────────────────────────────────────── */
 
 msg_title:
-    .asciz " CP/M Neo ARM Cortex-M Bootloader\n\n"
+    .asciz "CP/M Neo ARM Cortex-M Bootloader\n\n"
 
 msg_disk_ok:
     .asciz "- Disk OK\n"

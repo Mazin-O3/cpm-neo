@@ -26,11 +26,8 @@
 #include "config.h"
 #include "errno.h"
 
-#include <stddef.h>
-#include <stdint.h>
-
 #define MS_PER_SEC_DIV 96000UL
-#define UART_BRR_115200 833U
+#define UART_BRR_115200 (96000000UL / 115200U)
 
 #define UART_RX_BUF_SIZE 256U
 
@@ -38,47 +35,7 @@
 #define PLL_N 192U
 #define PLL_Q 4U
 
-#define BP_HSE_RDY_MS 5U
-#define BP_PLL_RDY_MS 10U
-#define BP_SWS_MS 2U
-
-#define BP_USART_READY_CYCLES (2U * 96000UL)
-
 /* ── Helpers ───────────────────────────────────────────────── */
-
-static int bp_dwt_enable(void)
-{
-    CoreDebug_DEMCR |= TRCENA;
-    DWT_CYCCNT = 0;
-    DWT_CTRL |= DWT_CTRL_CYCCNTENA;
-
-    if (!(CoreDebug_DEMCR & TRCENA) || !(DWT_CTRL & DWT_CTRL_CYCCNTENA))
-        return EIO;
-
-    return EOK;
-}
-
-static int bp_wait_cycles(volatile uint32_t *reg, uint32_t mask, uint32_t expect, uint32_t cycles)
-{
-    uint32_t start = DWT_CYCCNT;
-
-    while ((*reg & mask) != expect)
-    {
-
-        if ((DWT_CYCCNT - start) >= cycles)
-            return EIO;
-    }
-
-    return EOK;
-}
-
-/* ms-budgeted wait at 16 MHz HSI: the clock-ready waits run BEFORE SYSCLK
- * switches away from HSI (see the BP_*_MS budgets above).  Waits that run
- * after the switch (on 96 MHz SYSCLK) must use bp_wait_cycles() instead. */
-static int bp_wait_ms(volatile uint32_t *reg, uint32_t mask, uint32_t expect, uint32_t ms)
-{
-    return bp_wait_cycles(reg, mask, expect, ms * 16000UL);
-}
 
 static void bp_copy(uint8_t *dst, const uint8_t *src, uint32_t n)
 {
@@ -90,7 +47,7 @@ static void bp_copy(uint8_t *dst, const uint8_t *src, uint32_t n)
 
 /* ── Clock / time ──────────────────────────────────────────── */
 
-static int clock_init(void)
+static void clock_init(void)
 {
     /*
      * Reuse the bootloader clock when it has already configured
@@ -100,16 +57,8 @@ static int clock_init(void)
     if ((RCC_CR & RCC_CR_PLLON) && (RCC_CR & RCC_CR_HSERDY) &&
         ((RCC_CFGR & RCC_CFGR_SWS) == RCC_CFGR_SWS_PLL))
     {
-        return EOK;
+        return;
     }
-
-    /*
-     * The DWT cycle counter bounds every wait below, so enable it first.
-     * All the waits run at HSI (16 MHz), before SYSCLK switches to the PLL.
-     */
-
-    if (bp_dwt_enable() != EOK)
-        return EIO;
 
     /*
      * 96 MHz SYSCLK requires three FLASH wait states.
@@ -118,13 +67,13 @@ static int clock_init(void)
 
     RCC_CR |= RCC_CR_HSEON;
 
-    if (bp_wait_ms(&RCC_CR, RCC_CR_HSERDY, RCC_CR_HSERDY, BP_HSE_RDY_MS) != EOK)
-        return EIO;
+    while (!(RCC_CR & RCC_CR_HSERDY))
+        ;
 
     RCC_CR &= ~RCC_CR_PLLON;
 
-    if (bp_wait_ms(&RCC_CR, RCC_CR_PLLRDY, 0, BP_PLL_RDY_MS) != EOK)
-        return EIO;
+    while (RCC_CR & RCC_CR_PLLRDY)
+        ;
 
     /*
      * 25 MHz HSE:
@@ -140,8 +89,8 @@ static int clock_init(void)
 
     RCC_CR |= RCC_CR_PLLON;
 
-    if (bp_wait_ms(&RCC_CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY, BP_PLL_RDY_MS) != EOK)
-        return EIO;
+    while (!(RCC_CR & RCC_CR_PLLRDY))
+        ;
 
     /*
      * APB1 = 48 MHz
@@ -151,20 +100,18 @@ static int clock_init(void)
 
     RCC_CFGR = (RCC_CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
 
-    if (bp_wait_ms(&RCC_CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL, BP_SWS_MS) != EOK)
-        return EIO;
-
-    return EOK;
+    while ((RCC_CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL)
+        ;
 }
 
 static int dwt_init(void)
 {
-    int rc = bp_dwt_enable();
-
-    if (rc != EOK)
-        return rc;
-
+    CoreDebug_DEMCR |= TRCENA;
     DWT_CYCCNT = 0;
+    DWT_CTRL |= DWT_CTRL_CYCCNTENA;
+
+    if (!(CoreDebug_DEMCR & TRCENA) || !(DWT_CTRL & DWT_CTRL_CYCCNTENA))
+        return EIO;
 
     return EOK;
 }
@@ -181,12 +128,11 @@ typedef struct
 
 static uart_port uart;
 
-static int uart_init(void)
+static void uart_init(void)
 {
     RCC_AHB1ENR |= RCC_AHB1_GPIOA;
     RCC_APB2ENR |= RCC_APB2ENR_USART1EN;
 
-    USART1->CR1 = 0;
     USART1->CR2 = 0;
     USART1->CR3 = 0;
 
@@ -201,29 +147,15 @@ static int uart_init(void)
     GPIOA_OSPEEDR = (GPIOA_OSPEEDR & ~GPIOA_OSPEEDR_PA9_MASK & ~GPIOA_OSPEEDR_PA10_MASK) |
                     GPIOA_OSPEEDR_PA9_FAST | GPIOA_OSPEEDR_PA10_FAST;
 
+    GPIOA_PUPDR = (GPIOA_PUPDR & ~GPIOA_PUPDR_PA9_MASK & ~GPIOA_PUPDR_PA10_MASK) |
+                  GPIOA_PUPDR_PA9_UP | GPIOA_PUPDR_PA10_UP;
+
     GPIOA_MODER = (GPIOA_MODER & ~GPIOA_MODER_PA9_MASK & ~GPIOA_MODER_PA10_MASK) |
                   GPIOA_MODER_PA9_AF | GPIOA_MODER_PA10_AF;
 
     USART1->BRR = UART_BRR_115200;
 
-    USART1->CR1 = USART_CR1_UE | USART_CR1_RE;
-    USART1->CR1 |= USART_CR1_TE;
-
-    USART1->SR = (uint32_t)~USART_SR_TC;
-
-    if (bp_wait_cycles(&USART1->SR, USART_SR_TC, USART_SR_TC, BP_USART_READY_CYCLES) != EOK)
-        return EIO;
-
-    while (!(USART1->SR & USART_SR_TXE))
-        ;
-
-    /* Re-arm TC so the first payload frame tracks a clean flag. */
-    USART1->SR = (uint32_t)~USART_SR_TC;
-
-    if (!(USART1->CR1 & USART_CR1_UE) || !(USART1->CR1 & (USART_CR1_TE | USART_CR1_RE)))
-        return EIO;
-
-    return EOK;
+    USART1->CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
 }
 
 static void uart_poll(void)
@@ -259,8 +191,10 @@ static void uart_putc(uint8_t c)
 
 int bios_init(void)
 {
+    clock_init();
+    uart_init();
 
-    if (clock_init() != EOK || dwt_init() != EOK || uart_init() != EOK)
+    if (dwt_init() != EOK)
         return EIO;
 
     return EOK;
@@ -273,7 +207,6 @@ uint32_t bios_time(void)
 
 void bios_conout(int c)
 {
-
     if (c == '\n')
         uart_putc('\r');
 
@@ -310,7 +243,6 @@ void bios_consize(uint8_t *cw, uint8_t *ch)
 
 int bios_read(uint16_t sec, uint8_t *buf)
 {
-
     if (buf == NULL)
         return EINVAL;
 
@@ -327,7 +259,6 @@ int bios_read(uint16_t sec, uint8_t *buf)
 
 int bios_write(uint16_t sec, const uint8_t *buf)
 {
-
     if (sec >= ((uint32_t)CONFIG_DISK_SIZE * 2U))
         return EINVAL;
 
