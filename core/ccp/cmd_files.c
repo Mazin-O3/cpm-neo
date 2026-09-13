@@ -150,7 +150,7 @@ CmdErr cmd_era(FsContext *ctx, int argc, char **argv)
 
     if (!has_wildcard(argv[1]))
     {
-        int rc = remove(argv[1]);
+        int rc = erase(argv[1]);
 
         return cmderr_bdos(vol_from_arg(argv[1], ctx->vol_id), rc);
     }
@@ -168,7 +168,7 @@ CmdErr cmd_era(FsContext *ctx, int argc, char **argv)
     {
         char full[FSPATH_MAX];
         make_path(full, ref.fs_ctx, di.name);
-        int rc = remove(full);
+        int rc = erase(full);
 
         if (rc != EOK)
             return cmderr_bdos(ref.fs_ctx.vol_id, rc);

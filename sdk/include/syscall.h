@@ -40,8 +40,8 @@ uint32_t sys_getsize(int fd);
 /* Create a new empty file.  Returns 0 or negative errno. */
 int sys_create(const char *name);
 
-/* Delete a file.  Returns 0 or negative errno. */
-int sys_delete(const char *name);
+/* Erase a file.  Returns 0 or negative errno. */
+int sys_erase(const char *name);
 
 /* Rename old to new.  Returns 0 or negative errno. */
 int sys_rename(const char *old, const char *new);

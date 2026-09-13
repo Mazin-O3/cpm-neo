@@ -120,7 +120,7 @@ static int sub_process(int8_t vol, const char *src_name, int argc, char **argv)
 
     if (rc != EOK)
     {
-        remove(batch_path);
+        erase(batch_path);
         return rc;
     }
 

@@ -5,7 +5,8 @@
  * Disk layout:
  *   Sector 0 : boot sector (geometry + kernel/CCP pointers)
  *   Sector 1 : VMAP  = { u16 num_blocks, u16 base_sec,
- *                        u16 magic=0x4350, VolRec[4], 0xAA55@0x1FE }
+ *                        u16 magic=0x4350, VolRec[MAX_VOLUMES],
+ *                        0xAA55@0x1FE }
  *   Sectors 2.. : kernel (KERN_START_SEC=2), CCP, then the block grid.
  *
  * A block is a fixed run of 2 sectors (1 KB) at
@@ -18,19 +19,25 @@
  *
  * All byte-level layout constants (VMAP_*, VolRec, caps) live in
  * disk_format.h so the sysgen tool shares the same on-disk format.
+ *
+ * Functions return EOK (0) on success or a negative errno; the query
+ * helpers that return data instead (volume_sectors, volume_run_count,
+ * volume_readonly) return 0 when they cannot answer.
  */
 
 #ifndef DISK_H
 #define DISK_H
 
 #include "abi.h"
+#include "errno.h"
 #include <stdint.h>
 
-int disk_init(void); /* 0 = OK, nonzero = failure */
-int disk_xip(void);  /* 1 = XIP disk image         */
+int disk_init(void); /* Load and validate the VMAP from the platform */
+int disk_xip(void);  /* 1 = XIP disk image                          */
 
 /* Translate a volume-relative sector index through the volume's block runs
- * into a physical disk sector.  Returns 0 on success, -1 on error. */
+ * into a physical disk sector.  Returns 0 on success, EINVAL for an invalid
+ * volume/sector, ENOENT if the sector lies beyond the volume's end. */
 int disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec);
 
 uint16_t disk_block_count(void); /* Total 1 KB blocks on disk (constant) */
@@ -38,29 +45,27 @@ uint16_t disk_base_sec(void);    /* Sector of block 0                   */
 uint16_t disk_free_blocks(void); /* Unallocated blocks in the grid       */
 
 /* Flush the disk-layer write-back cache and enforce physical persistence
- * via the BIOS barrier. Returns 0 on success, nonzero on error. */
+ * via the BIOS barrier. */
 int disk_sync(void);
 
 /* Sector-level I/O: sec is relative to the volume.
- * Returns 0 on success, nonzero on I/O error. */
+ * volume_write returns EVOLRO for a read-only volume. */
 int volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf);
 int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf);
 
-/* Volume lifecycle: mount allocates default runs, unmount frees all.
- * Returns EOK or error. */
-int volume_mount(int8_t vol_id); /* Mount at default blocks */
-
-/* Unmount a volume: frees all its blocks. Returns EOK or error. */
+/* Volume lifecycle. */
+int volume_mount(int8_t vol_id); /* Mount at default blocks    */
 int volume_unmount(int8_t vol_id);
 
 /* Resize a volume by delta blocks. delta > 0 grows by delta, delta < 0
- * shrinks by |delta|, delta == 0 is a no-op. Returns EOK or error. */
+ * shrinks by |delta|, delta == 0 is a no-op. */
 int volume_resize(int8_t vol_id, int16_t delta);
 
-/* Query helpers: returns 0 if the volume is unmounted. */
-uint32_t volume_sectors(int8_t vol_id);   /* Capacity in sectors (0 if unmounted) */
-uint8_t  volume_run_count(int8_t vol_id); /* Active runs count (0 = unmounted)  */
+/* Query helpers (0 when the volume is unmounted). */
+uint32_t volume_sectors(int8_t vol_id);   /* Capacity in sectors */
+uint8_t  volume_run_count(int8_t vol_id); /* Active runs count  */
 int      volume_getattr(int8_t vol_id, uint8_t *attr);
 int      volume_setattr(int8_t vol_id, uint8_t attr);
+int      volume_readonly(int8_t vol_id);
 
 #endif /* DISK_H */

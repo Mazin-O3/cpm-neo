@@ -483,7 +483,7 @@ int sys_create(const char *name)
     return (rc < 0) ? rc : rc + FD_FILE_BASE;
 }
 
-int sys_delete(const char *name)
+int sys_erase(const char *name)
 {
     FsContext ctx = parse_prefix(&name);
     char      n83[12];
@@ -492,7 +492,7 @@ int sys_delete(const char *name)
     if (err != EOK)
         return err;
 
-    return bd_delete(n83, ctx);
+    return bd_erase(n83, ctx);
 }
 
 int sys_rename(const char *old, const char *new)

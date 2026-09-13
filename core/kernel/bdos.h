@@ -15,6 +15,7 @@
 
 #include "abi.h"
 #include "config.h"
+#include "disk_format.h"
 #include "errno.h"
 #include <stdint.h>
 
@@ -22,19 +23,17 @@
 #define BD_DISK_MAX_SECS 65535
 
 /*
- * BDOS allocation geometry.
- *
- * A BDOS block consists of two disk sectors.  Eight blocks form one
- * extent, and the allocation bitmap supports up to BD_VOL_MAX_BLOCKS
- * blocks per volume.  CONFIG_DISK_SIZE is the per-volume disk-size cap in
- * KB (1 KB per block), so the bitmap is ceil(CONFIG_DISK_SIZE/8) bytes
- * (one bit per block) and the volume cap is CONFIG_DISK_SIZE blocks.
+ * BDOS allocation geometry.  The on-disk block/volume invariants (1 KB
+ * block, reserved block, volume region, per-volume cap) are owned by
+ * disk_format.h; the BD_* names below alias them.  Eight blocks form one
+ * extent, and the allocation bitmap supports up to DISK_VOL_MAX_BLOCKS
+ * blocks per volume.
  */
-#define BD_BLOCK_SECS 2
-#define BD_BLOCK_BYTES (BD_BLOCK_SECS * DISK_SECTOR_SIZE)
+#define BD_BLOCK_SECS DISK_BLOCK_SECS
+#define BD_BLOCK_BYTES DISK_BLOCK_BYTES
 #define BD_BLOCKS_PER_EXTENT 8
-#define BD_BLOCK_MAP_BYTES ((CONFIG_DISK_SIZE + 7) / 8) /* Ceil: one bit per 1K block */
-#define BD_VOL_MAX_BLOCKS CONFIG_DISK_SIZE        /* Per-volume block cap */
+#define BD_BLOCK_MAP_BYTES ((CONFIG_DISK_SIZE + 7) / 8) /* One bit per 1K block */
+#define BD_VOL_MAX_BLOCKS DISK_VOL_MAX_BLOCKS           /* Per-volume block cap */
 
 #define BD_ENTRY_SIZE 32
 #define BD_ROOT_ENTRIES 256
@@ -49,17 +48,13 @@
 
 /* Per-volume metadata layout: header sector 0, then the root directory.
  * BD_DATA_START is the first sector of a volume's data blocks. */
-#define BD_HEADER_SECS 1
-#define BD_ROOT_SECS (BD_ROOT_ENTRIES * BD_ENTRY_SIZE / DISK_SECTOR_SIZE)
-#define BD_DATA_START (BD_HEADER_SECS + BD_ROOT_SECS)
-
-/* Data block 0 of every volume is unusable: directory extent lists encode
- * an absent slot as 0, so the allocator permanently reserves it. */
-#define BD_RESERVED_BLOCKS 1
+#define BD_HEADER_SECS DISK_HEADER_SECS
+#define BD_ROOT_SECS DISK_ROOT_SECS
+#define BD_DATA_START DISK_DATA_START
 
 /* Minimum volume size: header + root, plus the reserved block and at
  * least one usable data block. */
-#define BD_MIN_VOL_SECS (BD_DATA_START + (BD_RESERVED_BLOCKS + 1) * BD_BLOCK_SECS)
+#define BD_MIN_VOL_SECS DISK_MIN_VOL_SECS
 
 #define BD_DIR_ATTR 11
 #define BD_DIR_USER 12
@@ -71,11 +66,11 @@
 #define BD_ENTRY_DELETED 0xE5
 
 #define BD_USER_INVALID 0xFF
-#define BD_HEADER_SECS 1
 #define BD_BITS_PER_BYTE 8
 #define BD_BITMAP_FULL UINT8_MAX
 #define BD_RESERVED_BLOCK 0
-#define BD_SECTORS_PER_KB (1024 / DISK_SECTOR_SIZE)
+#define BD_FIRST_USABLE_BLOCK (BD_RESERVED_BLOCK + 1)
+#define BD_SECTORS_PER_KB DISK_SECTORS_PER_KB
 #define DIR_SCAN_STOP 1
 
 /*
@@ -116,7 +111,7 @@ int bd_open(const char *name83, FsContext ctx, uint8_t writable);
 int bd_create(const char *name83, FsContext ctx);
 
 /* Read up to len bytes at the current position.  May return fewer
- * bytes than requested at EOF or on extent boundary. */
+ * bytes than requested at EOF. */
 int bd_read(int fd, uint8_t *buf, uint16_t len);
 
 /* Write up to len bytes.  Returns bytes written (may be short at
@@ -129,8 +124,8 @@ int bd_close(int fd);
 /* Return the total size in bytes of the open file. */
 uint32_t bd_size(int fd);
 
-/* Delete a file.  Returns EPERM if the file is read-only. */
-int bd_delete(const char *name83, FsContext ctx);
+/* Erase a file.  Returns EPERM if the file is read-only. */
+int bd_erase(const char *name83, FsContext ctx);
 
 /* Rename a file.  Returns EEXIST if new83 is already taken.
  * No data blocks are moved. */
@@ -141,7 +136,7 @@ int bd_rename(const char *old83, const char *new83, FsContext ctx);
  * Pass start_pos to resume a previous scan. */
 int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos);
 
-/* Read volume metadata (total sectors, free blocks, mount state). */
+/* Read volume metadata (usable/free blocks, read-only flag). */
 int bd_vstat(int8_t vol_id, VolStat *stat);
 
 /* Set the file position for the next read or write. */

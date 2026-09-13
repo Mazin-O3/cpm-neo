@@ -7,7 +7,7 @@
  * layer; BDOS deals only with filesystem semantics.
  *
  * All public bd_* functions accept a vol_id that must already be mounted
- * (bd_bind or bd_mount) — Callers never touch raw sectors.  The CHECK_VOL
+ * (bd_bind or bd_mount) — Callers never touch raw sectors.  The CHECK_VOLUME
  * and CHECK_FCB macros enforce this invariant at the top of each entry
  * point, returning ENOVOL/EBADF on violations.
  *
@@ -23,18 +23,18 @@
 #include "disk_format.h"
 #include "string.h"
 
-/* Vol-checked guard: resolves vol_id and returns ENOVOL if unmounted. */
-#define CHECK_VOL(v, vol_id)                                                                       \
+/* Volume-checked guard: resolves vol_id and returns ENOVOL if unmounted. */
+#define CHECK_VOLUME(v, vol_id)                                                                    \
     Volume *v = vol_checked(vol_id);                                                               \
     if (!v)                                                                                        \
         return ENOVOL;
 
-/* FCB-checked guard: validates fd, then applies CHECK_VOL on its volume. */
+/* FCB-checked guard: validates fd, then applies CHECK_VOLUME on its volume. */
 #define CHECK_FCB(f, v, fd)                                                                        \
     FCB *f = fcb_get(fd);                                                                          \
     if (!f)                                                                                        \
         return EBADF;                                                                              \
-    CHECK_VOL(v, f->ctx.vol_id);
+    CHECK_VOLUME(v, f->ctx.vol_id);
 
 typedef struct
 {
@@ -45,7 +45,6 @@ typedef struct
     uint16_t alloc_next;   /* Hint for next free-block scan */
     int8_t   id;
     uint8_t  mounted : 1;   /* Set by bd_bind/bd_mount, cleared by bd_unbind */
-    uint8_t  read_only : 1; /* Mirrors VOL_ATTR_RO on the disk */
     uint8_t  block_alloc_map[BD_BLOCK_MAP_BYTES]; /* Rebuilt on mount */
 } Volume;
 
@@ -105,12 +104,6 @@ typedef struct
 typedef int (*dir_scan_fn)(Volume *v, const uint8_t *entry, uint16_t idx, void *ctx);
 
 static BDState g_bd;
-
-/* Per-volume block cap. */
-static inline uint16_t bd_block_cap(void)
-{
-    return BD_VOL_MAX_BLOCKS;
-}
 
 static int dir_scan(Volume *v, uint8_t user, dir_scan_fn fn, void *ctx);
 
@@ -216,30 +209,17 @@ static Volume *vol_checked(int8_t vol_id)
     return v;
 }
 
-static int vol_read(Volume *v, uint16_t sec, uint8_t *buf)
-{
-    return volume_read(v->id, sec, buf) ? EIO : EOK;
-}
-
-static int vol_write(Volume *v, uint16_t sec, const uint8_t *buf)
-{
-    if (v->read_only)
-        return EVOLRO;
-
-    return volume_write(v->id, sec, buf) ? EIO : EOK;
-}
-
 static int bd_write_header(Volume *v)
 {
     uint8_t hdr[DISK_SECTOR_SIZE];
 
-    if (vol_read(v, 0, hdr) != EOK)
+    if (volume_read(v->id, 0, hdr) != EOK)
         return EIO;
 
     write16(&hdr[VHDR_SIZE_KB_OFF], (uint16_t)(v->total_sectors / BD_SECTORS_PER_KB));
     write16(&hdr[VHDR_TOT_BLKS_OFF], v->total_blocks);
 
-    return vol_write(v, 0, hdr);
+    return volume_write(v->id, 0, hdr);
 }
 
 static inline int block_is_allocated(const Volume *v, uint16_t block_num)
@@ -332,7 +312,7 @@ static uint8_t *load_dir_entry(Volume *v, uint16_t idx)
 {
     uint16_t s = idx / BD_ENTRIES_PER_SEC;
 
-    if (vol_read(v, v->root_start_sec + s, g_bd.sec_buf) != EOK)
+    if (volume_read(v->id, v->root_start_sec + s, g_bd.sec_buf) != EOK)
         return 0;
 
     return g_bd.sec_buf + (idx % BD_ENTRIES_PER_SEC) * BD_ENTRY_SIZE;
@@ -437,7 +417,7 @@ static int dir_scan(Volume *v, uint8_t user, dir_scan_fn fn, void *ctx)
 {
     for (uint16_t s = 0; s < BD_ROOT_SECS; s++)
     {
-        if (vol_read(v, v->root_start_sec + s, g_bd.sec_buf) != EOK)
+        if (volume_read(v->id, v->root_start_sec + s, g_bd.sec_buf) != EOK)
             return EIO;
 
         for (uint16_t e = 0; e < BD_ENTRIES_PER_SEC; e++)
@@ -510,7 +490,7 @@ static int update_extent(Volume *v, const DirInfo *de)
     entry[BD_DIR_EXTENT_IDX] = de->extent_idx;
     entry[BD_DIR_ATTR] = de->attrib;
 
-    return vol_write(v, v->root_start_sec + de->diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
+    return volume_write(v->id, v->root_start_sec + de->diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
 }
 
 static void fill_dir_entry(uint8_t *entry, const FileKey *key, const DirInfo *de,
@@ -531,7 +511,7 @@ static int create_extent(FileKey key, const DirInfo *de, uint16_t first_block, u
 
     for (uint16_t s = 0; s < BD_ROOT_SECS; s++)
     {
-        if (vol_read(v, v->root_start_sec + s, g_bd.sec_buf) != EOK)
+        if (volume_read(v->id, v->root_start_sec + s, g_bd.sec_buf) != EOK)
             return EIO;
 
         for (uint16_t e = 0; e < BD_ENTRIES_PER_SEC; e++)
@@ -550,7 +530,7 @@ static int create_extent(FileKey key, const DirInfo *de, uint16_t first_block, u
                 if (out_diridx)
                     *out_diridx = i;
 
-                return vol_write(v, v->root_start_sec + s, g_bd.sec_buf);
+                return volume_write(v->id, v->root_start_sec + s, g_bd.sec_buf);
             }
         }
     }
@@ -612,14 +592,14 @@ static int resolve_extent(FCB *f, Volume *v)
     if (extent_idx != f->cur.extent_idx)
     {
         if (extent_idx > UINT8_MAX)
-            return -1;
+            return EBADFS;
 
         DirInfo di;
         int     rc = find_extent(make_key(v, (const char *)f->name83, f->ctx.user_area),
                                  (uint8_t)extent_idx, &di);
 
         if (rc != EOK)
-            return -1;
+            return EBADFS;
 
         f->cur = di;
     }
@@ -632,10 +612,6 @@ static int fcb_flush(FCB *f, Volume *v)
     return update_extent(v, &f->cur);
 }
 
-/*
- * Bind an existing formatted volume.  Closes stale FCBs from any
- * previous bind on the same vol_id, then rescans the alloc map.
- */
 int bd_bind(int8_t vol_id)
 {
     Volume *v = vol_for(vol_id);
@@ -653,16 +629,7 @@ int bd_bind(int8_t vol_id)
     v->id = vol_id;
     v->mounted = 0;
 
-    uint8_t attr = VOL_ATTR_RW;
-
-    int rc = volume_getattr(vol_id, &attr);
-
-    if (rc != EOK)
-        return rc;
-
-    v->read_only = attr & VOL_ATTR_RO;
-
-    if (volume_read(vol_id, 0, hdr) != EOK)
+    if (volume_read(v->id, 0, hdr) != EOK)
         return EIO;
 
     if (read16(&hdr[VHDR_MAGIC_OFF]) != DISK_MAGIC)
@@ -673,7 +640,7 @@ int bd_bind(int8_t vol_id)
     v->total_sectors = read16(&hdr[VHDR_SIZE_KB_OFF]) * BD_SECTORS_PER_KB;
     v->total_blocks = read16(&hdr[VHDR_TOT_BLKS_OFF]);
 
-    if (!v->total_blocks || v->total_blocks > bd_block_cap())
+    if (!v->total_blocks || v->total_blocks > BD_VOL_MAX_BLOCKS)
         return EBADFS;
 
     if ((uint32_t)v->total_blocks * BD_BLOCK_SECS > BD_DISK_MAX_SECS)
@@ -682,26 +649,22 @@ int bd_bind(int8_t vol_id)
     if (v->total_sectors > (uint16_t)volume_sectors(vol_id))
         return EBADFS;
 
-    rc = bd_rescan_alloc_map(v);
+    int rc = bd_rescan_alloc_map(v);
 
     if (rc != EOK)
         return rc;
 
     uint16_t stride = v->total_blocks / MAX_VOLUMES;
-    v->alloc_next = stride ? ((uint16_t)vol_id * stride) % v->total_blocks : 1;
+    v->alloc_next = stride ? ((uint16_t)vol_id * stride) % v->total_blocks : BD_FIRST_USABLE_BLOCK;
 
     if (v->alloc_next == BD_RESERVED_BLOCK)
-        v->alloc_next = 1;
+        v->alloc_next = BD_FIRST_USABLE_BLOCK;
 
     v->mounted = 1;
 
     return EOK;
 }
 
-/*
- * Format and bind a fresh volume (SET MT).  Requires a prior
- * volume_mount() call.
- */
 int bd_mount(int8_t vol_id)
 {
     Volume *v = vol_for(vol_id);
@@ -721,7 +684,7 @@ int bd_mount(int8_t vol_id)
     uint16_t data_start = (uint16_t)(BD_HEADER_SECS + BD_ROOT_SECS);
     uint16_t num_data = (uint16_t)((n_secs - data_start) / BD_BLOCK_SECS);
 
-    if (num_data == 0 || num_data > bd_block_cap())
+    if (num_data == 0 || num_data > BD_VOL_MAX_BLOCKS)
     {
         volume_unmount(vol_id);
         return EBADFS;
@@ -755,20 +718,14 @@ int bd_mount(int8_t vol_id)
     return bd_bind(vol_id);
 }
 
-/*
- * Resize a mounted volume.  Positive delta grows, negative shrinks (by
- * |delta|), zero is a no-op.  Grow fails with EVOLRO on read-only
- * volumes; shrink returns EPERM if any target blocks are allocated,
- * EINVAL if the result would fall below BD_MIN_VOL_SECS.
- */
 int bd_resize(int8_t vol_id, int16_t delta)
 {
-    CHECK_VOL(v, vol_id);
+    CHECK_VOLUME(v, vol_id);
 
     if (delta == 0)
         return EOK;
 
-    if (v->read_only)
+    if (volume_readonly(v->id))
         return EVOLRO;
 
     if (delta > 0)
@@ -777,13 +734,27 @@ int bd_resize(int8_t vol_id, int16_t delta)
         uint16_t old_secs = v->total_sectors;
         uint16_t old_blocks = v->total_blocks;
 
-        if (old_blocks >= bd_block_cap())
+        if (old_blocks >= BD_VOL_MAX_BLOCKS)
             return ENOSPC;
 
-        uint16_t max_extra = bd_block_cap() - old_blocks;
+        uint16_t max_extra = BD_VOL_MAX_BLOCKS - old_blocks;
 
         if (n > max_extra)
             n = max_extra;
+
+        /* Keep the u16 volume geometry in range (mirrors the check applied
+         * at bind time): reject/clip a grow that would push the total
+         * sector count past BD_DISK_MAX_SECS. */
+        uint16_t secs_left = (v->total_sectors >= BD_DISK_MAX_SECS)
+                                 ? 0
+                                 : BD_DISK_MAX_SECS - v->total_sectors;
+        uint16_t max_sec_blocks = (uint16_t)(secs_left / BD_BLOCK_SECS);
+
+        if (n > max_sec_blocks)
+            n = max_sec_blocks;
+
+        if (n == 0)
+            return ENOSPC;
 
         int rc = volume_resize(vol_id, (int16_t)n);
 
@@ -793,8 +764,8 @@ int bd_resize(int8_t vol_id, int16_t delta)
         v->total_sectors = (uint16_t)volume_sectors(vol_id);
         v->total_blocks = (uint16_t)((v->total_sectors - v->data_start_sec) / BD_BLOCK_SECS);
 
-        if (v->total_blocks > bd_block_cap())
-            v->total_blocks = bd_block_cap();
+        if (v->total_blocks > BD_VOL_MAX_BLOCKS)
+            v->total_blocks = BD_VOL_MAX_BLOCKS;
 
         rc = bd_write_header(v);
 
@@ -862,10 +833,6 @@ int bd_resize(int8_t vol_id, int16_t delta)
     return EOK;
 }
 
-/*
- * Unbind a volume.  Returns EPERM if the volume still has allocated
- * data blocks (not empty).
- */
 int bd_unbind(int8_t vol_id)
 {
     Volume *v = vol_for(vol_id);
@@ -910,11 +877,6 @@ int bd_unbind(int8_t vol_id)
     return EOK;
 }
 
-/*
- * Complete pending filesystem synchronization and enforce physical
- * persistence, then refresh free-block hints for idle volumes (those with
- * no open writable files).
- */
 int bd_sync(void)
 {
     int rc = disk_sync();
@@ -934,7 +896,7 @@ int bd_sync(void)
         if (rc != EOK)
             return rc;
 
-        int block_num = find_free_block(vol, 1);
+        int block_num = find_free_block(vol, BD_FIRST_USABLE_BLOCK);
         vol->alloc_next = (block_num >= 0) ? (uint16_t)block_num : vol->total_blocks;
     }
 
@@ -943,20 +905,20 @@ int bd_sync(void)
 
 int bd_vstat(int8_t vol_id, VolStat *stat)
 {
-    CHECK_VOL(v, vol_id);
+    CHECK_VOLUME(v, vol_id);
 
     uint16_t usable = v->total_blocks > 0 ? (uint16_t)(v->total_blocks - 1) : 0;
 
     stat->total_blocks = usable;
     stat->free_blocks = count_free(v);
-    stat->read_only = v->read_only;
+    stat->read_only = (uint8_t)volume_readonly(v->id);
 
     return EOK;
 }
 
 int bd_vsetattr(int8_t vol_id, uint8_t attr)
 {
-    CHECK_VOL(v, vol_id);
+    CHECK_VOLUME(v, vol_id);
 
     if (attr & (uint8_t)~VOL_ATTR_RO)
         return EINVAL;
@@ -966,20 +928,14 @@ int bd_vsetattr(int8_t vol_id, uint8_t attr)
     if (rc != EOK)
         return rc;
 
-    v->read_only = attr & VOL_ATTR_RO;
-
     return EOK;
 }
 
-/*
- * Open an existing file.  Returns a non-negative fd on success,
- * or EFILERO/EPERM/ENOVOL/ENFILE on error.
- */
 int bd_open(const char *name83, FsContext ctx, uint8_t writable)
 {
-    CHECK_VOL(v, ctx.vol_id);
+    CHECK_VOLUME(v, ctx.vol_id);
 
-    if (writable && v->read_only)
+    if (writable && volume_readonly(v->id))
         return EVOLRO;
 
     int fd = fcb_alloc();
@@ -1028,10 +984,6 @@ int bd_open(const char *name83, FsContext ctx, uint8_t writable)
     return fd;
 }
 
-/*
- * Read up to len bytes at the current position.  May return fewer
- * bytes than requested at EOF or on extent boundary.
- */
 int bd_read(int fd, uint8_t *buf, uint16_t len)
 {
     CHECK_FCB(f, v, fd);
@@ -1055,7 +1007,7 @@ int bd_read(int fd, uint8_t *buf, uint16_t len)
         uint32_t sl = DISK_SECTOR_SIZE - off;
         uint32_t remain = len - br;
 
-        if (vol_read(v, sec, g_bd.sec_buf) != EOK)
+        if (volume_read(v->id, sec, g_bd.sec_buf) != EOK)
             return br ? (int)br : EIO;
 
         uint32_t tc = (remain > sl) ? sl : remain;
@@ -1069,10 +1021,6 @@ int bd_read(int fd, uint8_t *buf, uint16_t len)
     return (int)br;
 }
 
-/*
- * Write up to len bytes.  Returns bytes written (may be short at
- * ENOSPC), or a negative error code.
- */
 int bd_write(int fd, const uint8_t *buf, uint16_t len)
 {
     CHECK_FCB(f, v, fd);
@@ -1161,14 +1109,16 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
 
         if (!new_block && (off > 0 || tc < sl))
         {
-            if (vol_read(v, sec, g_bd.sec_buf) != EOK)
+            if (volume_read(v->id, sec, g_bd.sec_buf) != EOK)
                 return bw ? (int)bw : EIO;
         }
 
         memcpy(&g_bd.sec_buf[off], buf + bw, tc);
 
-        if (vol_write(v, sec, g_bd.sec_buf) != EOK)
-            return bw ? (int)bw : EIO;
+        int wrc = volume_write(v->id, sec, g_bd.sec_buf);
+
+        if (wrc != EOK)
+            return bw ? (int)bw : wrc;
 
         bw += (uint16_t)tc;
         f->position += tc;
@@ -1189,11 +1139,8 @@ int bd_write(int fd, const uint8_t *buf, uint16_t len)
     return (int)bw;
 }
 
-/*
- * Close a file descriptor, finalizing pending filesystem state.  Directory
- * entries are written through vol_write to the disk-layer cache; durability
- * is enforced centrally by bd_sync(), not at close time.
- */
+/* Close a file descriptor, finalizing pending filesystem state. Durability
+ * is enforced centrally by bd_sync(), not at close time. */
 int bd_close(int fd)
 {
     FCB *f = fcb_get(fd);
@@ -1229,14 +1176,9 @@ int bd_seek(int fd, uint32_t offset)
     return EOK;
 }
 
-/*
- * Search the directory for files matching a wildcard pattern.
- * Returns a 1-based directory index on match, or ENOENT.
- * Pass start_pos to resume a previous scan.
- */
 int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos)
 {
-    CHECK_VOL(v, ctx.vol_id);
+    CHECK_VOLUME(v, ctx.vol_id);
 
     /* Callers must supply the padded 8.3 form (see make_name83):
      * base at pat[0..7], extension at pat[8..10].  Fields are compared
@@ -1254,7 +1196,7 @@ int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos)
 
     for (uint16_t s = start_s; s < BD_ROOT_SECS; s++)
     {
-        if (vol_read(v, v->root_start_sec + s, g_bd.sec_buf) != EOK)
+        if (volume_read(v->id, v->root_start_sec + s, g_bd.sec_buf) != EOK)
             return EIO;
 
         uint16_t first_e = (s == start_s) ? (start_pos % BD_ENTRIES_PER_SEC) : 0;
@@ -1317,15 +1259,11 @@ int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos)
     return ENOENT;
 }
 
-/*
- * Create a new empty file.  Returns EEXIST if the name already
- * exists, EDIRFULL if the root directory is full.
- */
 int bd_create(const char *n83, FsContext ctx)
 {
-    CHECK_VOL(v, ctx.vol_id);
+    CHECK_VOLUME(v, ctx.vol_id);
 
-    if (v->read_only)
+    if (volume_readonly(v->id))
         return EVOLRO;
 
     int fd = fcb_alloc();
@@ -1338,7 +1276,7 @@ int bd_create(const char *n83, FsContext ctx)
 
     for (uint16_t s = 0; s < BD_ROOT_SECS; s++)
     {
-        if (vol_read(v, v->root_start_sec + s, g_bd.sec_buf) != EOK)
+        if (volume_read(v->id, v->root_start_sec + s, g_bd.sec_buf) != EOK)
         {
             f->in_use = 0;
             return EIO;
@@ -1390,10 +1328,12 @@ create_done:
     entry[BD_DIR_ATTR] = 0;
     entry[BD_DIR_USER] = ctx.user_area;
 
-    if (vol_write(v, v->root_start_sec + (uint16_t)fidx / BD_ENTRIES_PER_SEC, g_bd.sec_buf) != EOK)
+    int wrc = volume_write(v->id, v->root_start_sec + (uint16_t)fidx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
+
+    if (wrc != EOK)
     {
         f->in_use = 0;
-        return EIO;
+        return wrc;
     }
 
     memcpy(f->name83, n83, NAME83_LEN);
@@ -1406,14 +1346,11 @@ create_done:
     return fd;
 }
 
-/*
- * Delete a file.  Returns EPERM if the file is read-only.
- */
-int bd_delete(const char *name83, FsContext ctx)
+int bd_erase(const char *name83, FsContext ctx)
 {
-    CHECK_VOL(v, ctx.vol_id);
+    CHECK_VOLUME(v, ctx.vol_id);
 
-    if (v->read_only)
+    if (volume_readonly(v->id))
         return EVOLRO;
 
     FileKey key = make_key(v, name83, ctx.user_area);
@@ -1447,8 +1384,10 @@ int bd_delete(const char *name83, FsContext ctx)
          */
         entry[0] = BD_ENTRY_DELETED;
 
-        if (vol_write(v, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf) != EOK)
-            return EIO;
+        int wrc = volume_write(v->id, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
+
+        if (wrc != EOK)
+            return wrc;
 
         for (int b = 0; b < BD_BLOCKS_PER_EXTENT; b++)
         {
@@ -1460,15 +1399,11 @@ int bd_delete(const char *name83, FsContext ctx)
     return EOK;
 }
 
-/*
- * Rename a file.  Returns EEXIST if new83 is already taken.
- * No data blocks are moved.
- */
 int bd_rename(const char *old83, const char *new83, FsContext ctx)
 {
-    CHECK_VOL(v, ctx.vol_id);
+    CHECK_VOLUME(v, ctx.vol_id);
 
-    if (v->read_only)
+    if (volume_readonly(v->id))
         return EVOLRO;
 
     int num_extents;
@@ -1488,7 +1423,7 @@ int bd_rename(const char *old83, const char *new83, FsContext ctx)
         int dirty = 0;
         int stop = 0;
 
-        if (vol_read(v, v->root_start_sec + s, g_bd.sec_buf) != EOK)
+        if (volume_read(v->id, v->root_start_sec + s, g_bd.sec_buf) != EOK)
             return EIO;
 
         for (uint16_t e = 0; e < BD_ENTRIES_PER_SEC; e++)
@@ -1520,8 +1455,13 @@ int bd_rename(const char *old83, const char *new83, FsContext ctx)
             fnd = 1;
         }
 
-        if (dirty && vol_write(v, v->root_start_sec + s, g_bd.sec_buf) != EOK)
-            return EIO;
+        if (dirty)
+        {
+            int wrc = volume_write(v->id, v->root_start_sec + s, g_bd.sec_buf);
+
+            if (wrc != EOK)
+                return wrc;
+        }
 
         if (stop)
             break;
@@ -1537,13 +1477,9 @@ uint32_t bd_size(int fd)
     return f ? f->size : 0;
 }
 
-/*
- * Set attributes on all extents of a file.  Returns ENOENT if the
- * file does not exist.
- */
 int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib)
 {
-    CHECK_VOL(v, ctx.vol_id);
+    CHECK_VOLUME(v, ctx.vol_id);
 
     /* The extent index is a uint8_t on disk, so at most 256 extents exist. */
     int rc = ENOENT;
@@ -1567,8 +1503,10 @@ int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib)
 
         entry[BD_DIR_ATTR] = attrib;
 
-        if (vol_write(v, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf) != EOK)
-            return EIO;
+        int wrc = volume_write(v->id, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
+
+        if (wrc != EOK)
+            return wrc;
 
         rc = EOK;
     }

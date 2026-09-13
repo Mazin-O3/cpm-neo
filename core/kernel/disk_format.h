@@ -32,10 +32,11 @@
 #define DISK_SECTOR_SIZE 512
 
 /* Sector-0 identity markers. */
-#define DISK_MAGIC 0x4350 /* 'CP' — Sector-0 identity     */
-#define BOOT_SIG 0xAA55   /* Standard boot sector sig     */
+#define BOOT_SEC 0        /* Sector 0 — boot sector             */
+#define DISK_MAGIC 0x4350 /* 'CP' — Sector-0 identity           */
+#define BOOT_SIG 0xAA55   /* Standard boot sector sig           */
 #define BOOT_MAGIC DISK_MAGIC
-#define KERN_START_SEC 2 /* Kernel image start sector    */
+#define KERN_START_SEC 2 /* Kernel image start sector          */
 
 #define S0_MAGIC 0x000        /* u16   — Must equal DISK_MAGIC  */
 #define S0_DISK_VER 0x002     /* u16   — Disk format version    */
@@ -109,5 +110,36 @@
 #define VHDR_TOT_BLKS_OFF 0x0A
 
 #define VHDR_VER 0x0001u /* Volume header format version */
+
+/* ── Block / volume geometry ──────────────────────────────────────────── */
+
+/* A data block is a fixed run of DISK_BLOCK_SECS sectors (1 KB).  The
+ * block grid, every volume region calculation, and the BDOS allocator
+ * all derive from these; they are the single source for 1-KB-block
+ * arithmetic across the disk, bd, and sysgen layers. */
+
+#define DISK_BLOCK_SECS 2                   /* 1 KB data block = 2 sectors */
+#define DISK_SECTORS_PER_KB (1024 / DISK_SECTOR_SIZE)
+#define DISK_BLOCK_BYTES (DISK_BLOCK_SECS * DISK_SECTOR_SIZE)
+
+/* Per-volume region layout: header sector 0, then the root directory
+ * (fixed 8 KB: 256 x 32-byte BDOS entries), then the data blocks.
+ * DISK_DATA_START is the first sector of a volume's data area. */
+#define DISK_HEADER_SECS 1
+#define DISK_ROOT_SECS 16
+#define DISK_DATA_START (DISK_HEADER_SECS + DISK_ROOT_SECS)
+
+/* Data block 0 of every volume is unusable (the BDOS allocator encodes
+ * an absent directory extent slot as block 0), so the formatting rules
+ * permanently reserve it. */
+#define DISK_RESERVED_BLOCKS 1
+
+/* Minimum volume size: header + root, plus the reserved block and at
+ * least one usable data block. */
+#define DISK_MIN_VOL_SECS (DISK_DATA_START + (DISK_RESERVED_BLOCKS + 1) * DISK_BLOCK_SECS)
+
+/* Per-volume block cap (CONFIG_DISK_SIZE KB = blocks, since one block
+ * is 1 KB).  The BDOS allocation bitmap is sized from this. */
+#define DISK_VOL_MAX_BLOCKS CONFIG_DISK_SIZE
 
 #endif /* DISK_FORMAT_H */

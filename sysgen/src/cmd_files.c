@@ -214,7 +214,7 @@ int cmd_era(int argc, char **argv)
         }
     }
 
-    int rc = bd_delete(n83, ctx);
+    int rc = bd_erase(n83, ctx);
 
     if (rc != EOK)
     {

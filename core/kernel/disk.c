@@ -1,16 +1,16 @@
 /*
  * kernel/disk.c — Block/run volume-map disk layer
  *
- * Manages on-disk volume records (VolRec[4]) and the block grid geometry.
- * No free bitmap is kept: free runs are computed on demand from the
- * (at most MAX_VOLUMES * VOL_MAX_RUN = 16) volume runs.
+ * Manages on-disk volume records (VolRec[MAX_VOLUMES]) and the block grid
+ * geometry.  No free bitmap is kept: free runs are computed on demand from
+ * the volume run lists.
  */
 
 #include "disk.h"
 #include "abi.h"
-#include "bdos.h"
 #include "bios.h"
 #include "disk_format.h"
+#include "errno.h"
 #include "string.h"
 
 #define DISK_DEFAULT_MOUNT_BLOCKS 64
@@ -46,26 +46,25 @@ typedef struct
 
 static DiskState g_disk;
 
-/* Total-image block cap. */
-static inline uint16_t disk_block_cap(void)
+/* True if vol_id is a valid volume id and the disk layer is initialized. */
+static inline int volume_valid(int8_t vol_id)
 {
-    return BD_VOL_MAX_BLOCKS;
+    return vol_id >= 0 && vol_id < MAX_VOLUMES && g_disk.initialized;
 }
 
-/* Minimum block count for a viable volume: header(1) + root(16) + reserved
- * block(2) + one usable 1K block(2) = 21 sectors, rounded up to whole 1K
- * blocks. */
+/* Minimum viable volume size, rounded up to whole 1K blocks. */
 static uint16_t min_viable_blocks(void)
 {
-    return (uint16_t)((BD_MIN_VOL_SECS + BD_BLOCK_SECS - 1) / BD_BLOCK_SECS);
+    return (uint16_t)((DISK_MIN_VOL_SECS + DISK_BLOCK_SECS - 1) / DISK_BLOCK_SECS);
 }
 
-static uint16_t vol_blocks(const VolRec *vr)
+static uint16_t volume_blocks(const VolRec *vr)
 {
     uint16_t blocks = 0;
 
     for (uint8_t i = 0; i < vr->run_count; i++)
         blocks += vr->run[i].count;
+
     return blocks;
 }
 
@@ -230,30 +229,30 @@ static int range_is_free(uint16_t start, uint16_t n)
  * into a physical disk sector. */
 int disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES || !g_disk.initialized)
-        return -1;
+    if (!volume_valid(vol_id))
+        return EINVAL;
 
     VolRec *vr = &g_disk.volumes[vol_id];
 
     if (vr->run_count == 0)
-        return -1;
+        return EINVAL;
 
     uint16_t sofar = 0;
 
     for (uint8_t i = 0; i < vr->run_count; i++)
     {
-        uint16_t seg = vr->run[i].count * BD_BLOCK_SECS;
+        uint16_t seg = vr->run[i].count * DISK_BLOCK_SECS;
 
         if (sec < sofar + seg)
         {
-            *phy_sec = g_disk.base_sec + vr->run[i].start * BD_BLOCK_SECS + (sec - sofar);
-            return 0;
+            *phy_sec = g_disk.base_sec + vr->run[i].start * DISK_BLOCK_SECS + (sec - sofar);
+            return EOK;
         }
 
         sofar += seg;
     }
 
-    return -1;
+    return ENOENT;
 }
 
 /* Persist the current VolRec[4] + geometry to the VMAP sector. This is the
@@ -278,30 +277,30 @@ int disk_init(void)
     g_disk.wb_valid = 0;
 
     if (bios_read(VMAP_SEC, buf) != 0)
-        return -1;
+        return EIO;
 
     g_disk.num_blocks = read16(buf + VMAP_NUM_BLOCKS);
     g_disk.base_sec = read16(buf + VMAP_BASE_SEC);
 
     if (read16(buf + VMAP_MAGIC_OFF) != VMAP_MAGIC)
-        return -1;
+        return EBADFS;
 
-    if (g_disk.num_blocks == 0 || g_disk.num_blocks > disk_block_cap())
-        return -1;
+    if (g_disk.num_blocks == 0 || g_disk.num_blocks > DISK_VOL_MAX_BLOCKS)
+        return EBADFS;
 
     if (g_disk.base_sec < VMAP_SEC + 1)
-        return -1;
+        return EBADFS;
 
     memcpy(g_disk.volumes, buf + VMAP_VOLREC, sizeof(g_disk.volumes));
 
     if (validate_layout() != 0)
-        return -1;
+        return EBADFS;
 
-    if (bios_read(0, buf) == 0)
+    if (bios_read(BOOT_SEC, buf) == 0)
         g_disk.xip = buf[S0_XIP];
 
     g_disk.initialized = 1;
-    return 0;
+    return EOK;
 }
 
 int disk_xip(void)
@@ -328,19 +327,21 @@ int volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf)
     uint16_t phy_sec;
 
     if (!buf)
-        return -1;
+        return EINVAL;
 
-    if (disk_translate(vol_id, sec, &phy_sec) != 0)
-        return -1;
+    int rc = disk_translate(vol_id, sec, &phy_sec);
+
+    if (rc != EOK)
+        return rc;
 
     /* Serve the cached sector so a read observes the caller's own write. */
     if (g_disk.wb_valid && g_disk.wb_sec == phy_sec)
     {
         memcpy(buf, g_disk.wb_buf, DISK_SECTOR_SIZE);
-        return 0;
+        return EOK;
     }
 
-    return bios_read(phy_sec, buf) ? -1 : 0;
+    return bios_read(phy_sec, buf) ? EIO : EOK;
 }
 
 int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf)
@@ -348,22 +349,24 @@ int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf)
     uint16_t phy_sec;
 
     if (!buf)
-        return -1;
+        return EINVAL;
 
-    if (disk_translate(vol_id, sec, &phy_sec) != 0)
-        return -1;
+    int rc = disk_translate(vol_id, sec, &phy_sec);
+
+    if (rc != EOK)
+        return rc;
+
+    if (g_disk.volumes[vol_id].attr & VOL_ATTR_RO)
+        return EVOLRO;
 
     if (g_disk.wb_valid && g_disk.wb_sec != phy_sec)
-    {
-        if (wb_flush() != EOK)
-            return -1;
-    }
+        return wb_flush();
 
     memcpy(g_disk.wb_buf, buf, DISK_SECTOR_SIZE);
     g_disk.wb_sec = phy_sec;
     g_disk.wb_valid = 1;
 
-    return 0;
+    return EOK;
 }
 
 /* Flush the write-back cache, then enforce durability at the platform. The
@@ -381,11 +384,8 @@ int disk_sync(void)
 
 int volume_mount(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
+    if (!volume_valid(vol_id))
         return EINVAL;
-
-    if (!g_disk.initialized)
-        return EIO;
 
     VolRec *vr = &g_disk.volumes[vol_id];
 
@@ -403,12 +403,6 @@ int volume_mount(int8_t vol_id)
             return ENOSPC;
     }
 
-    /* The run must leave room for the reserved block plus at least
-     * one usable data block, or the volume would be unusable. */
-
-    if ((n * BD_BLOCK_SECS - BD_DATA_START) / BD_BLOCK_SECS <= BD_RESERVED_BLOCKS)
-        return ENOSPC;
-
     vr->run_count = 1;
     vr->run[0].start = start;
     vr->run[0].count = n;
@@ -417,13 +411,10 @@ int volume_mount(int8_t vol_id)
     return vmap_persist();
 }
 
-static int vol_extend(int8_t vol_id, uint16_t n)
+static int volume_extend(int8_t vol_id, uint16_t n)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
+    if (!volume_valid(vol_id))
         return EINVAL;
-
-    if (!g_disk.initialized)
-        return EIO;
 
     VolRec *vr = &g_disk.volumes[vol_id];
 
@@ -435,11 +426,6 @@ static int vol_extend(int8_t vol_id, uint16_t n)
 
     if (vr->attr & VOL_ATTR_RO)
         return EVOLRO;
-
-    /* Cap enforcement (BD_VOL_MAX_BLOCKS) lives at the bd layer, in
-     * bd_resize(), before this function is ever called. This layer only
-     * needs to respect physical disk geometry, which the tail/
-     * find_free_run checks below already guarantee. */
 
     /* Prefer to extend the last run's tail when the blocks right after it
      * are free and contiguous. */
@@ -484,13 +470,10 @@ static int vol_extend(int8_t vol_id, uint16_t n)
     return EOK;
 }
 
-static int vol_shrink(int8_t vol_id, uint16_t n)
+static int volume_shrink(int8_t vol_id, uint16_t n)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
+    if (!volume_valid(vol_id))
         return EINVAL;
-
-    if (!g_disk.initialized)
-        return EIO;
 
     VolRec *vr = &g_disk.volumes[vol_id];
 
@@ -503,7 +486,7 @@ static int vol_shrink(int8_t vol_id, uint16_t n)
     if (vr->attr & VOL_ATTR_RO)
         return EVOLRO;
 
-    uint16_t cur = vol_blocks(vr);
+    uint16_t cur = volume_blocks(vr);
 
     if (n >= cur)
         return EINVAL;
@@ -549,21 +532,18 @@ static int vol_shrink(int8_t vol_id, uint16_t n)
 int volume_resize(int8_t vol_id, int16_t delta)
 {
     if (delta > 0)
-        return vol_extend(vol_id, (uint16_t)delta);
+        return volume_extend(vol_id, (uint16_t)delta);
 
     if (delta < 0)
-        return vol_shrink(vol_id, (uint16_t)(0 - delta));
+        return volume_shrink(vol_id, (uint16_t)(0 - delta));
 
     return EOK;
 }
 
 int volume_unmount(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
+    if (!volume_valid(vol_id))
         return EINVAL;
-
-    if (!g_disk.initialized)
-        return EIO;
 
     VolRec *vr = &g_disk.volumes[vol_id];
 
@@ -584,15 +564,15 @@ int volume_unmount(int8_t vol_id)
 
 uint32_t volume_sectors(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES || !g_disk.initialized)
+    if (!volume_valid(vol_id))
         return 0;
 
-    return (uint32_t)vol_blocks(&g_disk.volumes[vol_id]) * BD_BLOCK_SECS;
+    return (uint32_t)volume_blocks(&g_disk.volumes[vol_id]) * DISK_BLOCK_SECS;
 }
 
 uint8_t volume_run_count(int8_t vol_id)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
+    if (!volume_valid(vol_id))
         return 0;
 
     return g_disk.volumes[vol_id].run_count;
@@ -600,11 +580,8 @@ uint8_t volume_run_count(int8_t vol_id)
 
 int volume_getattr(int8_t vol_id, uint8_t *attr)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES || !attr)
+    if (!volume_valid(vol_id) || !attr)
         return EINVAL;
-
-    if (!g_disk.initialized)
-        return EIO;
 
     *attr = g_disk.volumes[vol_id].attr;
     return EOK;
@@ -612,11 +589,8 @@ int volume_getattr(int8_t vol_id, uint8_t *attr)
 
 int volume_setattr(int8_t vol_id, uint8_t attr)
 {
-    if (vol_id < 0 || vol_id >= MAX_VOLUMES)
+    if (!volume_valid(vol_id))
         return EINVAL;
-
-    if (!g_disk.initialized)
-        return EIO;
 
     if (attr & ~VOL_ATTR_RO)
         return EINVAL;
@@ -632,6 +606,14 @@ int volume_setattr(int8_t vol_id, uint8_t attr)
     }
 
     return EOK;
+}
+
+int volume_readonly(int8_t vol_id)
+{
+    if (!volume_valid(vol_id))
+        return 0;
+
+    return (g_disk.volumes[vol_id].attr & VOL_ATTR_RO) ? 1 : 0;
 }
 
 uint16_t disk_block_count(void)

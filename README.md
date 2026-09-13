@@ -30,7 +30,7 @@ It provides a CP/M-style command environment, filesystem, system calls, applicat
 | :--- | :--- | :--- | :--- | :--- |
 | **VEMU** | RISC-V | Emulated | Yes | ✅ Done |
 | **TinyMCU** | RISC-V | — | —  | ⏳ WIP |
-| **Blackpill F411** | ARM | FLASH | Yes | ⏳ WIP |
+| **Blackpill F411** | ARM | Internal Flash | Yes | ⏳ WIP |
 --- 
 
 ## Quick Start

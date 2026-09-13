@@ -35,8 +35,8 @@ int readline(int fd, char *buf, int sz);
  */
 int lseek(int fd, uint32_t offset, int whence);
 
-/* Delete a file; returns 0 or negative errno */
-int remove(const char *path);
+/* Erase a file; returns 0 or negative errno */
+int erase(const char *path);
 
 /* Rename a file; returns 0 or negative errno */
 int rename(const char *old, const char *newname);

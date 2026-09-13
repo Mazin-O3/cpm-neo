@@ -154,7 +154,7 @@ void try_run_batch(FsContext *ctx)
         {
             if (getchar() == CH_ESC)
             {
-                remove(batch_path);
+                erase(batch_path);
                 sys_setenv(ENV_BATCH_OFFSET, 0);
                 return;
             }
@@ -177,7 +177,7 @@ void try_run_batch(FsContext *ctx)
         if (n <= 0)
         {
             close(fd);
-            remove(batch_path);
+            erase(batch_path);
             sys_setenv(ENV_BATCH_OFFSET, 0);
             return;
         }

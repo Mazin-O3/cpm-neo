@@ -48,7 +48,7 @@ int file_save(PicoState *s, const char *path)
     char buf[ARG_LEN_MAX];
     strncpy(buf, path, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
-    remove(buf);
+    erase(buf);
     int fd = open(buf, "w");
 
     if (fd < 0)

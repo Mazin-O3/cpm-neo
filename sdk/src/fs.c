@@ -72,7 +72,7 @@ int open(const char *path, const char *mode)
         if (sys_findfile(path, &fi, 0) > 0 && (fi.attrib & FILE_ATTR_READ_ONLY))
             return EFILERO;
 
-        int rc = sys_delete(path);
+        int rc = sys_erase(path);
 
         if (rc != EOK && rc != ENOENT)
             return rc;
@@ -142,9 +142,9 @@ int lseek(int fd, uint32_t offset, int whence)
     return sys_seek(fd, offset);
 }
 
-int remove(const char *path)
+int erase(const char *path)
 {
-    return sys_delete(path);
+    return sys_erase(path);
 }
 
 int rename(const char *old, const char *newname)
