@@ -8,7 +8,7 @@
 
 <em> A CP/M-inspired operating system </em>
 
-[![Try it Online](https://img.shields.io/badge/Try_it_Online-green?style=flat-square)](https://mazin-o3.github.io/vemu/)
+[![Try it Online](https://img.shields.io/badge/Launch_Emulator-green?style=flat-square)](https://mazin-o3.github.io/vemu/)
 [![GitHub Repo stars](https://img.shields.io/github/stars/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo)
 [![GitHub forks](https://img.shields.io/github/forks/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo)
 [![GitHub contributors](https://img.shields.io/github/contributors/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo)
