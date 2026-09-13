@@ -27,13 +27,16 @@
  * MEMORY geometry — it reports "invalid origin for memory region XIP_REGION"
  * and silently sets the origin to 0 — but it reliably folds plain constant
  * expressions over --defsym symbols, the same idiom the kernel scripts use.
- * The XIP region has no configured size: LENGTH is a never-binding
- * placeholder (GNU ld requires a LENGTH token); the CCP footprint is placed
- * right after the kernel's XIP code and its fit is enforced by
- * sysgen/mkdisk. */
+ * The XIP region is bounded by the maximum possible disk image: its LENGTH
+ * (32 MB = 0x2000000) is the sysgen host ceiling CONFIG_DISK_SIZE = 32768 KB
+ * (see platform/vemu/config.sh) — a real image is always smaller, so this is
+ * a hard upper bound on the in-flash kernel/CCP contents, never a fake
+ * "whole address space" window.  No disk can exceed it; the CCP footprint is
+ * placed right after the kernel's XIP code and its fit in the current image
+ * is enforced by sysgen/mkdisk. */
 
 MEMORY {
-    XIP_REGION (rx) : ORIGIN = __kernel_xip_end, LENGTH = 0x80000000
+    XIP_REGION (rx) : ORIGIN = __kernel_xip_end, LENGTH = 0x2000000
     RAM        (rwx) : ORIGIN = __tpa_base, LENGTH = __tpa_len
 }
 

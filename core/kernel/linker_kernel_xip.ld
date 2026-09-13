@@ -21,14 +21,16 @@
  *   XIP_BASE          — XIP window base (set by the build; also a runtime symbol)
  *   __kernel_xip_base — kernel's XIP entry/placement address
  *
- * The XIP region has no configured size: LENGTH is a never-binding
- * placeholder (its only job is to satisfy GNU ld's MEMORY grammar).  The
- * kernel's real XIP footprint ends at __kernel_xip_end (below), and whether
- * that footprint fits the disk is enforced later by sysgen/mkdisk, not by a
- * link-time window.                                             */
+ * The XIP region is bounded by the maximum possible disk image: its LENGTH
+ * (32 MB = 0x2000000) is the sysgen host ceiling CONFIG_DISK_SIZE = 32768 KB
+ * (see platform/vemu/config.sh) — a real image is always smaller, so this is
+ * a hard upper bound on the in-flash kernel/CCP contents, never a fake
+ * "whole address space" window.  No disk can exceed it, and whether the
+ * current footprint fits the current image is enforced by
+ * sysgen/mkdisk, not by a link-time window.                          */
 
 MEMORY {
-    XIP_REGION (rx) : ORIGIN = __kernel_xip_base, LENGTH = 0x80000000
+    XIP_REGION (rx) : ORIGIN = __kernel_xip_base, LENGTH = 0x2000000
     KRAM      (rwx) : ORIGIN = __KERN_START, LENGTH = __ram_top - __KERN_START
 }
 
