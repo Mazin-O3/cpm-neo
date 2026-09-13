@@ -907,11 +907,11 @@ int bd_vstat(int8_t vol_id, VolStat *stat)
 {
     CHECK_VOLUME(v, vol_id);
 
-    uint16_t usable = v->total_blocks > 0 ? (uint16_t)(v->total_blocks - 1) : 0;
+    uint16_t usable = v->total_blocks > 0 ? v->total_blocks - 1 : 0;
 
     stat->total_blocks = usable;
     stat->free_blocks = count_free(v);
-    stat->read_only = (uint8_t)volume_readonly(v->id);
+    stat->read_only = volume_readonly(v->id);
 
     return EOK;
 }

@@ -96,7 +96,4 @@ uint32_t sys_time(void);
 /* Flush all writeback caches to disk.  Returns 0 or negative errno. */
 int sys_sync(void);
 
-/* Query console dimensions.  Writes width and height in characters. */
-int sys_consize(uint8_t *cw, uint8_t *ch);
-
 #endif /* SYSCALL_H */

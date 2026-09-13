@@ -44,7 +44,6 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 | `void bios_conout(int c)` | Write a character to the console |
 | `int bios_conin(void)` | Blocking console read |
 | `int bios_constat(void)` | Console status (0xFF = key ready) |
-| `void bios_consize(uint8_t *cw, uint8_t *ch)` | Console dimensions |
 | `int bios_read(uint16_t sec, uint8_t *buf)` | Read one 512-byte sector |
 | `int bios_write(uint16_t sec, const uint8_t *buf)` | Write one sector |
 | `uint32_t bios_time(void)` | platform-defined time service |
@@ -149,7 +148,7 @@ A platform is a self-contained `platform/<name>/` directory:
 ### The BIOS contract
 
 Each platform implements the functions declared in `core/kernel/bios.h`
-(console: `bios_conout`, `bios_conin`, `bios_constat`, `bios_consize`,
+(console: `bios_conout`, `bios_conin`, `bios_constat`,
 `bios_init`; storage: `bios_read`, `bios_write`, `bios_sync`; time:
 `bios_time`) directly in `bios.c`.
 

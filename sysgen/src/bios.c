@@ -6,6 +6,7 @@
 #include "bios.h"
 #include "sysgen.h"
 
+#include "errno.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -14,7 +15,7 @@ static uint32_t g_disk_size;
 
 int bios_init(void)
 {
-    return 0;
+    return EOK;
 }
 
 void bios_conout(int c)
@@ -37,10 +38,10 @@ int bios_read(uint16_t sec, uint8_t *buf)
     uint32_t off = (uint32_t)sec * DISK_SECTOR_SIZE;
 
     if (off + DISK_SECTOR_SIZE > g_disk_size)
-        return -1;
+        return EINVAL;
 
     memcpy(buf, g_disk + off, DISK_SECTOR_SIZE);
-    return 0;
+    return EOK;
 }
 
 int bios_write(uint16_t sec, const uint8_t *buf)
@@ -48,23 +49,17 @@ int bios_write(uint16_t sec, const uint8_t *buf)
     uint32_t off = (uint32_t)sec * DISK_SECTOR_SIZE;
 
     if (off + DISK_SECTOR_SIZE > g_disk_size)
-        return -1;
+        return EINVAL;
 
     memcpy(g_disk + off, buf, DISK_SECTOR_SIZE);
-    return 0;
+    return EOK;
 }
 
 int bios_sync(void)
 {
     /* The in-memory host disk image is already committed; the caller is
      * responsible for writing it out to a file. No barrier work needed. */
-    return 0;
-}
-
-void bios_consize(uint8_t *cw, uint8_t *ch)
-{
-    (void)cw;
-    (void)ch;
+    return EOK;
 }
 
 uint32_t bios_time(void)

@@ -360,7 +360,12 @@ int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf)
         return EVOLRO;
 
     if (g_disk.wb_valid && g_disk.wb_sec != phy_sec)
-        return wb_flush();
+    {
+        int rc = wb_flush();
+
+        if (rc != EOK)
+            return rc;
+    }
 
     memcpy(g_disk.wb_buf, buf, DISK_SECTOR_SIZE);
     g_disk.wb_sec = phy_sec;

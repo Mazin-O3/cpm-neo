@@ -46,11 +46,7 @@ static CmdErr dir_list(FsContext *ctx, int argc, char **argv, int show_sys)
 
     int count = 0, col = 0, rc;
 
-    uint8_t cw, ch;
-
-    sys_consize(&cw, &ch);
-
-    int ncols = cw / 20;
+    int ncols = CONSOLE_WIDTH / 20;
 
     if (ncols < 1)
         ncols = 1;

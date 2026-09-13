@@ -10,6 +10,7 @@
 #include "bios.h"
 #include "disk_format.h"
 #include "mmio.h"
+#include "errno.h"
 #include <stddef.h>
 
 /* DMA-based sector read/write */
@@ -29,7 +30,7 @@ static int dma_transfer(uint16_t dst, uint16_t src, uint32_t count, uint8_t flag
     MMIO_W16(DMA_DAR, dst);
     MMIO_W16(DMA_WCR, count);
     MMIO_W8(DMA_CSTR, cfg | DMA_CSTR_START);
-    return (MMIO_R8(DMA_CSTR) & DMA_CSTR_RUNNING) ? -1 : 0;
+    return (MMIO_R8(DMA_CSTR) & DMA_CSTR_RUNNING) ? EIO : EOK;
 }
 
 static uint16_t g_time_prev;
@@ -42,7 +43,7 @@ int bios_init(void)
     MMIO_W16(TIMER_CNTR, 0);
     g_time_prev = 0;
     g_time_acc = 0;
-    return 0;
+    return EOK;
 }
 
 uint32_t bios_time(void)
@@ -93,17 +94,11 @@ int bios_conin(void)
 int bios_read(uint16_t sec, uint8_t *buf)
 {
     if (buf == NULL)
-        return -1;
+        return EINVAL;
 
     MMIO_W16(DISK_SECTOR, sec | DISK_CFG_READ);
     return dma_transfer((uint16_t)(uintptr_t)buf, (uint16_t)DISK_BUFFER, DISK_SECTOR_SIZE,
                         DMA_DISK_RD);
-}
-
-void bios_consize(uint8_t *cw, uint8_t *ch)
-{
-    *cw = 80;
-    *ch = 24;
 }
 
 int bios_write(uint16_t sec, const uint8_t *buf)
@@ -115,7 +110,7 @@ int bios_write(uint16_t sec, const uint8_t *buf)
         return rc;
 
     MMIO_W16(DISK_SECTOR, sec | DISK_CFG_WRITE);
-    return 0;
+    return EOK;
 }
 
 int bios_sync(void)
@@ -123,5 +118,5 @@ int bios_sync(void)
     /* VEMU sector writes reach the emulated disk immediately and are
      * persisted by the host shell (dirty-flag -> IndexedDB). There is no
      * deferred platform cache, so no barrier work is required here. */
-    return 0;
+    return EOK;
 }

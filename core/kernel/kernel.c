@@ -21,6 +21,7 @@
 #include "string.h"
 #include "syscall.h"
 #include <limits.h>
+#include "syscall.h"
 
 __attribute__((weak)) void kjump(uintptr_t addr)
 {
@@ -267,7 +268,7 @@ int kexec(const char *name83, int argc, char **argv, FsContext ctx)
     while (remaining > 0)
     {
         uint16_t chunk = (remaining > USHRT_MAX) ? USHRT_MAX : (uint16_t)remaining;
-        int      n = bd_read(fd, dest, chunk);
+        int n = bd_read(fd, dest, chunk);
 
         if (n <= 0)
         {
@@ -692,10 +693,4 @@ int sys_sync(void)
 uint32_t sys_time(void)
 {
     return bios_time();
-}
-
-int sys_consize(uint8_t *cw, uint8_t *ch)
-{
-    bios_consize(cw, ch);
-    return 0;
 }

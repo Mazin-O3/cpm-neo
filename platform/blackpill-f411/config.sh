@@ -6,7 +6,7 @@
 #   RAM    128 KB SRAM @ 0x20000000
 #   FLASH  512 KB @ 0x08000000 (boot + XIP window + disk image share this)
 #   CPU    96 MHz (PLL: 25 MHz HSE, M=25 N=192 P=2) — bios.c
-#   Console USB CDC-ACM (OTG_FS, PA11/PA12, native USB-C port)
+#   Console USART1, polled, 115200 8N1 (PA9 TX / PA10 RX, AF7)
 #   Storage Read-only: the XIP disk image (VMAP/kernel/CCP/apps) is
 #          memcpy'd from flash; phase 1 has no write/erase support.
 #   Time   DWT cycle counter

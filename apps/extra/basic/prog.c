@@ -170,10 +170,6 @@ void prog_list(BasicState *s)
 {
     int rows = 0;
 
-    uint8_t cw, ch;
-
-    sys_consize(&cw, &ch);
-
     char *p = s->prog.data;
 
     while (p < s->prog.free)
@@ -195,7 +191,7 @@ void prog_list(BasicState *s)
 
         printf("\n");
 
-        if (anykey("...", &rows, ch))
+        if (anykey("...", &rows, CONSOLE_HEIGHT))
         {
             printf("\n");
             break;

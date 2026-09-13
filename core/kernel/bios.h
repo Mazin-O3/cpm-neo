@@ -21,9 +21,6 @@ int bios_conin(void);
 /* Return the console input status (e.g., 0xFF if char ready, 0 if empty). */
 int bios_constat(void);
 
-/* Get the console width and height in characters. */
-void bios_consize(uint8_t *cw, uint8_t *ch);
-
 /* Read one sector from the disk into buf. Returns 0 on success. */
 int bios_read(uint16_t sec, uint8_t *buf);
 

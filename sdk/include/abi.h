@@ -32,6 +32,10 @@
 #define CH_EOF 0x1A   /* ^Z — End-of-file marker in text files         */
 #define CH_ESC 0x1B   /* ESC — Abort listings / quit pager             */
 
+/* Console geometry */
+#define CONSOLE_WIDTH 80
+#define CONSOLE_HEIGHT 24
+
 /* Volume names */
 #define VOL_A 0
 #define VOL_B 1
@@ -94,7 +98,7 @@ typedef struct
 {
     uint16_t total_blocks; /* Usable 1 KB data blocks      */
     uint16_t free_blocks;  /* Free 1 KB data blocks        */
-    uint8_t  read_only;    /* VOL_ATTR_RO or VOL_ATTR_RW  */
+    int      read_only;    /* VOL_ATTR_RO or VOL_ATTR_RW  */
 } VolStat;
 
 typedef struct

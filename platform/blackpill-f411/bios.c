@@ -235,12 +235,6 @@ int bios_conin(void)
     return (int)c;
 }
 
-void bios_consize(uint8_t *cw, uint8_t *ch)
-{
-    *cw = 80;
-    *ch = 24;
-}
-
 int bios_read(uint16_t sec, uint8_t *buf)
 {
     if (buf == NULL)

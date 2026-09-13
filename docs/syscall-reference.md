@@ -48,7 +48,6 @@ on failure. File handles are non-negative values; standard handles such as
 | 23 | `vsetattr` | Get or set volume attributes | `volid`, `attr` | `0`, or negative errno |
 | 24 | `time` | Get platform-specific time | - | Platform-defined |
 | 25 | `sync` | Flush filesystem changes | - | `0`, or negative errno |
-| 26 | `consize` | Get console dimensions | `cw*`, `ch*` | `0` |
 
 ## Volume operations
 

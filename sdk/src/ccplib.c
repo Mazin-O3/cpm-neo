@@ -355,9 +355,7 @@ void make_batch_path(char *out, int8_t vol)
 
 Pager pager_start(void)
 {
-    Pager p;
-    sys_consize(&p.cols, &p.rows);
-    p.line_count = 0;
+    Pager p = {.cols = CONSOLE_WIDTH, .rows = CONSOLE_HEIGHT, .line_count = 0};
     return p;
 }
 

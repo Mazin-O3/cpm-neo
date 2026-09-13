@@ -25,7 +25,7 @@ int getline(char *buf, int maxlen); /* Echo + backspace      */
 /* Pause output after a full screen of lines: prints msg, waits for a key,
  * erases the prompt, returns 1 when the user pressed ESC.  `row` is a
  * caller-owned counter of lines printed since the last pause; `screen_rows`
- * is the console height (from sys_consize). */
+ * is the console height (CONSOLE_HEIGHT). */
 int anykey(const char *msg, int *row, int screen_rows);
 
 /* Error strings */
