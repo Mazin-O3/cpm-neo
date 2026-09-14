@@ -457,8 +457,8 @@ int cmd_new(int argc, char **argv)
         goto cleanup;
     }
 
-    AddFileOpts sys_opts = {VOL_A, 0, FILE_ATTR_SYSTEM | FILE_ATTR_READ_ONLY, "installed"};
-    AddFileOpts extra_opts = {VOL_A, 0, FILE_ATTR_READ_ONLY, "installed"};
+    AddFileOpts sys_opts = {VOL_A, 0, FILE_ATTR_SYSTEM | FILE_ATTR_READ_ONLY, "Installed"};
+    AddFileOpts extra_opts = {VOL_A, 0, FILE_ATTR_READ_ONLY, "Installed"};
 
     /* Per-platform app selection: build_disk.sh stamps CONFIG_SYS_APPS /
      * CONFIG_EXTRA_APPS into build/.sys_apps / build/.extra_apps.  For each

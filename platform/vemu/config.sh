@@ -81,4 +81,4 @@ CONFIG_STACK_SIZE=0x1000
 
 # Application installation
 CONFIG_SYS_APPS="*"
-CONFIG_EXTRA_APPS="basic ed pico"
+CONFIG_EXTRA_APPS="basic ed pico chip8"

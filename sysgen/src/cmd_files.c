@@ -129,7 +129,7 @@ int cmd_add(int argc, char **argv)
             &vol, &user, &attr, 0, disk_buf, sizeof(disk_buf)) != 0)
         return 1;
 
-    AddFileOpts afo = {vol, user, attr, "added"};
+    AddFileOpts afo = {vol, user, attr, "Added"};
 
     /* Folder mode: add every file from a flat folder, skipping duplicates. */
 
@@ -229,7 +229,7 @@ int cmd_era(int argc, char **argv)
 
     char dot[NAME83_LEN + 2];
     n83_dot(n83, dot, sizeof(dot));
-    printf("  erased %-13s -> %c:%u\n", dot, 'A' + vol, user);
+    printf("  Erased %-13s -> %c:%u\n", dot, 'A' + vol, user);
     return 0;
 }
 
@@ -268,7 +268,7 @@ int cmd_install(int argc, char **argv)
     if (build_folder_com(sysgen_paths(), src, &bfo) != 0)
         return 1;
 
-    AddFileOpts afo = {vol, user, attr, "installed"};
+    AddFileOpts afo = {vol, user, attr, "Installed"};
     return add_file(disk_buf, out_com, &afo);
 }
 

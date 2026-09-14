@@ -43,4 +43,4 @@ CONFIG_STACK_SIZE=0x1000
 
 # Application installation
 CONFIG_SYS_APPS="dump help stat sys"
-CONFIG_EXTRA_APPS="basic pico"
+CONFIG_EXTRA_APPS="basic pico chip8"
