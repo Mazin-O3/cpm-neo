@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "utility.h"
 #include "bdos.h"
 #include "disk.h"
 #include "sysgen.h"
@@ -503,7 +503,7 @@ int open_disk(const char *path)
 
     sysgen_set_disk(buf, len);
 
-    if (read16(sysgen_disk() + S0_MAGIC) != DISK_MAGIC)
+    if (get_le16(sysgen_disk() + S0_MAGIC) != DISK_MAGIC)
     {
         err("'%s' is not a CP/M Neo disk image (bad magic)", path);
         return -1;

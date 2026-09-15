@@ -12,7 +12,7 @@
 #include "bdos.h"
 #include "disk.h"
 #include "sysgen.h"
-#include "utils.h"
+#include "utility.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -165,15 +165,15 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
     printf("  CCP size         : %u B\n", ccp_size);
     printf("  TPA              : %lu KB\n", (unsigned long)((kern_load - tpa_base) / 1024));
     printf("  Reserved secs    : %u (kernel + CCP)\n", reserved);
-    printf("  Kernel sector    : %u\n", read16(sysgen_disk() + S0_KERN_SEC));
+    printf("  Kernel sector    : %u\n", get_le16(sysgen_disk() + S0_KERN_SEC));
 
     printf("  Block size       : 1 KB\n");
-    printf("  Blocks           : %u @ sector %u\n", read16(vmap + VMAP_NUM_BLOCKS),
-           read16(vmap + VMAP_BASE_SEC));
+    printf("  Blocks           : %u @ sector %u\n", get_le16(vmap + VMAP_NUM_BLOCKS),
+           get_le16(vmap + VMAP_BASE_SEC));
 
     printf("-------------------------------------------------------------\n");
 
-    uint16_t base_sec = read16(vmap + VMAP_BASE_SEC);
+    uint16_t base_sec = get_le16(vmap + VMAP_BASE_SEC);
     uint16_t disk_usable_kb = 0;
 
     for (int8_t v = 0; v < (int8_t)cfg->vol_count; v++)
@@ -181,11 +181,11 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
         const uint8_t *vr = vmap + VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
         const char    *mode = (vr[VMAP_VR_ATTR] & VOL_ATTR_RO) ? "RO" : "RW";
 
-        uint32_t start = read16(vr + VMAP_VR_RUN0_START);
+        uint32_t start = get_le16(vr + VMAP_VR_RUN0_START);
 
         /* Usable capacity mirrors bd_vstat: data blocks from the volume header,
          * minus the reserved sentinel block. */
-        uint16_t tot_blks = read16(
+        uint16_t tot_blks = get_le16(
             sysgen_disk() + ((uint32_t)(base_sec + start * BD_BLOCK_SECS)) * DISK_SECTOR_SIZE +
             VHDR_TOT_BLKS_OFF);
         uint32_t usable = tot_blks > 0 ? (uint32_t)(tot_blks - 1) : 0;

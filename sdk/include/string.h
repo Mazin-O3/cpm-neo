@@ -11,8 +11,8 @@
  * isalpha, isdigit, isalnum) live in <ctype.h>.
  */
 
-#ifndef STRING_H
-#define STRING_H
+#ifndef SDK_STRING_H
+#define SDK_STRING_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -38,4 +38,4 @@ void strupr(char *s);                                     /* Uppercase in place 
 int  strcasecmp(const char *a, const char *b);            /* Case-insensitive compare */
 int  strncasecmp(const char *a, const char *b, size_t n); /* First n chars           */
 
-#endif /* STRING_H */
+#endif /* SDK_STRING_H */

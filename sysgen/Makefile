@@ -18,7 +18,7 @@ OBJ_DIR   := $(BUILD_DIR)/obj
 BIN       := $(BUILD_DIR)/sysgen
 
 OBJS := $(OBJ_DIR)/bios.o $(OBJ_DIR)/mkdisk.o \
-        $(OBJ_DIR)/utils.o \
+        $(OBJ_DIR)/utility.o \
         $(OBJ_DIR)/cmd_common.o $(OBJ_DIR)/cmd_new.o \
         $(OBJ_DIR)/cmd_apps.o $(OBJ_DIR)/cmd_files.o \
         $(OBJ_DIR)/main.o $(OBJ_DIR)/bdos.o $(OBJ_DIR)/disk.o
@@ -33,7 +33,7 @@ all: $(BIN)
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(OBJ_DIR)/bios.o: src/bios.c include/sysgen.h ../core/kernel/bios.h ../sdk/include/abi.h
+$(OBJ_DIR)/bios.o: src/bios.c include/sysgen.h ../core/kernel/bios.h ../sdk/include/fsctx.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
@@ -41,37 +41,37 @@ $(OBJ_DIR)/mkdisk.o: src/mkdisk.c include/sysgen.h ../core/kernel/bdos.h ../core
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/utils.o: src/utils.c include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+$(OBJ_DIR)/utility.o: src/utility.c include/utility.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/cmd_common.o: src/cmd_common.c include/cmd.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+$(OBJ_DIR)/cmd_common.o: src/cmd_common.c include/cmd.h include/utility.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/cmd_new.o: src/cmd_new.c include/cmd.h include/commands.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+$(OBJ_DIR)/cmd_new.o: src/cmd_new.c include/cmd.h include/commands.h include/utility.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_CMD) -c $< -o $@
 
-$(OBJ_DIR)/cmd_apps.o: src/cmd_apps.c include/cmd.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+$(OBJ_DIR)/cmd_apps.o: src/cmd_apps.c include/cmd.h include/utility.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/cmd_files.o: src/cmd_files.c include/cmd.h include/commands.h include/utils.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
+$(OBJ_DIR)/cmd_files.o: src/cmd_files.c include/cmd.h include/commands.h include/utility.h include/sysgen.h ../core/kernel/bdos.h ../core/kernel/disk.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
-$(OBJ_DIR)/main.o: src/main.c include/commands.h include/utils.h
+$(OBJ_DIR)/main.o: src/main.c include/commands.h include/utility.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_LOCAL) -c $< -o $@
 
 $(OBJ_DIR)/bdos.o: ../core/kernel/bdos.c ../core/kernel/bdos.h ../core/kernel/disk.h \
-        ../sdk/include/abi.h ../core/kernel/bios.h include/config.h
+        ../sdk/include/fsctx.h ../sdk/include/byteorder.h ../core/kernel/bios.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_BDOS) -c $< -o $@
 
 $(OBJ_DIR)/disk.o: ../core/kernel/disk.c ../core/kernel/disk.h ../core/kernel/disk_format.h \
-        ../sdk/include/abi.h ../core/kernel/bios.h include/config.h
+        ../sdk/include/fsctx.h ../sdk/include/byteorder.h ../core/kernel/bios.h include/config.h
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) $(INC_BDOS) -c $< -o $@
 

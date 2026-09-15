@@ -1,7 +1,6 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include <abi.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>

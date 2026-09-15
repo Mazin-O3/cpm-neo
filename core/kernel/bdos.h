@@ -7,7 +7,7 @@
  *
  * Tunables come from config.h (the platform's effective values, via the
  * generated build/gen/config.h; the sysgen host resolves its own ceiling
- * include/config.h).  User-facing ABI types come from abi.h.
+ * include/config.h).  User-facing ABI types come from fsctx.h.
  */
 
 #ifndef BDOS_H
@@ -15,7 +15,8 @@
 
 #include <stdint.h>
 
-#include "abi.h"
+#include "fsctx.h"
+#include "byteorder.h"
 #include "config.h"
 #include "disk_format.h"
 #include "errno.h"

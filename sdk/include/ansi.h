@@ -1,7 +1,7 @@
 /* ANSI/VT100 escape-sequence mnemonics for the CP/M Neo console. */
 
-#ifndef ANSI_H
-#define ANSI_H
+#ifndef SDK_ANSI_H
+#define SDK_ANSI_H
 
 /* CSI = Control Sequence Introducer (ESC [) */
 
@@ -25,4 +25,4 @@
 #define CSI_REVERSE "\x1B[7m" /* Reverse video (SGR 7)           */
 #define CSI_RESET   "\x1B[0m" /* Reset attributes (SGR 0)        */
 
-#endif /* ANSI_H */
+#endif /* SDK_ANSI_H */

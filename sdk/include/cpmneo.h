@@ -1,12 +1,14 @@
-#ifndef CPMNEO_H
-#define CPMNEO_H
+#ifndef SDK_CPMNEO_H
+#define SDK_CPMNEO_H
 
-#include <abi.h>
+#include <fsctx.h>
+#include <sys.h>
 #include <ansi.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fs.h>
 #include <limits.h>
+#include <path.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,4 +17,4 @@
 #include <string.h>
 #include <syscall.h>
 
-#endif
+#endif /* SDK_CPMNEO_H */

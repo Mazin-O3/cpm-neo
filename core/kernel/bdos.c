@@ -217,8 +217,8 @@ static int bd_write_header(Volume *v)
     if (volume_read(v->id, 0, hdr) != EOK)
         return EIO;
 
-    write16(&hdr[VHDR_SIZE_KB_OFF], (uint16_t)(v->total_sectors / BD_SECTORS_PER_KB));
-    write16(&hdr[VHDR_TOT_BLKS_OFF], v->total_blocks);
+    put_le16(&hdr[VHDR_SIZE_KB_OFF], (uint16_t)(v->total_sectors / BD_SECTORS_PER_KB));
+    put_le16(&hdr[VHDR_TOT_BLKS_OFF], v->total_blocks);
 
     return volume_write(v->id, 0, hdr);
 }
@@ -322,13 +322,13 @@ static uint8_t *load_dir_entry(Volume *v, uint16_t idx)
 static void entry_block_list(const uint8_t *entry, uint16_t *out)
 {
     for (int b = 0; b < BD_BLOCKS_PER_EXTENT; b++)
-        out[b] = read16(&entry[BD_DIR_BLOCKS + b * 2]);
+        out[b] = get_le16(&entry[BD_DIR_BLOCKS + b * 2]);
 }
 
 static void set_entry_block_list(uint8_t *entry, const uint16_t *blocks)
 {
     for (int b = 0; b < BD_BLOCKS_PER_EXTENT; b++)
-        write16(&entry[BD_DIR_BLOCKS + b * 2], blocks[b]);
+        put_le16(&entry[BD_DIR_BLOCKS + b * 2], blocks[b]);
 }
 
 static int rescan_alloc_cb(Volume *v, const uint8_t *entry, uint16_t idx, void *arg)
@@ -461,7 +461,7 @@ static int find_extent_cb(Volume *v, const uint8_t *entry, uint16_t idx, void *a
 
     ctx->out->diridx = idx;
     entry_block_list(entry, ctx->out->blocks);
-    ctx->out->extent_bytes = read16(&entry[BD_DIR_EXTENT_BYTES]);
+    ctx->out->extent_bytes = get_le16(&entry[BD_DIR_EXTENT_BYTES]);
     ctx->out->attrib = entry[BD_DIR_ATTR];
 
     return DIR_SCAN_STOP;
@@ -487,7 +487,7 @@ static int update_extent(Volume *v, const DirInfo *de)
         return EIO;
 
     set_entry_block_list(entry, de->blocks);
-    write16(&entry[BD_DIR_EXTENT_BYTES], de->extent_bytes);
+    put_le16(&entry[BD_DIR_EXTENT_BYTES], de->extent_bytes);
     entry[BD_DIR_EXTENT_IDX] = de->extent_idx;
     entry[BD_DIR_ATTR] = de->attrib;
 
@@ -503,7 +503,7 @@ static void fill_dir_entry(uint8_t *entry, const FileKey *key, const DirInfo *de
     entry[BD_DIR_USER] = key->user;
     entry[BD_DIR_EXTENT_IDX] = de->extent_idx;
     memset(&entry[BD_DIR_BLOCKS], 0, BD_BLOCKS_PER_EXTENT * 2);
-    write16(&entry[BD_DIR_BLOCKS], first_block);
+    put_le16(&entry[BD_DIR_BLOCKS], first_block);
 }
 
 static int create_extent(FileKey key, const DirInfo *de, uint16_t first_block, uint16_t *out_diridx)
@@ -551,7 +551,7 @@ static int scan_extents_cb(Volume *vol, const uint8_t *entry, uint16_t diridx, v
     if (ctx->n >= BD_MAX_EXTENTS)
         return EBADFS;
 
-    uint16_t extent_bytes = read16(&entry[BD_DIR_EXTENT_BYTES]);
+    uint16_t extent_bytes = get_le16(&entry[BD_DIR_EXTENT_BYTES]);
 
     if (ctx->n == 0 && ctx->first_diridx)
         *ctx->first_diridx = diridx;
@@ -620,6 +620,9 @@ int bd_bind(int8_t vol_id)
     if (!v)
         return ENOVOL;
 
+    if (volume_run_count(vol_id) == 0)
+        return ENOVOL;
+
     for (int i = 0; i < BD_MAX_FCBS; i++)
     {
         if (g_bd.fcb[i].ctx.vol_id == vol_id)
@@ -633,13 +636,13 @@ int bd_bind(int8_t vol_id)
     if (volume_read(v->id, 0, hdr) != EOK)
         return EIO;
 
-    if (read16(&hdr[VHDR_MAGIC_OFF]) != DISK_MAGIC)
+    if (get_le16(&hdr[VHDR_MAGIC_OFF]) != DISK_MAGIC)
         return EBADFS;
 
-    v->root_start_sec = read16(&hdr[VHDR_ROOT_SEC_OFF]);
-    v->data_start_sec = read16(&hdr[VHDR_DATA_SEC_OFF]);
-    v->total_sectors = read16(&hdr[VHDR_SIZE_KB_OFF]) * BD_SECTORS_PER_KB;
-    v->total_blocks = read16(&hdr[VHDR_TOT_BLKS_OFF]);
+    v->root_start_sec = get_le16(&hdr[VHDR_ROOT_SEC_OFF]);
+    v->data_start_sec = get_le16(&hdr[VHDR_DATA_SEC_OFF]);
+    v->total_sectors = get_le16(&hdr[VHDR_SIZE_KB_OFF]) * BD_SECTORS_PER_KB;
+    v->total_blocks = get_le16(&hdr[VHDR_TOT_BLKS_OFF]);
 
     if (!v->total_blocks || v->total_blocks > BD_VOL_MAX_BLOCKS)
         return EBADFS;
@@ -692,12 +695,12 @@ int bd_mount(int8_t vol_id)
     }
 
     memset(g_bd.sec_buf, 0, DISK_SECTOR_SIZE);
-    write16(g_bd.sec_buf + VHDR_MAGIC_OFF, DISK_MAGIC);
-    write16(g_bd.sec_buf + VHDR_VER_OFF, VHDR_VER);
-    write16(g_bd.sec_buf + VHDR_SIZE_KB_OFF, (uint16_t)(n_secs / BD_SECTORS_PER_KB));
-    write16(g_bd.sec_buf + VHDR_ROOT_SEC_OFF, BD_HEADER_SECS);
-    write16(g_bd.sec_buf + VHDR_DATA_SEC_OFF, data_start);
-    write16(g_bd.sec_buf + VHDR_TOT_BLKS_OFF, num_data);
+    put_le16(g_bd.sec_buf + VHDR_MAGIC_OFF, DISK_MAGIC);
+    put_le16(g_bd.sec_buf + VHDR_VER_OFF, VHDR_VER);
+    put_le16(g_bd.sec_buf + VHDR_SIZE_KB_OFF, (uint16_t)(n_secs / BD_SECTORS_PER_KB));
+    put_le16(g_bd.sec_buf + VHDR_ROOT_SEC_OFF, BD_HEADER_SECS);
+    put_le16(g_bd.sec_buf + VHDR_DATA_SEC_OFF, data_start);
+    put_le16(g_bd.sec_buf + VHDR_TOT_BLKS_OFF, num_data);
 
     if (volume_write(vol_id, 0, g_bd.sec_buf) != EOK)
     {

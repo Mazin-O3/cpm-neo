@@ -1,8 +1,7 @@
 #include "stdlib.h"
 #include "syscall.h"
 
-#include <limits.h>
-#include <stddef.h>
+#include <ctype.h>
 
 void exit(int status)
 {
@@ -21,77 +20,58 @@ int getargs(ArgBlock *out)
 
 int atoi(const char *s)
 {
-    return strtoi(s, NULL, 10);
-}
+    int sign = 1, val = 0;
 
-int strtoi(const char *nptr, char **endptr, int base)
-{
-    const char *p = nptr;
-    int         sign = 1, val = 0;
+    while (isspace((unsigned char)*s))
+        s++;
 
-    while (*p == ' ' || *p == '\t')
-        p++;
-
-    if (*p == '+')
-        p++;
-    else if (*p == '-')
+    if (*s == '+')
+        s++;
+    else if (*s == '-')
     {
         sign = -1;
-        p++;
+        s++;
     }
 
-    if (base == 0)
+    while (isdigit((unsigned char)*s))
+        val = val * 10 + (*s++ - '0');
+
+    return sign * val;
+}
+
+char *itoa(int value, char *str, int base)
+{
+    static const char digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    char *p = str;
+    int   neg = (value < 0) && (base == 10);
+    unsigned int v = neg ? ((unsigned int)(-(value + 1)) + 1u) : (unsigned int)value;
+
+    if (base < 2 || base > 36)
     {
-        if (*p == '0')
-        {
-            p++;
+        *str = '\0';
 
-            if (*p == 'x' || *p == 'X')
-            {
-                base = 16;
-                p++;
-            }
-            else
-            {
-                base = 8;
-            }
-        }
-        else
-            base = 10;
+        return str;
     }
 
-    int ovf = 0;
-
-    while (1)
+    do
     {
-        int d;
+        *p++ = digits[v % (unsigned int)base];
+        v /= (unsigned int)base;
+    } while (v);
 
-        if (*p >= '0' && *p <= '9')
-            d = *p - '0';
-        else if (*p >= 'a' && *p <= 'f')
-            d = *p - 'a' + 10;
-        else if (*p >= 'A' && *p <= 'F')
-            d = *p - 'A' + 10;
-        else
-            break;
+    if (neg)
+        *p++ = '-';
 
-        if (d >= base)
-            break;
+    *p = '\0';
 
-        if (!ovf && val > (INT_MAX - d) / base)
-            ovf = 1;
-        else if (!ovf)
-            val = val * base + d;
-        p++;
+    for (char *a = str, *b = p - 1; a < b; a++, b--)
+    {
+        char t = *a;
+        *a = *b;
+        *b = t;
     }
 
-    if (endptr)
-        *endptr = (char *)p;
-
-    if (ovf)
-        return sign > 0 ? INT_MAX : INT_MIN;
-
-    return val * sign;
+    return str;
 }
 
 static uint32_t rnd_seed = 1;

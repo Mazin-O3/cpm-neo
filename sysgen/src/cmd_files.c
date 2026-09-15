@@ -11,7 +11,7 @@
 #include "bdos.h"
 #include "disk.h"
 #include "sysgen.h"
-#include "utils.h"
+#include "utility.h"
 
 #include <stdbool.h>
 #include <stdio.h>

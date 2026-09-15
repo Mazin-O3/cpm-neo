@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "bdos.h"
-#include "utils.h"
+#include "utility.h"
 
 /* Disk image path + filesystem context for host-side operations. */
 typedef struct

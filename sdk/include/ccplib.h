@@ -1,7 +1,8 @@
-#ifndef CCPLIB_H
-#define CCPLIB_H
+#ifndef SDK_CCPLIB_H
+#define SDK_CCPLIB_H
 
 #include <cpmneo.h>
+#include <path.h>
 
 /* Command error / return-code convention shared by the CCP and transient
  * commands.  A command returns cmderr_ok() (err_code == 0) on success;
@@ -56,44 +57,8 @@ typedef struct
 
 const CmdEntry *cmd_lookup(const CmdEntry *table, const char *name);
 
-/* A parsed file reference: the filesystem context (volume + user area) plus
- * the raw 8.3 name (possibly containing wildcards). */
-typedef struct
-{
-    FsContext fs_ctx;
-    char      name[FILENAME_MAX];
-} FileRef;
-
-/* Argument / filespec helpers shared by every command. */
-int8_t vol_from_arg(const char *arg, int8_t def);
-int    parse_fileref(FsContext *ctx, const char *arg, FileRef *out);
-char  *make_path(char *buf, FsContext ctx, const char *name);
-int    check_fmt(int argc, char **argv, const char *fmt);
-
-/* Full path buffer size: "V15:" prefix + 8.3 name + NUL. */
-#define FSPATH_MAX (ARG_LEN_MAX + 4)
-
-/* True if the 8.3 name contains '*' or '?'. */
-int has_wildcard(const char *name);
-
-/* Copy up to n chars of src into out, always NUL-terminated. */
-void name_copy(char *out, const char *src, size_t n);
-
-/* Length of a leading volume/user prefix ("V:", "VU:", "U:"), or 0. */
-int vu_prefix_len(const char *arg);
-
-/* An 8.3 name split into base/extension views. The pointers alias |name|
- * and the fields are NOT NUL-terminated; lengths are capped at
- * NAME83_BASE/NAME83_EXT so printf "%.*s" is always in range. */
-typedef struct
-{
-    const char *base;
-    int         base_len;
-    const char *ext; /* "" when the name has no extension */
-    int         ext_len;
-} SplitName;
-
-SplitName split_name83(const char *name);
+/* Validate argument shape against a format string (see check_fmt). */
+int check_fmt(int argc, char **argv, const char *fmt);
 
 /* Copy min(len,w) chars of src into out, space-pad to exactly w chars and
  * NUL-terminate (out must hold w+1 bytes).  Passing len == w just
@@ -104,12 +69,6 @@ void pad_field(char *out, const char *src, int len, int w);
 /* Strict decimal integer parse: the entire string must be consumed.
  * Returns 1 on success (with *out set), 0 on malformed input. */
 int parse_int(const char *s, int *out);
-
-/* Batch-file convention: "$$$.SUB" addressed as "<vol>0:" so it lives in
- * user 0 where the resident CCP finds it after USER switches. */
-#define BATCH_NAME     "$$$.SUB"
-#define BATCH_PATH_LEN 12 /* "A0:" + "$$$.SUB" + NUL */
-void make_batch_path(char *out, int8_t vol);
 
 /* Console pagination ("more" prompting) shared by TYPE/DUMP-style output:
  * pager_start() queries the console size, pager_line() counts a printed
@@ -129,4 +88,4 @@ int   pager_line(Pager *p);
  * command, print any error, and return the err_code for ENV_RETURN_CODE. */
 int ccp_run_app(cmd_fn_t fn, int argc, char **argv);
 
-#endif /* CCPLIB_H */
+#endif /* SDK_CCPLIB_H */

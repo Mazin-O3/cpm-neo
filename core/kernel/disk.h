@@ -30,7 +30,8 @@
 
 #include <stdint.h>
 
-#include "abi.h"
+#include "fsctx.h"
+#include "byteorder.h"
 #include "errno.h"
 
 int disk_init(void); /* Load and validate the VMAP from the platform */

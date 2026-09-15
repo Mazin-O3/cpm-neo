@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "abi.h"
+#include "fsctx.h"
 #include "disk_format.h"
 
 /* Image buffer owned by bios_host.c */

@@ -10,8 +10,8 @@
  * Prototypes must match the definitions in ctype.c exactly.
  */
 
-#ifndef CTYPE_H
-#define CTYPE_H
+#ifndef SDK_CTYPE_H
+#define SDK_CTYPE_H
 
 /* Convert an ASCII letter to uppercase.  Non-letters pass through unchanged. */
 int toupper(int c);
@@ -25,7 +25,10 @@ int isalpha(int c);
 /* Return nonzero if c is an ASCII digit (0-9). */
 int isdigit(int c);
 
+/* Return nonzero if c is ASCII whitespace (space, tab, CR, LF, VT, FF). */
+int isspace(int c);
+
 /* Return nonzero if c is an ASCII letter or digit (alphanumeric). */
 int isalnum(int c);
 
-#endif /* CTYPE_H */
+#endif /* SDK_CTYPE_H */

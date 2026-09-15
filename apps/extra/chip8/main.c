@@ -1,5 +1,4 @@
 #include "chip8.h"
-#include <ccplib.h>
 
 static Chip8State s;
 
@@ -74,9 +73,9 @@ int main(int argc, char **argv)
 
     if (argc == 3)
     {
-        int speed = 0;
+        int speed = atoi(argv[2]);
 
-        if (parse_int(argv[2], &speed) && speed >= CH8_MIN_STEP && speed <= CH8_MAX_STEP)
+        if (speed >= CH8_MIN_STEP && speed <= CH8_MAX_STEP)
             s.step = (uint8_t)speed;
     }
 

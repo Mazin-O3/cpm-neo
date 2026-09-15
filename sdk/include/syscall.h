@@ -9,10 +9,11 @@
  * header is the low-level escape hatch.
  */
 
-#ifndef SYSCALL_H
-#define SYSCALL_H
+#ifndef SDK_SYSCALL_H
+#define SDK_SYSCALL_H
 
-#include <abi.h>
+#include <fsctx.h>
+#include <sys.h>
 
 /* Open name83 for reading or writing.  Returns fd or negative errno. */
 int sys_open(const char *name, uint8_t writable);
@@ -96,4 +97,4 @@ uint32_t sys_millis(void);
 /* Flush all writeback caches to disk.  Returns 0 or negative errno. */
 int sys_sync(void);
 
-#endif /* SYSCALL_H */
+#endif /* SDK_SYSCALL_H */

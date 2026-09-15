@@ -25,7 +25,7 @@
 
 /* Sector size — The single source for sector-based I/O byte counts across
  * the bootloader (boot.S + platform bios.c), the kernel disk layer,
- * sysgen, and user programs (re-exported via abi.h).  This is an on-disk
+ * sysgen, and user programs (re-exported via fsctx.h).  This is an on-disk
  * format *invariant*, not a CONFIG_* tunable: the block layer (1 KB = 2
  * sectors), the volume geometry, MKDSK, and the emulator's sector DMA
  * all assume 512. */

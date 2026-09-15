@@ -7,6 +7,7 @@
 /* Limits */
 #define CCP_LINE_MAX 128
 #define CCP_ARGC_MAX 32
+#define CCP_MAX_CMDS 10
 
 int main(void);
 

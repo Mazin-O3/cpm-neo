@@ -14,8 +14,8 @@
  *   negative = error
  */
 
-#ifndef ERRNO_H
-#define ERRNO_H
+#ifndef SDK_ERRNO_H
+#define SDK_ERRNO_H
 
 #define EOK      0   /* Success                            */
 #define ENOENT   -1  /* No such file or directory          */
@@ -34,4 +34,4 @@
 #define EBADF    -14 /* Bad file descriptor / handle        */
 #define EBADFS   -15 /* Bad filesystem                      */
 
-#endif /* ERRNO_H */
+#endif /* SDK_ERRNO_H */

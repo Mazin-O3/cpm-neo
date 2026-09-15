@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef LIMITS_H
-#define LIMITS_H
+#ifndef SDK_LIMITS_H
+#define SDK_LIMITS_H
 
 #define INT_MAX  0x7FFFFFFF     /* Maximum value of an int          */
 #define INT_MIN  (-INT_MAX - 1) /* Minimum value of an int       */
@@ -26,4 +26,4 @@
 #define LONG_MIN  (-LONG_MAX - 1L)
 #define ULONG_MAX 0xFFFFFFFFul
 
-#endif /* LIMITS_H */
+#endif /* SDK_LIMITS_H */

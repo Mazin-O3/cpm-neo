@@ -27,12 +27,21 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 ### SDK surface
 
 - `cpmneo.h`: umbrella header (syscalls + kernel ABI types).
+- `fsctx.h`: the filesystem/process ABI: `FsContext`, `VolStat`,
+  `FileInfo`, `ArgBlock`, `FD_*` handles,
+  `DISK_SECTOR_SIZE` (sourced from `disk_format.h`).
+- `path.h`: filespec prefix grammar and 8.3 name parsing/building
+  (`split_prefix`, `parse_fileref`, `make_path`, `split_name83`, …),
+  implemented in `sdk/src/path.c` and compiled into the kernel, the
+  CCP, and libc.a.
+- `byteorder.h`: header-only little-endian accessors `get_le16`/`put_le16`,
+  shared by the kernel and the sysgen host tool.
+- `sys.h`: system-level ABI: `SysInfo`, env slot layout, console
+  keys/geometry.
 - `syscall.h`: plain `sys_open`/`sys_read`/… declarations — the kernel
   functions themselves, called directly (see
   [Syscall Reference](syscall-reference.md)).
-- `abi.h`: the user-facing ABI: `SysInfo`, `FsContext`, `VolStat`,
-  env slot layout, `FD_*` handles, `DISK_SECTOR_SIZE` (sourced from
-  `disk_format.h`). Tunable parameters come from `config.h`; on-disk layout
+  Tunable parameters come from `config.h`; on-disk layout
   constants in `core/kernel/disk_format.h`.
 - `core/kernel/bios.h`: BIOS interface (see below).
 

@@ -6,7 +6,7 @@
  * the volume run lists.
  */
 
-#include <abi.h>
+#include <fsctx.h>
 #include <errno.h>
 #include <string.h>
 
@@ -262,11 +262,11 @@ static int vmap_persist(void)
 {
     uint8_t buf[DISK_SECTOR_SIZE];
     memset(buf, 0, sizeof(buf));
-    write16(buf + VMAP_NUM_BLOCKS, g_disk.num_blocks);
-    write16(buf + VMAP_BASE_SEC, g_disk.base_sec);
-    write16(buf + VMAP_MAGIC_OFF, VMAP_MAGIC);
+    put_le16(buf + VMAP_NUM_BLOCKS, g_disk.num_blocks);
+    put_le16(buf + VMAP_BASE_SEC, g_disk.base_sec);
+    put_le16(buf + VMAP_MAGIC_OFF, VMAP_MAGIC);
     memcpy(buf + VMAP_VOLREC, g_disk.volumes, sizeof(g_disk.volumes));
-    write16(buf + VMAP_SIG, BOOT_SIG);
+    put_le16(buf + VMAP_SIG, BOOT_SIG);
 
     return bios_write(VMAP_SEC, buf) ? EIO : EOK;
 }
@@ -280,10 +280,10 @@ int disk_init(void)
     if (bios_read(VMAP_SEC, buf) != 0)
         return EIO;
 
-    g_disk.num_blocks = read16(buf + VMAP_NUM_BLOCKS);
-    g_disk.base_sec = read16(buf + VMAP_BASE_SEC);
+    g_disk.num_blocks = get_le16(buf + VMAP_NUM_BLOCKS);
+    g_disk.base_sec = get_le16(buf + VMAP_BASE_SEC);
 
-    if (read16(buf + VMAP_MAGIC_OFF) != VMAP_MAGIC)
+    if (get_le16(buf + VMAP_MAGIC_OFF) != VMAP_MAGIC)
         return EBADFS;
 
     if (g_disk.num_blocks == 0 || g_disk.num_blocks > DISK_VOL_MAX_BLOCKS)

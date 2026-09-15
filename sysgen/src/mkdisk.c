@@ -95,8 +95,8 @@ int elf32_symbol(const uint8_t *e, size_t n, const char *name, uint32_t *value)
         return -1;
 
     uint32_t shoff = read32(e + 32);
-    uint16_t shentsize = read16(e + 46);
-    uint16_t shnum = read16(e + 48);
+    uint16_t shentsize = get_le16(e + 46);
+    uint16_t shnum = get_le16(e + 48);
 
     if (shentsize != 40 || shnum == 0 || shoff == 0)
         return -1;
@@ -116,7 +116,7 @@ int elf32_symbol(const uint8_t *e, size_t n, const char *name, uint32_t *value)
             sym_off = read32(sh + 16);
             sym_size = read32(sh + 20);
             sym_entsize = read32(sh + 36);
-            uint16_t link = read16(sh + 24);
+            uint16_t link = get_le16(sh + 24);
 
             if (link < shnum)
             {
@@ -324,25 +324,25 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
     /* S0_DISK_SIZE_KB / S0_KERN_SIZE / S0_KERN_SECS are documented
      * on-disk metadata (docs/disk-format.md) reserved for host tools;
      * the bootloader and kernel read only the fields below. */
-    write16(disk + S0_MAGIC, DISK_MAGIC);
-    write16(disk + S0_DISK_SIZE_KB, (uint16_t)size_kb);
+    put_le16(disk + S0_MAGIC, DISK_MAGIC);
+    put_le16(disk + S0_DISK_SIZE_KB, (uint16_t)size_kb);
     write32(disk + S0_KERN_LOAD, kern_load);
     write32(disk + S0_KERN_SIZE, kern_size);
-    write16(disk + S0_KERN_SECTORS, num_kern_sects);
-    write16(disk + S0_KERN_SEC, KERN_START_SEC);
-    write16(disk + S0_OS_VER, os_ver);
-    write16(disk + S0_KERN_VER, kern_ver);
-    write16(disk + S0_CCP_VER, ccp_ver);
-    write16(disk + S0_KERN_SECS, reserved);
-    write16(disk + S0_CCP_SEC, KERN_START_SEC + num_kern_sects);
-    write16(disk + S0_CCP_SIZE, num_ccp_sects);
+    put_le16(disk + S0_KERN_SECTORS, num_kern_sects);
+    put_le16(disk + S0_KERN_SEC, KERN_START_SEC);
+    put_le16(disk + S0_OS_VER, os_ver);
+    put_le16(disk + S0_KERN_VER, kern_ver);
+    put_le16(disk + S0_CCP_VER, ccp_ver);
+    put_le16(disk + S0_KERN_SECS, reserved);
+    put_le16(disk + S0_CCP_SEC, KERN_START_SEC + num_kern_sects);
+    put_le16(disk + S0_CCP_SIZE, num_ccp_sects);
 
     if (platform)
         memcpy(disk + S0_PLATFORM, platform, 8);
 
     disk[S0_XIP] = (uint8_t)(xip ? 1 : 0);
 
-    write16(disk + S0_SIG, BOOT_SIG);
+    put_le16(disk + S0_SIG, BOOT_SIG);
 
     /* ── Kernel image (padded; BOOT_MAGIC trailer on non-XIP only) ── */
     uint32_t kern_sect_bytes = num_kern_sects * DISK_SECTOR_SIZE;
@@ -379,9 +379,9 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
         return -1; /* Disk too small to give every volume a viable block count */
 
     uint8_t *vmap = disk + VMAP_SEC * DISK_SECTOR_SIZE;
-    write16(vmap + VMAP_NUM_BLOCKS, (uint16_t)num_blocks);
-    write16(vmap + VMAP_BASE_SEC, base_sec);
-    write16(vmap + VMAP_MAGIC_OFF, VMAP_MAGIC);
+    put_le16(vmap + VMAP_NUM_BLOCKS, (uint16_t)num_blocks);
+    put_le16(vmap + VMAP_BASE_SEC, base_sec);
+    put_le16(vmap + VMAP_MAGIC_OFF, VMAP_MAGIC);
 
     for (uint32_t v = 0; v < cfg->vol_count; v++)
     {
@@ -395,8 +395,8 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
 
         uint32_t vr = VMAP_VOLREC + v * VMAP_VOLREC_SIZE;
 
-        write16(vmap + vr + VMAP_VR_RUN0_START, (uint16_t)start);
-        write16(vmap + vr + VMAP_VR_RUN0_COUNT, (uint16_t)count);
+        put_le16(vmap + vr + VMAP_VR_RUN0_START, (uint16_t)start);
+        put_le16(vmap + vr + VMAP_VR_RUN0_COUNT, (uint16_t)count);
         vmap[vr + VMAP_VR_RUN_COUNT] = 1;      /* Run count */
         vmap[vr + VMAP_VR_ATTR] = VOL_ATTR_RW; /* Attr */
 
@@ -411,17 +411,17 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
             num_data = cfg->disk_size_kb;
 
         uint8_t *hdr = disk + (base_sec + start * BD_BLOCK_SECS) * DISK_SECTOR_SIZE;
-        write16(hdr, DISK_MAGIC);
-        write16(hdr + VHDR_VER_OFF, VHDR_VER);
-        write16(hdr + VHDR_SIZE_KB_OFF, (uint16_t)(v_secs / 2));
-        write16(hdr + VHDR_ROOT_SEC_OFF, 1);
-        write16(hdr + VHDR_DATA_SEC_OFF, BD_DATA_START);
-        write16(hdr + VHDR_TOT_BLKS_OFF, num_data);
+        put_le16(hdr, DISK_MAGIC);
+        put_le16(hdr + VHDR_VER_OFF, VHDR_VER);
+        put_le16(hdr + VHDR_SIZE_KB_OFF, (uint16_t)(v_secs / 2));
+        put_le16(hdr + VHDR_ROOT_SEC_OFF, 1);
+        put_le16(hdr + VHDR_DATA_SEC_OFF, BD_DATA_START);
+        put_le16(hdr + VHDR_TOT_BLKS_OFF, num_data);
         hdr[0x1FE] = 0x55;
         hdr[0x1FF] = 0xAA;
     }
 
-    write16(vmap + VMAP_SIG, BOOT_SIG);
+    put_le16(vmap + VMAP_SIG, BOOT_SIG);
 
     return (int)reserved;
 }

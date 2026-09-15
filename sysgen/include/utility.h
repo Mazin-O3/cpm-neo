@@ -1,5 +1,5 @@
-#ifndef SYSGEN_UTILS_H
-#define SYSGEN_UTILS_H
+#ifndef SYSGEN_UTILITY_H
+#define SYSGEN_UTILITY_H
 
 #include <stddef.h>
 #include <stdint.h>

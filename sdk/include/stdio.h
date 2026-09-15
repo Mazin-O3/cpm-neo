@@ -1,7 +1,7 @@
 /* I/O via FD_STDIN/FD_STDOUT. */
 
-#ifndef STDIO_H
-#define STDIO_H
+#ifndef SDK_STDIO_H
+#define SDK_STDIO_H
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -31,4 +31,4 @@ int anykey(const char *msg, int *row, int screen_rows);
 /* Error strings */
 const char *strerror(int err);
 
-#endif /* STDIO_H */
+#endif /* SDK_STDIO_H */

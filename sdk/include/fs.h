@@ -1,7 +1,7 @@
-#ifndef FS_H
-#define FS_H
+#ifndef SDK_FS_H
+#define SDK_FS_H
 
-#include <abi.h>
+#include <fsctx.h>
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
@@ -112,4 +112,4 @@ void find_reset(void);
 /* Get volume stats (total/free bytes, label, access mode) */
 int vstat(int8_t vol, VolStat *out);
 
-#endif /* FS_H */
+#endif /* SDK_FS_H */

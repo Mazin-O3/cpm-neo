@@ -19,6 +19,8 @@
 #include <string.h>
 #include <syscall.h>
 
+#include <path.h>
+
 #include "bios.h"
 #include "disk.h"
 #include "kernel.h"
@@ -48,10 +50,12 @@ typedef struct
 static KernelState g_kstate = {0};
 
 /*
- * Volume/user prefixes are optional and position-dependent; scan up to
- * 4 chars for a colon delimiter.  This lets the CCP accept bare
- * filenames transparently — Only an explicit "X:" or "Xn:" triggers
- * a context switch.
+ * Volume/user prefixes are optional and position-dependent.  The grammar
+ * ("X:", "Xn:", "n:") is owned by split_prefix (sdk/include/path.h) and
+ * shared with
+ * the CCP's filespec parsing so both layers agree on one rule.  This lets
+ * the CCP accept bare filenames transparently — only an explicit "X:" or
+ * "Xn:" triggers a context switch.
  */
 static FsContext parse_prefix(const char **path_ptr)
 {
@@ -60,63 +64,12 @@ static FsContext parse_prefix(const char **path_ptr)
     if (!path_ptr || !*path_ptr)
         return ctx;
 
-    const char *p = *path_ptr;
+    const char *endptr = split_prefix(*path_ptr, &ctx);
 
-    if (isalpha((unsigned char)p[0]))
-    {
-        int colon = -1;
-
-        for (int i = 1; i <= 4 && p[i]; i++)
-
-            if (p[i] == ':')
-            {
-                colon = i;
-                break;
-            }
-
-        if (colon < 0)
-            return ctx;
-
-        int8_t vol_id = toupper((unsigned char)p[0]) - 'A';
-
-        if (vol_id >= MAX_VOLUMES)
-            return ctx;
-
-        ctx.vol_id = vol_id;
-
-        if (colon > 1)
-        {
-            int ua = 0;
-
-            for (int i = 1; i < colon; i++)
-            {
-                if (p[i] < '0' || p[i] > '9')
-                    return ctx;
-
-                ua = ua * 10 + (p[i] - '0');
-            }
-
-            if (ua > USER_AREA_MAX)
-                return ctx;
-
-            ctx.user_area = (uint8_t)ua;
-        }
-
-        *path_ptr = p + colon + 1;
+    if (endptr == *path_ptr)
         return ctx;
-    }
 
-    if (isdigit((unsigned char)p[0]))
-    {
-        char *ep;
-        int   ua = strtoi(p, &ep, 10);
-
-        if (ep > p && *ep == ':' && ua >= 0 && ua <= USER_AREA_MAX)
-        {
-            ctx.user_area = (uint8_t)ua;
-            *path_ptr = ep + 1;
-        }
-    }
+    *path_ptr = endptr;
 
     return ctx;
 }
@@ -605,9 +558,9 @@ int sys_info(SysInfo *out)
     if (bios_read(0, s0) != 0)
         return EIO;
 
-    out->os_version = read16(&s0[S0_OS_VER]);
-    out->kern_version = read16(&s0[S0_KERN_VER]);
-    out->ccp_version = read16(&s0[S0_CCP_VER]);
+    out->os_version = get_le16(&s0[S0_OS_VER]);
+    out->kern_version = get_le16(&s0[S0_KERN_VER]);
+    out->ccp_version = get_le16(&s0[S0_CCP_VER]);
 
     memcpy(out->platform, &s0[S0_PLATFORM], 8);
     out->platform[8] = '\0';
