@@ -94,11 +94,11 @@ int strtoi(const char *nptr, char **endptr, int base)
     return val * sign;
 }
 
-static unsigned long rnd_seed = 1;
+static uint32_t rnd_seed = 1;
 
-void srand(unsigned seed)
+void srand(uint32_t seed)
 {
-    rnd_seed = seed ? seed : (unsigned)sys_millis();
+    rnd_seed = seed ? seed : (uint32_t)sys_millis();
 }
 
 int rand(void)

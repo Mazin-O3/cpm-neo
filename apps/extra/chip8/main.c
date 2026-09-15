@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
     chip8_reset(&s);
 
-    srand(sys_millis());
+    srand(0);
 
     if (argc == 3)
     {

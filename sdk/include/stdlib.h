@@ -12,7 +12,7 @@ int atoi(const char *s);
 int strtoi(const char *nptr, char **endptr, int base);
 
 int  rand(void);
-void srand(unsigned seed);
+void srand(uint32_t seed);
 
 void delay(uint32_t ms);
 
