@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
     chip8_reset(&s);
 
-    srand(sys_time());
+    srand(sys_millis());
 
     if (argc == 3)
     {
@@ -115,5 +115,7 @@ int main(int argc, char **argv)
             if (key >= 0)
                 s.keys[key] = 1;
         }
+
+        delay(CH8_FRAME_MS);
     }
 }

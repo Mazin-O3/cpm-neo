@@ -201,7 +201,7 @@ int bios_init(void)
     return EOK;
 }
 
-uint32_t bios_time(void)
+uint32_t bios_millis(void)
 {
     return DWT_CYCCNT / MS_PER_SEC_DIV;
 }

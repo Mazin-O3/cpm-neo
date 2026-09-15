@@ -14,4 +14,6 @@ int strtoi(const char *nptr, char **endptr, int base);
 int  rand(void);
 void srand(unsigned seed);
 
+void delay(uint32_t ms);
+
 #endif

@@ -690,7 +690,7 @@ int sys_sync(void)
     return bd_sync();
 }
 
-uint32_t sys_time(void)
+uint32_t sys_millis(void)
 {
-    return bios_time();
+    return bios_millis();
 }

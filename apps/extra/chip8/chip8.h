@@ -14,7 +14,7 @@
 #define CH8_DEFAULT_STEP 10 /* instructions per 60 Hz frame tick = 600 Hz */
 #define CH8_MIN_STEP     1
 #define CH8_MAX_STEP     64
-#define CH8_FRAME_MS     16
+#define CH8_FRAME_MS     17
 
 typedef struct
 {

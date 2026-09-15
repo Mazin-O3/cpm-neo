@@ -98,11 +98,19 @@ static unsigned long rnd_seed = 1;
 
 void srand(unsigned seed)
 {
-    rnd_seed = seed ? seed : (unsigned)sys_time();
+    rnd_seed = seed ? seed : (unsigned)sys_millis();
 }
 
 int rand(void)
 {
     rnd_seed = rnd_seed * 1103515245UL + 12345;
     return (int)((rnd_seed >> 16) & 0x7FFF);
+}
+
+void delay(uint32_t ms)
+{
+    uint32_t start = sys_millis();
+
+    while (sys_millis() - start < ms)
+        ;
 }

@@ -90,8 +90,8 @@ uint32_t sys_getenv(uint8_t slot);
 /* Write an environment slot.  Returns 0 or negative errno. */
 int sys_setenv(uint8_t slot, uint32_t value);
 
-/* Return current time in seconds since boot. */
-uint32_t sys_time(void);
+/* Return monotonic milliseconds since boot. */
+uint32_t sys_millis(void);
 
 /* Flush all writeback caches to disk.  Returns 0 or negative errno. */
 int sys_sync(void);

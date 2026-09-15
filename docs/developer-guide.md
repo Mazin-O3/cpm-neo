@@ -46,7 +46,7 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 | `int bios_constat(void)` | Console status (0xFF = key ready) |
 | `int bios_read(uint16_t sec, uint8_t *buf)` | Read one 512-byte sector |
 | `int bios_write(uint16_t sec, const uint8_t *buf)` | Write one sector |
-| `uint32_t bios_time(void)` | platform-defined time service |
+| `uint32_t bios_millis(void)` | monotonic ms since power-on |
 
 ## Configuring the system
 
@@ -150,7 +150,7 @@ A platform is a self-contained `platform/<name>/` directory:
 Each platform implements the functions declared in `core/kernel/bios.h`
 (console: `bios_conout`, `bios_conin`, `bios_constat`,
 `bios_init`; storage: `bios_read`, `bios_write`, `bios_sync`; time:
-`bios_time`) directly in `bios.c`.
+`bios_millis`) directly in `bios.c`.
 
 Storage semantics follow a write-back contract:
 `bios_write` only *accepts* a sector (the platform may cache it); `bios_sync` is

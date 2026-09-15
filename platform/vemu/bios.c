@@ -47,7 +47,7 @@ int bios_init(void)
     return EOK;
 }
 
-uint32_t bios_time(void)
+uint32_t bios_millis(void)
 {
     uint16_t now = MMIO_R16(TIMER_CNTR);
 

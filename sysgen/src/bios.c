@@ -62,7 +62,7 @@ int bios_sync(void)
     return EOK;
 }
 
-uint32_t bios_time(void)
+uint32_t bios_millis(void)
 {
     return 0;
 }

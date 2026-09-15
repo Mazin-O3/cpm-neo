@@ -32,7 +32,7 @@ int bios_write(uint16_t sec, const uint8_t *buf);
  * A successful return is the durability guarantee. Returns 0 on success. */
 int bios_sync(void);
 
-/* Platform-specific time value.*/
-uint32_t bios_time(void);
+/* Monotonic milliseconds since power-on (wraps). */
+uint32_t bios_millis(void);
 
 #endif /* BIOS_H */

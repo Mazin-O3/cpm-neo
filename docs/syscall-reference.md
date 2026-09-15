@@ -46,7 +46,7 @@ on failure. File handles are non-negative values; standard handles such as
 | 21 | `getenv` | Read an environment slot | `slot` | Slot value, or `-1` if invalid |
 | 22 | `setenv` | Write an environment slot | `slot`, `value` | `0`, or `-1` if invalid or protected |
 | 23 | `vsetattr` | Get or set volume attributes | `volid`, `attr` | `0`, or negative errno |
-| 24 | `time` | Get platform-specific time | - | Platform-defined |
+| 24 | `millis` | Monotonic milliseconds since boot | - | Platform-defined |
 | 25 | `sync` | Flush filesystem changes | - | `0`, or negative errno |
 
 ## Volume operations
