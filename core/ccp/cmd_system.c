@@ -9,11 +9,12 @@
  * with an automatic fallback to A0: if not found on the current volume.
  */
 
-#include "ansi.h"
-#include "bdos.h"
-#include "ccp.h"
+#include <ansi.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "bdos.h"
+#include "ccp.h"
 #include <string.h>
 
 static const char *dir_fmt = "p*";

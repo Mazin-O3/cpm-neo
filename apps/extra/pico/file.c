@@ -157,7 +157,7 @@ void file_truncate_83(char *name)
 int file_prompt(PicoState *s, const char *prompt)
 {
     char newname[ARG_LEN_MAX];
-    int pos;
+    int  pos;
 
     printf(CSI_CUP, SCREEN_ROWS, 1);
     printf("\r" CSI_EL);

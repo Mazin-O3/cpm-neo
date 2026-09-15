@@ -2,10 +2,19 @@
 
 static int prev_status_row = -1, prev_status_col = -1;
 
-void scr_invalidate_status(void) { prev_status_row = -1; }
+void scr_invalidate_status(void)
+{
+    prev_status_row = -1;
+}
 
-int scr_row(PicoState *s) { return s->cur.row - s->cur.top; }
-int scr_col(PicoState *s) { return s->cur.col; }
+int scr_row(PicoState *s)
+{
+    return s->cur.row - s->cur.top;
+}
+int scr_col(PicoState *s)
+{
+    return s->cur.col;
+}
 
 static void clamp_scroll(PicoState *s)
 {
@@ -17,7 +26,10 @@ static void clamp_scroll(PicoState *s)
         s->cur.top = 0;
 }
 
-void scr_batch_start(PicoState *s) { s->ansi.pos = 0; }
+void scr_batch_start(PicoState *s)
+{
+    s->ansi.pos = 0;
+}
 
 void scr_batch_printf(PicoState *s, const char *fmt, ...)
 {
@@ -46,7 +58,7 @@ void scr_batch_status(PicoState *s)
 {
     if (s->cur.row == prev_status_row && s->cur.col == prev_status_col)
         return;
-        
+
     prev_status_row = s->cur.row;
     prev_status_col = s->cur.col;
     char sbuf[128];
@@ -60,9 +72,8 @@ void scr_batch_status(PicoState *s)
     n += pad;
 
     snprintf(sbuf + n, sizeof(sbuf) - (size_t)n,
-        CSI_REVERSE "^S" CSI_RESET "=Save   "
-        CSI_REVERSE "^O" CSI_RESET "=Open   "
-        CSI_REVERSE "^Q" CSI_RESET "=Quit");
+             CSI_REVERSE "^S" CSI_RESET "=Save   " CSI_REVERSE "^O" CSI_RESET "=Open   " CSI_REVERSE
+                         "^Q" CSI_RESET "=Quit");
 
     scr_batch_printf(s, CSI_CUP_ROW CSI_EL "%s", SCREEN_ROWS, sbuf);
 }
@@ -73,7 +84,11 @@ static int parse_volref(const char *name, uint8_t *vol, uint8_t *ua, const char 
         return 0;
     int cp = -1;
     for (int i = 1; i <= 4 && name[i]; i++)
-        if (name[i] == ':') { cp = i; break; }
+        if (name[i] == ':')
+        {
+            cp = i;
+            break;
+        }
     if (cp < 0)
         return 0;
     *vol = toupper((unsigned char)name[0]) - 'A';
@@ -83,7 +98,8 @@ static int parse_volref(const char *name, uint8_t *vol, uint8_t *ua, const char 
         int n = 0;
         for (int i = 1; i < cp; i++)
         {
-            if (name[i] < '0' || name[i] > '9') break;
+            if (name[i] < '0' || name[i] > '9')
+                break;
             n = n * 10 + (name[i] - '0');
         }
         if (n <= USER_AREA_MAX)
@@ -104,9 +120,9 @@ void scr_batch_draw_banner(PicoState *s)
     }
     else
     {
-        char loc_buf[8] = "";
+        char        loc_buf[8] = "";
         const char *display = s->file.name;
-        uint8_t vol, ua;
+        uint8_t     vol, ua;
         const char *base;
         if (parse_volref(s->file.name, &vol, &ua, &base))
         {
@@ -160,10 +176,10 @@ void scr_render(PicoState *s)
 {
     clamp_scroll(s);
 
-    int tl = gap_text_len(s);
+    int  tl = gap_text_len(s);
     char line_buf[MAX_VISIBLE_LINE + 1];
-    int cur_line = 0, start = 0, vis_row = 0;
-    int li;
+    int  cur_line = 0, start = 0, vis_row = 0;
+    int  li;
 
     scr_batch_start(s);
     scr_batch_printf(s, CSI_HIDE);
@@ -230,7 +246,7 @@ void scr_ensure_visible(PicoState *s)
     else
     {
         scr_batch_printf(s, CSI_CUP CSI_IND CSI_RST_SCR, SCREEN_ROWS - 2, 1);
-        int bottom_idx = s->cur.top + PICO_ROWS - 1;
+        int  bottom_idx = s->cur.top + PICO_ROWS - 1;
         char line_buf[MAX_VISIBLE_LINE + 1];
         gap_get_line(s, bottom_idx, line_buf, sizeof(line_buf));
         if (bottom_idx < s->cur.lines)

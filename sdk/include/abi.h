@@ -22,25 +22,25 @@
 #include <stdint.h>
 
 /* Filename constants */
-#define NAME83_BASE 8
-#define NAME83_EXT 3
-#define NAME83_LEN (NAME83_BASE + NAME83_EXT)
+#define NAME83_BASE  8
+#define NAME83_EXT   3
+#define NAME83_LEN   (NAME83_BASE + NAME83_EXT)
 #define FILENAME_MAX 13 /* 8.3 name + NUL terminator */
 
 /* Console control-key conventions shared by the kernel, SDK and apps. */
 #define CH_BREAK 0x03 /* ^C — Break a running program                  */
-#define CH_EOF 0x1A   /* ^Z — End-of-file marker in text files         */
-#define CH_ESC 0x1B   /* ESC — Abort listings / quit pager             */
+#define CH_EOF   0x1A /* ^Z — End-of-file marker in text files         */
+#define CH_ESC   0x1B /* ESC — Abort listings / quit pager             */
 
 /* Console geometry */
-#define CONSOLE_WIDTH 80
+#define CONSOLE_WIDTH  80
 #define CONSOLE_HEIGHT 24
 
 /* Volume names */
-#define VOL_A 0
-#define VOL_B 1
-#define VOL_C 2
-#define VOL_D 3
+#define VOL_A       0
+#define VOL_B       1
+#define VOL_C       2
+#define VOL_D       3
 #define MAX_VOLUMES CONFIG_VOL_MAX
 #define VOL_INVALID -1
 
@@ -53,9 +53,9 @@ typedef struct
 
 /* File-descriptor constants */
 
-#define FD_STDIN 0
-#define FD_STDOUT 1
-#define FD_STDERR 2
+#define FD_STDIN     0
+#define FD_STDOUT    1
+#define FD_STDERR    2
 #define FD_FILE_BASE 3
 
 static inline int fd_is_console(int fd)
@@ -69,7 +69,7 @@ static inline int fd_is_stdin(int fd)
 
 #define USER_AREA_MAX 15
 
-#define ARGS_MAX 8
+#define ARGS_MAX    8
 #define ARG_LEN_MAX 32
 
 typedef struct
@@ -89,7 +89,7 @@ typedef struct
 } FileInfo;
 
 #define FILE_ATTR_READ_ONLY 0x01
-#define FILE_ATTR_SYSTEM 0x02
+#define FILE_ATTR_SYSTEM    0x02
 
 #define VOL_ATTR_RW 0
 #define VOL_ATTR_RO 1
@@ -135,9 +135,9 @@ static inline void write16(uint8_t *p, uint16_t v)
 
 /* Environment slot indices */
 
-#define ENV_RETURN_CODE 0  /* Return code of last program/command */
+#define ENV_RETURN_CODE  0 /* Return code of last program/command */
 #define ENV_BATCH_OFFSET 1 /* Offset of batch file in CCP */
 #define ENV_USER_DEFINED 2 /* User-defined environment slot */
-#define ENV_SLOTS_MAX 3
+#define ENV_SLOTS_MAX    3
 
 #endif /* ABI_H */

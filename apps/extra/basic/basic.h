@@ -1,17 +1,17 @@
 #ifndef BASIC_H
 #define BASIC_H
 
-#include <cpm.h>
+#include <cpmneo.h>
 
-#define MAX_TEXT 4096
-#define FOR_MAX 8
-#define GS_MAX 32
-#define NVARS 26
-#define STR_SZ 64
+#define MAX_TEXT      4096
+#define FOR_MAX       8
+#define GS_MAX        32
+#define NVARS         26
+#define STR_SZ        64
 #define BASIC_LINE_SZ 96
-#define ARR_MAX 16
-#define DIM_MAX (ARR_MAX - 1) /* Largest subscript accepted by DIM */
-#define TOK_BASE 0x80
+#define ARR_MAX       16
+#define DIM_MAX       (ARR_MAX - 1) /* Largest subscript accepted by DIM */
+#define TOK_BASE      0x80
 
 enum
 {

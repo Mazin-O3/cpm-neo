@@ -1,21 +1,20 @@
 #ifndef CHIP8_H
 #define CHIP8_H
 
-#include <ansi.h>
-#include <stdint.h>
+#include <cpmneo.h>
 
-#define CH8_W 64
-#define CH8_H 32
-#define CH8_RAM 0x1000
-#define CH8_PROG 0x200
-#define CH8_FONT 0x000
-#define CH8_MAX (CH8_RAM - CH8_PROG)
-#define CH8_STACK 16
-#define CH8_NKEYS 16
+#define CH8_W            64
+#define CH8_H            32
+#define CH8_RAM          0x1000
+#define CH8_PROG         0x200
+#define CH8_FONT         0x000
+#define CH8_MAX          (CH8_RAM - CH8_PROG)
+#define CH8_STACK        16
+#define CH8_NKEYS        16
 #define CH8_DEFAULT_STEP 10 /* instructions per 60 Hz frame tick = 600 Hz */
-#define CH8_MIN_STEP 1
-#define CH8_MAX_STEP 64
-#define CH8_FRAME_MS 16
+#define CH8_MIN_STEP     1
+#define CH8_MAX_STEP     64
+#define CH8_FRAME_MS     16
 
 typedef struct
 {

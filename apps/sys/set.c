@@ -15,10 +15,6 @@
  */
 
 #include <ccplib.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 /* Volume subcommands: "v" rejects user digits (B5: is invalid). */
 static const char *set_vol_fmt = "v a";     /* SET B: RO, MT, UM */

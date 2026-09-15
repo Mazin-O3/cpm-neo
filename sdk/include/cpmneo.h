@@ -1,7 +1,8 @@
-#ifndef CPM_H
-#define CPM_H
+#ifndef CPMNEO_H
+#define CPMNEO_H
 
 #include <abi.h>
+#include <ansi.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fs.h>

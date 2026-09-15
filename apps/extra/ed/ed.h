@@ -1,11 +1,11 @@
 #ifndef ED_H
 #define ED_H
 
-#include <cpm.h>
+#include <cpmneo.h>
 
 #define EDIT_BUF_SIZE 4096
-#define ED_MAX_LINES 2048
-#define LINE_LEN 128
+#define ED_MAX_LINES  2048
+#define LINE_LEN      128
 
 _Static_assert(EDIT_BUF_SIZE <= UINT16_MAX, "line_off[] entries are uint16_t");
 

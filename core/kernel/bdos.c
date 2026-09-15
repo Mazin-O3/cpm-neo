@@ -17,11 +17,12 @@
  * last free block was found.
  */
 
+#include <ctype.h>
+#include <string.h>
+
 #include "bdos.h"
-#include "ctype.h"
 #include "disk.h"
 #include "disk_format.h"
-#include "string.h"
 
 /* Volume-checked guard: resolves vol_id and returns ENOVOL if unmounted. */
 #define CHECK_VOLUME(v, vol_id)                                                                    \
@@ -44,7 +45,7 @@ typedef struct
     uint16_t total_blocks; /* Capped at BD_VOL_MAX_BLOCKS */
     uint16_t alloc_next;   /* Hint for next free-block scan */
     int8_t   id;
-    uint8_t  mounted : 1;   /* Set by bd_bind/bd_mount, cleared by bd_unbind */
+    uint8_t  mounted : 1; /* Set by bd_bind/bd_mount, cleared by bd_unbind */
     uint8_t  block_alloc_map[BD_BLOCK_MAP_BYTES]; /* Rebuilt on mount */
 } Volume;
 
@@ -745,9 +746,8 @@ int bd_resize(int8_t vol_id, int16_t delta)
         /* Keep the u16 volume geometry in range (mirrors the check applied
          * at bind time): reject/clip a grow that would push the total
          * sector count past BD_DISK_MAX_SECS. */
-        uint16_t secs_left = (v->total_sectors >= BD_DISK_MAX_SECS)
-                                 ? 0
-                                 : BD_DISK_MAX_SECS - v->total_sectors;
+        uint16_t secs_left =
+            (v->total_sectors >= BD_DISK_MAX_SECS) ? 0 : BD_DISK_MAX_SECS - v->total_sectors;
         uint16_t max_sec_blocks = (uint16_t)(secs_left / BD_BLOCK_SECS);
 
         if (n > max_sec_blocks)
@@ -1328,7 +1328,8 @@ create_done:
     entry[BD_DIR_ATTR] = 0;
     entry[BD_DIR_USER] = ctx.user_area;
 
-    int wrc = volume_write(v->id, v->root_start_sec + (uint16_t)fidx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
+    int wrc =
+        volume_write(v->id, v->root_start_sec + (uint16_t)fidx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
 
     if (wrc != EOK)
     {
@@ -1384,7 +1385,8 @@ int bd_erase(const char *name83, FsContext ctx)
          */
         entry[0] = BD_ENTRY_DELETED;
 
-        int wrc = volume_write(v->id, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
+        int wrc =
+            volume_write(v->id, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
 
         if (wrc != EOK)
             return wrc;
@@ -1503,7 +1505,8 @@ int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib)
 
         entry[BD_DIR_ATTR] = attrib;
 
-        int wrc = volume_write(v->id, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
+        int wrc =
+            volume_write(v->id, v->root_start_sec + di.diridx / BD_ENTRIES_PER_SEC, g_bd.sec_buf);
 
         if (wrc != EOK)
             return wrc;

@@ -1,6 +1,4 @@
 #include <ccplib.h>
-#include <stdio.h>
-#include <string.h>
 
 #define SUBMIT_LINE_MAX 128
 

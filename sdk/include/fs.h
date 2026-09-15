@@ -1,11 +1,11 @@
 #ifndef FS_H
 #define FS_H
 
-#include "abi.h"
-#include "errno.h"
-#include "string.h"
-#include "syscall.h"
+#include <abi.h>
+#include <errno.h>
 #include <stdint.h>
+#include <string.h>
+#include <syscall.h>
 
 /* Seek whence */
 #define SEEK_SET 0

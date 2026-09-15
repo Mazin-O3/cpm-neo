@@ -12,7 +12,7 @@
 #ifndef SYSCALL_H
 #define SYSCALL_H
 
-#include "abi.h"
+#include <abi.h>
 
 /* Open name83 for reading or writing.  Returns fd or negative errno. */
 int sys_open(const char *name, uint8_t writable);

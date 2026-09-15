@@ -38,8 +38,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define CONFIG_VOL_MAX 4       /* Host ceiling: platform CONFIG_VOL_MAX   */
+#define CONFIG_VOL_MAX   4     /* Host ceiling: platform CONFIG_VOL_MAX   */
 #define CONFIG_DISK_SIZE 32768 /* Host ceiling in KB/vol: bitmap = /8 B   */
-#define CONFIG_FCB_MAX 4       /* Host ceiling: platform CONFIG_FCB_MAX   */
+#define CONFIG_FCB_MAX   4     /* Host ceiling: platform CONFIG_FCB_MAX   */
 
 #endif /* CONFIG_H */

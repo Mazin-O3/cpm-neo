@@ -26,7 +26,7 @@ $ ./sysgen/build/sysgen add hello.txt --dst=A0 --attr=RW
 
 ### SDK surface
 
-- `cpm.h`: umbrella header (syscalls + kernel ABI types).
+- `cpmneo.h`: umbrella header (syscalls + kernel ABI types).
 - `syscall.h`: plain `sys_open`/`sys_read`/… declarations — the kernel
   functions themselves, called directly (see
   [Syscall Reference](syscall-reference.md)).

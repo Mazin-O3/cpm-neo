@@ -7,8 +7,6 @@
  */
 
 #include <ccplib.h>
-#include <stdio.h>
-#include <string.h>
 
 static const char *stat_vol_fmt = "v";   /* STAT B: — Volume stats, no user digits */
 static const char *stat_file_fmt = "f*"; /* STAT FOO.TXT — File stats */

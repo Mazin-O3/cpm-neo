@@ -37,11 +37,13 @@ typedef struct
     int (*fn)(int argc, char **argv);
 } SysgenCmd;
 
-static const SysgenCmd g_cmds[] = {
-    {.name = "new", .fn = cmd_new},         {.name = "add", .fn = cmd_add},
-    {.name = "era", .fn = cmd_era},         {.name = "install", .fn = cmd_install},
-    {.name = "extract", .fn = cmd_extract}, {.name = "dir", .fn = cmd_dir},
-    {0}};
+static const SysgenCmd g_cmds[] = {{.name = "new", .fn = cmd_new},
+                                   {.name = "add", .fn = cmd_add},
+                                   {.name = "era", .fn = cmd_era},
+                                   {.name = "install", .fn = cmd_install},
+                                   {.name = "extract", .fn = cmd_extract},
+                                   {.name = "dir", .fn = cmd_dir},
+                                   {0}};
 
 int main(int argc, char **argv)
 {

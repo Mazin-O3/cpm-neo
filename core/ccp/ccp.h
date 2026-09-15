@@ -2,7 +2,7 @@
 #define CCP_H
 
 #include <ccplib.h>
-#include <cpm.h>
+#include <cpmneo.h>
 
 /* Limits */
 #define CCP_LINE_MAX 128

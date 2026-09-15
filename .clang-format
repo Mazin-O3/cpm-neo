@@ -13,3 +13,4 @@ AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortBlocksOnASingleLine: Never
 AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true

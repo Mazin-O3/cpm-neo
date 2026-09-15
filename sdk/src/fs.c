@@ -15,7 +15,7 @@
 
 #define O_RDONLY 0x01
 #define O_WRONLY 0x02
-#define O_CREAT 0x04
+#define O_CREAT  0x04
 #define O_APPEND 0x10
 
 static int g_find_pos = 0;

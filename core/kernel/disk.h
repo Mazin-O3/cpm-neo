@@ -28,9 +28,10 @@
 #ifndef DISK_H
 #define DISK_H
 
+#include <stdint.h>
+
 #include "abi.h"
 #include "errno.h"
-#include <stdint.h>
 
 int disk_init(void); /* Load and validate the VMAP from the platform */
 int disk_xip(void);  /* 1 = XIP disk image                          */

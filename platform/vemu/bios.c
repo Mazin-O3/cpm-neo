@@ -7,11 +7,12 @@
  * register access.
  */
 
+#include <errno.h>
+#include <stddef.h>
+
 #include "bios.h"
 #include "disk_format.h"
 #include "mmio.h"
-#include "errno.h"
-#include <stddef.h>
 
 /* DMA-based sector read/write */
 

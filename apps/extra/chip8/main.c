@@ -1,15 +1,5 @@
 #include "chip8.h"
-
 #include <ccplib.h>
-#include <ctype.h>
-#include <errno.h>
-#include <fs.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <syscall.h>
-
-#define KEY_ESC 0x1B
 
 static Chip8State s;
 
@@ -114,7 +104,7 @@ int main(int argc, char **argv)
         {
             int c = getchar();
 
-            if (c == KEY_ESC)
+            if (c == CH_ESC)
             {
                 printf(CSI_CLS CSI_HOME CSI_SHOW);
                 return 0;

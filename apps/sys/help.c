@@ -7,8 +7,6 @@
  */
 
 #include <ccplib.h>
-#include <stdio.h>
-#include <string.h>
 
 typedef struct
 {

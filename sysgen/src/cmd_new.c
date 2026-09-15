@@ -20,9 +20,9 @@
 #include <string.h>
 #include <strings.h>
 
-#define OS_VER 0x0100
-#define KERN_VER 0x0100
-#define CCP_VER 0x0100
+#define OS_VER               0x0100
+#define KERN_VER             0x0100
+#define CCP_VER              0x0100
 #define SYSGEN_MAX_APP_NAMES 64
 
 static uint32_t get_file_size(const char *path)

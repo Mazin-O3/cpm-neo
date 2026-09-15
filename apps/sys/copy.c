@@ -12,7 +12,6 @@
  */
 
 #include <ccplib.h>
-#include <string.h>
 
 /*
  * copy_one — Copy a single file from src to dst.

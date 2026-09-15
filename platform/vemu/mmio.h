@@ -78,12 +78,12 @@ extern char __io_base[];
  *  IO+0x14  CLK_KHZ       IO+0x2C  DMA_CSTR
  */
 
-#define DISK_BASE (IO_BASE + 0x00)
-#define KBD_BASE (IO_BASE + 0x08)
-#define DSP_BASE (IO_BASE + 0x10)
+#define DISK_BASE    (IO_BASE + 0x00)
+#define KBD_BASE     (IO_BASE + 0x08)
+#define DSP_BASE     (IO_BASE + 0x10)
 #define CLK_KHZ_BASE (IO_BASE + 0x14)
-#define TIMER_BASE (IO_BASE + 0x18)
-#define DMA_BASE (IO_BASE + 0x20)
+#define TIMER_BASE   (IO_BASE + 0x18)
+#define DMA_BASE     (IO_BASE + 0x20)
 
 /*
  * Single-channel DMA. Register map:
@@ -93,9 +93,9 @@ extern char __io_base[];
  *   DMA_CSTR — Control (write) / Status (read) (8-bit)
  */
 
-#define DMA_SAR (DMA_BASE + 0x00)  /* IO+0x20 */
-#define DMA_DAR (DMA_BASE + 0x04)  /* IO+0x24 */
-#define DMA_WCR (DMA_BASE + 0x08)  /* IO+0x28 */
+#define DMA_SAR  (DMA_BASE + 0x00) /* IO+0x20 */
+#define DMA_DAR  (DMA_BASE + 0x04) /* IO+0x24 */
+#define DMA_WCR  (DMA_BASE + 0x08) /* IO+0x28 */
 #define DMA_CSTR (DMA_BASE + 0x0C) /* IO+0x2C */
 
 /*
@@ -118,13 +118,13 @@ extern char __io_base[];
  *   [7:6] 0
  */
 
-#define DMA_CSTR_START (1u << 0)
-#define DMA_CSTR_STREAM (1u << 1)
-#define DMA_CSTR_SRC_INC (1u << 2)
-#define DMA_CSTR_DST_INC (1u << 3)
-#define DMA_CSTR_WIDTH_8 (0u << 4)
-#define DMA_CSTR_WIDTH_16 (1u << 4)
-#define DMA_CSTR_WIDTH_32 (2u << 4)
+#define DMA_CSTR_START      (1u << 0)
+#define DMA_CSTR_STREAM     (1u << 1)
+#define DMA_CSTR_SRC_INC    (1u << 2)
+#define DMA_CSTR_DST_INC    (1u << 3)
+#define DMA_CSTR_WIDTH_8    (0u << 4)
+#define DMA_CSTR_WIDTH_16   (1u << 4)
+#define DMA_CSTR_WIDTH_32   (2u << 4)
 #define DMA_CSTR_WIDTH_MASK (3u << 4)
 
 /* Read layout only: bit 0 reads back as the channel-busy status. */
@@ -144,15 +144,15 @@ extern char __io_base[];
  *   [4]   stream   1=stream mode (bus-lock)  0=normal mode
  */
 
-#define DMA_FLAG_WIDTH_8 (0u << 0)
-#define DMA_FLAG_WIDTH_16 (1u << 0)
-#define DMA_FLAG_WIDTH_32 (2u << 0)
+#define DMA_FLAG_WIDTH_8    (0u << 0)
+#define DMA_FLAG_WIDTH_16   (1u << 0)
+#define DMA_FLAG_WIDTH_32   (2u << 0)
 #define DMA_FLAG_WIDTH_MASK (3u << 0)
-#define DMA_FLAG_SRC_INC (1u << 2)
-#define DMA_FLAG_DST_INC (1u << 3)
-#define DMA_FLAG_STREAM (1u << 4)
+#define DMA_FLAG_SRC_INC    (1u << 2)
+#define DMA_FLAG_DST_INC    (1u << 3)
+#define DMA_FLAG_STREAM     (1u << 4)
 
-#define DMA_MEMCPY (DMA_FLAG_SRC_INC | DMA_FLAG_DST_INC | DMA_FLAG_STREAM)
+#define DMA_MEMCPY  (DMA_FLAG_SRC_INC | DMA_FLAG_DST_INC | DMA_FLAG_STREAM)
 #define DMA_DISK_RD (DMA_FLAG_DST_INC | DMA_FLAG_STREAM)
 #define DMA_DISK_WR (DMA_FLAG_SRC_INC | DMA_FLAG_STREAM)
 
@@ -161,12 +161,12 @@ extern char __io_base[];
 #define TIMER_CSTR (TIMER_BASE + 0x00) /* IO+0x18 */
 #define TIMER_CNTR (TIMER_BASE + 0x04) /* IO+0x1C */
 
-#define TIMER_CST_EN (1u << 0)
-#define TIMER_CST_MOD (1u << 1)
-#define TIMER_CST_OVF (1u << 2)
-#define TIMER_PRESCALE_1 (0u << 4)
-#define TIMER_PRESCALE_8 (1u << 4)
-#define TIMER_PRESCALE_64 (2u << 4)
+#define TIMER_CST_EN       (1u << 0)
+#define TIMER_CST_MOD      (1u << 1)
+#define TIMER_CST_OVF      (1u << 2)
+#define TIMER_PRESCALE_1   (0u << 4)
+#define TIMER_PRESCALE_8   (1u << 4)
+#define TIMER_PRESCALE_64  (2u << 4)
 #define TIMER_PRESCALE_256 (3u << 4)
 
 /* Keyboard register */
@@ -180,9 +180,9 @@ extern char __io_base[];
 
 /* Disk registers */
 
-#define DISK_BUFFER (DISK_BASE + 0x00) /* IO+0x00 */
-#define DISK_SECTOR (DISK_BASE + 0x04) /* IO+0x04 */
-#define DISK_CFG_READ (0x0000)
+#define DISK_BUFFER    (DISK_BASE + 0x00) /* IO+0x00 */
+#define DISK_SECTOR    (DISK_BASE + 0x04) /* IO+0x04 */
+#define DISK_CFG_READ  (0x0000)
 #define DISK_CFG_WRITE (0x8000)
 
 /* Clock register */

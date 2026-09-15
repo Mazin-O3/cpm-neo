@@ -13,15 +13,15 @@
  * so transient programs cannot corrupt CCP state.
  */
 
-#include "kernel.h"
-#include "bios.h"
-#include "ctype.h"
-#include "disk.h"
-#include "stdlib.h"
-#include "string.h"
-#include "syscall.h"
+#include <ctype.h>
 #include <limits.h>
-#include "syscall.h"
+#include <stdlib.h>
+#include <string.h>
+#include <syscall.h>
+
+#include "bios.h"
+#include "disk.h"
+#include "kernel.h"
 
 __attribute__((weak)) void kjump(uintptr_t addr)
 {
@@ -268,7 +268,7 @@ int kexec(const char *name83, int argc, char **argv, FsContext ctx)
     while (remaining > 0)
     {
         uint16_t chunk = (remaining > USHRT_MAX) ? USHRT_MAX : (uint16_t)remaining;
-        int n = bd_read(fd, dest, chunk);
+        int      n = bd_read(fd, dest, chunk);
 
         if (n <= 0)
         {

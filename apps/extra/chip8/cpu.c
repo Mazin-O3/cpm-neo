@@ -1,8 +1,5 @@
 #include "chip8.h"
 
-#include <stdlib.h>
-#include <string.h>
-
 static void alu_ld(Chip8State *s, uint8_t x, uint8_t y)
 {
     s->v[x] = s->v[y];

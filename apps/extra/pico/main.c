@@ -94,7 +94,8 @@ static int load_file(PicoState *s)
         if (s->file.name[0])
         {
             FileInfo fi;
-            if (find(s->file.name, &fi) == 0 && (fi.attrib & (FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM)))
+            if (find(s->file.name, &fi) == 0 &&
+                (fi.attrib & (FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM)))
                 s->file.readonly = 1;
         }
     }
@@ -233,7 +234,8 @@ static void handle_open(PicoState *s)
         gap_init(s);
         file_load(s, s->file.name);
         FileInfo fi2;
-        s->file.readonly = (find(s->file.name, &fi2) == 0 && (fi2.attrib & (FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM)));
+        s->file.readonly = (find(s->file.name, &fi2) == 0 &&
+                            (fi2.attrib & (FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM)));
         strcpy(s->file.orig, s->file.name);
         s->file.is_default = 0;
         s->cur.row = 0;

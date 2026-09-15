@@ -13,13 +13,14 @@
 #ifndef BDOS_H
 #define BDOS_H
 
+#include <stdint.h>
+
 #include "abi.h"
 #include "config.h"
 #include "disk_format.h"
 #include "errno.h"
-#include <stdint.h>
 
-#define BD_MAX_FCBS CONFIG_FCB_MAX
+#define BD_MAX_FCBS      CONFIG_FCB_MAX
 #define BD_DISK_MAX_SECS 65535
 
 /*
@@ -29,13 +30,13 @@
  * extent, and the allocation bitmap supports up to DISK_VOL_MAX_BLOCKS
  * blocks per volume.
  */
-#define BD_BLOCK_SECS DISK_BLOCK_SECS
-#define BD_BLOCK_BYTES DISK_BLOCK_BYTES
+#define BD_BLOCK_SECS        DISK_BLOCK_SECS
+#define BD_BLOCK_BYTES       DISK_BLOCK_BYTES
 #define BD_BLOCKS_PER_EXTENT 8
-#define BD_BLOCK_MAP_BYTES ((CONFIG_DISK_SIZE + 7) / 8) /* One bit per 1K block */
-#define BD_VOL_MAX_BLOCKS DISK_VOL_MAX_BLOCKS           /* Per-volume block cap */
+#define BD_BLOCK_MAP_BYTES   ((CONFIG_DISK_SIZE + 7) / 8) /* One bit per 1K block */
+#define BD_VOL_MAX_BLOCKS    DISK_VOL_MAX_BLOCKS          /* Per-volume block cap */
 
-#define BD_ENTRY_SIZE 32
+#define BD_ENTRY_SIZE   32
 #define BD_ROOT_ENTRIES 256
 
 /* The extent index is a uint8_t on disk, so at most 256 extents (2 MB) are
@@ -44,34 +45,34 @@
 #define BD_MAX_EXTENTS 256
 
 #define BD_ENTRIES_PER_SEC (DISK_SECTOR_SIZE / BD_ENTRY_SIZE)
-#define BD_EXTENT_BYTES (BD_BLOCKS_PER_EXTENT * BD_BLOCK_BYTES)
+#define BD_EXTENT_BYTES    (BD_BLOCKS_PER_EXTENT * BD_BLOCK_BYTES)
 
 /* Per-volume metadata layout: header sector 0, then the root directory.
  * BD_DATA_START is the first sector of a volume's data blocks. */
 #define BD_HEADER_SECS DISK_HEADER_SECS
-#define BD_ROOT_SECS DISK_ROOT_SECS
-#define BD_DATA_START DISK_DATA_START
+#define BD_ROOT_SECS   DISK_ROOT_SECS
+#define BD_DATA_START  DISK_DATA_START
 
 /* Minimum volume size: header + root, plus the reserved block and at
  * least one usable data block. */
 #define BD_MIN_VOL_SECS DISK_MIN_VOL_SECS
 
-#define BD_DIR_ATTR 11
-#define BD_DIR_USER 12
-#define BD_DIR_EXTENT_IDX 13
+#define BD_DIR_ATTR         11
+#define BD_DIR_USER         12
+#define BD_DIR_EXTENT_IDX   13
 #define BD_DIR_EXTENT_BYTES 14
-#define BD_DIR_BLOCKS 16
+#define BD_DIR_BLOCKS       16
 
-#define BD_ENTRY_EMPTY 0x00
+#define BD_ENTRY_EMPTY   0x00
 #define BD_ENTRY_DELETED 0xE5
 
-#define BD_USER_INVALID 0xFF
-#define BD_BITS_PER_BYTE 8
-#define BD_BITMAP_FULL UINT8_MAX
-#define BD_RESERVED_BLOCK 0
+#define BD_USER_INVALID       0xFF
+#define BD_BITS_PER_BYTE      8
+#define BD_BITMAP_FULL        UINT8_MAX
+#define BD_RESERVED_BLOCK     0
 #define BD_FIRST_USABLE_BLOCK (BD_RESERVED_BLOCK + 1)
-#define BD_SECTORS_PER_KB DISK_SECTORS_PER_KB
-#define DIR_SCAN_STOP 1
+#define BD_SECTORS_PER_KB     DISK_SECTORS_PER_KB
+#define DIR_SCAN_STOP         1
 
 /*
  * Bind an existing formatted volume.  Closes stale FCBs from any

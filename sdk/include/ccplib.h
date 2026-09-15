@@ -1,7 +1,7 @@
 #ifndef CCPLIB_H
 #define CCPLIB_H
 
-#include <cpm.h>
+#include <cpmneo.h>
 
 /* Command error / return-code convention shared by the CCP and transient
  * commands.  A command returns cmderr_ok() (err_code == 0) on success;
@@ -107,7 +107,7 @@ int parse_int(const char *s, int *out);
 
 /* Batch-file convention: "$$$.SUB" addressed as "<vol>0:" so it lives in
  * user 0 where the resident CCP finds it after USER switches. */
-#define BATCH_NAME "$$$.SUB"
+#define BATCH_NAME     "$$$.SUB"
 #define BATCH_PATH_LEN 12 /* "A0:" + "$$$.SUB" + NUL */
 void make_batch_path(char *out, int8_t vol);
 
