@@ -3,6 +3,7 @@
 #include "errno.h"
 #include "string.h"
 #include "syscall.h"
+
 /* Output */
 
 int putchar(int c)

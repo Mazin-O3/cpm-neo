@@ -20,17 +20,18 @@ int ed_load(Editor *e, const char *path)
     {
         e->gap_start = 0;
         e->gap_end = EDIT_BUF_SIZE;
-        return -1;
+        return fd;
     }
 
     char line[LINE_LEN];
 
     while (e->num_lines < ED_MAX_LINES && readline(fd, line, sizeof(line)) > 0)
     {
-        if (ed_put_line(e, e->num_lines, line, strlen(line)) < 0)
+        if (ed_put_line(e, e->num_lines, line, strlen(line)) != EOK)
         {
             printf("?FULL\n");
-            break;
+            close(fd);
+            return ENOSPC;
         }
     }
 
@@ -39,7 +40,7 @@ int ed_load(Editor *e, const char *path)
     e->gap_start = e->logical_bytes;
     e->gap_end = EDIT_BUF_SIZE;
 
-    return 0;
+    return EOK;
 }
 
 int ed_save(Editor *e)
@@ -47,7 +48,7 @@ int ed_save(Editor *e)
     if (e->readonly)
     {
         printf("** FILE IS READ/ONLY **\n");
-        return -1;
+        return EVOLRO;
     }
 
     int fd = open(e->name, "w");
@@ -55,17 +56,22 @@ int ed_save(Editor *e)
     if (fd == EFILERO)
     {
         printf("** FILE/VOL IS READ/ONLY **\n");
-        return -1;
+        return EFILERO;
     }
 
     if (fd < 0)
-        return -1;
+        return fd;
 
     for (int i = 0; i < e->num_lines; i++)
     {
         int phys = log_to_phys(e, e->line_off[i]);
-        write(fd, e->buf + phys, strlen(e->buf + phys));
-        write(fd, "\n", 1);
+
+        if (write(fd, e->buf + phys, strlen(e->buf + phys)) < 0 || write(fd, "\n", 1) < 0)
+        {
+            printf("** SAVE FAILED **\n");
+            close(fd);
+            return EIO;
+        }
     }
 
     int rc = close(fd);
@@ -73,12 +79,12 @@ int ed_save(Editor *e)
     if (rc < 0)
     {
         printf("** SAVE FAILED **\n");
-        return -1;
+        return rc;
     }
 
     e->modified = 0;
 
-    return 0;
+    return EOK;
 }
 
 /* External file read */
@@ -90,7 +96,7 @@ int ed_read(Editor *e, int line, const char *path)
     if (fd < 0)
     {
         printf("NOT FOUND\n");
-        return -1;
+        return fd;
     }
 
     if (line < 0)
@@ -103,11 +109,11 @@ int ed_read(Editor *e, int line, const char *path)
 
     while (e->num_lines < ED_MAX_LINES && readline(fd, lbuf, sizeof(lbuf)) > 0)
     {
-        if (ed_put_line(e, line, lbuf, strlen(lbuf)) < 0)
+        if (ed_put_line(e, line, lbuf, strlen(lbuf)) != EOK)
         {
             printf("?FULL\n");
             close(fd);
-            return -1;
+            return ENOSPC;
         }
 
         e->modified = 1;
@@ -119,5 +125,5 @@ int ed_read(Editor *e, int line, const char *path)
 
     e->cur = line - 1;
 
-    return 0;
+    return EOK;
 }

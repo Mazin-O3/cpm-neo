@@ -2,6 +2,7 @@
 #include "syscall.h"
 
 #include <ctype.h>
+
 /* Conversion */
 
 int atoi(const char *s)

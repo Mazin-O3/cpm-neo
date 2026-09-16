@@ -5,6 +5,7 @@
 
 #include "string.h"
 #include "ctype.h"
+
 /* String helpers */
 
 void *memcpy(void *dst, const void *src, size_t n)

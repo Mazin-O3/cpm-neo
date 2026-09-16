@@ -310,6 +310,6 @@ CmdErr cmd_type(FsContext *ctx, int argc, char **argv)
 
     putchar('\n');
     close(fd);
-    
+
     return cmderr_ok();
 }

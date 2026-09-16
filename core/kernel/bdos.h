@@ -68,7 +68,7 @@
  *
  * Header + root, plus the reserved block and at least one usable
  * data block.
-*/
+ */
 
 #define BD_MIN_VOL_SECS DISK_MIN_VOL_SECS
 

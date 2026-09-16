@@ -44,12 +44,12 @@ void ed_list(Editor *e, int from, int to)
 
 /* Text substitution */
 
-void ed_subst(Editor *e, int line, const char *old, const char *new_s)
+int ed_subst(Editor *e, int line, const char *old, const char *new_s)
 {
     if (line < 0 || line >= e->num_lines)
     {
         printf("?RANGE\n");
-        return;
+        return EINVAL;
     }
 
     int line_log = e->line_off[line];
@@ -61,7 +61,7 @@ void ed_subst(Editor *e, int line, const char *old, const char *new_s)
     if (!p)
     {
         printf("?NOT FOUND\n");
-        return;
+        return ENOENT;
     }
 
     int olen = strlen(old);
@@ -79,7 +79,7 @@ void ed_subst(Editor *e, int line, const char *old, const char *new_s)
     if (diff > 0 && e->gap_end - e->gap_start < diff)
     {
         printf("?LONG\n");
-        return;
+        return EINVAL;
     }
 
     memmove(e->buf + tail_phys + diff, e->buf + tail_phys, tail_len);
@@ -93,4 +93,6 @@ void ed_subst(Editor *e, int line, const char *old, const char *new_s)
         e->line_off[i] += diff;
 
     e->modified = 1;
+
+    return EOK;
 }

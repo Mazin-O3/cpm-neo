@@ -75,7 +75,7 @@ void scr_batch_status(PicoState *s)
     char sbuf[128];
 
     int n = snprintf(sbuf, sizeof(sbuf), " Ln %d Col %d", s->cur.row + 1, s->cur.col + 1);
-    int pad = SCREEN_WIDTH - n - 28;
+    int pad = CONSOLE_WIDTH - n - 28;
 
     if (pad < 1)
         pad = 1;
@@ -87,7 +87,7 @@ void scr_batch_status(PicoState *s)
              CSI_REVERSE "^S" CSI_RESET "=Save   " CSI_REVERSE "^O" CSI_RESET "=Open   " CSI_REVERSE
                          "^Q" CSI_RESET "=Quit");
 
-    scr_batch_printf(s, CSI_CUP_ROW CSI_EL "%s", SCREEN_ROWS, sbuf);
+    scr_batch_printf(s, CSI_CUP_ROW CSI_EL "%s", CONSOLE_HEIGHT, sbuf);
 }
 
 static int parse_volref(const char *name, uint8_t *vol, uint8_t *ua, const char **base)
@@ -133,7 +133,7 @@ static int parse_volref(const char *name, uint8_t *vol, uint8_t *ua, const char 
 
 void scr_batch_draw_banner(PicoState *s)
 {
-    char tag[SCREEN_WIDTH + 1];
+    char tag[CONSOLE_WIDTH + 1];
     char mod = s->flags.file_modified ? '*' : ' ';
 
     if (s->file.is_default)
@@ -142,9 +142,9 @@ void scr_batch_draw_banner(PicoState *s)
     }
     else
     {
-        char loc_buf[8] = "";
+        char        loc_buf[8] = "";
         const char *display = s->file.name;
-        uint8_t vol, ua;
+        uint8_t     vol, ua;
         const char *base;
 
         if (parse_volref(s->file.name, &vol, &ua, &base))
@@ -159,16 +159,16 @@ void scr_batch_draw_banner(PicoState *s)
 
     int tag_len = strlen(tag);
 
-    if (tag_len > SCREEN_WIDTH)
-        tag_len = SCREEN_WIDTH;
+    if (tag_len > CONSOLE_WIDTH)
+        tag_len = CONSOLE_WIDTH;
 
-    char buf[SCREEN_WIDTH + 1];
-    memset(buf, ' ', SCREEN_WIDTH);
+    char buf[CONSOLE_WIDTH + 1];
+    memset(buf, ' ', CONSOLE_WIDTH);
 
-    int left = (SCREEN_WIDTH - tag_len) / 2;
+    int left = (CONSOLE_WIDTH - tag_len) / 2;
     memcpy(buf + left, tag, tag_len);
 
-    buf[SCREEN_WIDTH] = '\0';
+    buf[CONSOLE_WIDTH] = '\0';
     scr_batch_printf(s, CSI_REVERSE "\x1B[H%s" CSI_RESET, buf);
 }
 
@@ -210,10 +210,10 @@ void scr_render(PicoState *s)
 {
     clamp_scroll(s);
 
-    int tl = gap_text_len(s);
+    int  tl = gap_text_len(s);
     char line_buf[MAX_VISIBLE_LINE + 1];
-    int cur_line = 0, start = 0, vis_row = 0;
-    int li;
+    int  cur_line = 0, start = 0, vis_row = 0;
+    int  li;
 
     scr_batch_start(s);
     scr_batch_printf(s, CSI_HIDE);
@@ -250,7 +250,7 @@ void scr_render(PicoState *s)
     for (int r = vis_row; r < PICO_ROWS; r++)
         scr_batch_printf(s, CSI_CUP_ROW CSI_EL, r + 2);
 
-    scr_batch_printf(s, CSI_CUP_ROW CSI_EL, SCREEN_ROWS - 1);
+    scr_batch_printf(s, CSI_CUP_ROW CSI_EL, CONSOLE_HEIGHT - 1);
 
     prev_status_row = -1;
 
@@ -284,7 +284,7 @@ void scr_ensure_visible(PicoState *s)
 
     scr_batch_start(s);
     scr_batch_printf(s, CSI_HIDE);
-    scr_batch_printf(s, CSI_DECSTBM, 2, SCREEN_ROWS - 2);
+    scr_batch_printf(s, CSI_DECSTBM, 2, CONSOLE_HEIGHT - 2);
 
     if (delta == -1)
     {
@@ -296,16 +296,16 @@ void scr_ensure_visible(PicoState *s)
     }
     else
     {
-        scr_batch_printf(s, CSI_CUP CSI_IND CSI_RST_SCR, SCREEN_ROWS - 2, 1);
+        scr_batch_printf(s, CSI_CUP CSI_IND CSI_RST_SCR, CONSOLE_HEIGHT - 2, 1);
 
-        int bottom_idx = s->cur.top + PICO_ROWS - 1;
+        int  bottom_idx = s->cur.top + PICO_ROWS - 1;
         char line_buf[MAX_VISIBLE_LINE + 1];
         gap_get_line(s, bottom_idx, line_buf, sizeof(line_buf));
 
         if (bottom_idx < s->cur.lines)
-            scr_batch_printf(s, CSI_CUP_ROW CSI_EL "%s", SCREEN_ROWS - 2, line_buf);
+            scr_batch_printf(s, CSI_CUP_ROW CSI_EL "%s", CONSOLE_HEIGHT - 2, line_buf);
         else
-            scr_batch_printf(s, CSI_CUP_ROW CSI_EL, SCREEN_ROWS - 2);
+            scr_batch_printf(s, CSI_CUP_ROW CSI_EL, CONSOLE_HEIGHT - 2);
     }
 
     scr_batch_status(s);

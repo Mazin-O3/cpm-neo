@@ -27,7 +27,7 @@ static int gap_idx_from_rc(PicoState *s, int row, int *col)
 void file_prompt_error(PicoState *s, const char *msg)
 {
     printf(CSI_SHOW);
-    printf(CSI_CUP, SCREEN_ROWS, 1);
+    printf(CSI_CUP, CONSOLE_HEIGHT, 1);
     printf("\r" CSI_EL);
     printf("%s", msg);
     getchar();
@@ -243,7 +243,7 @@ static void handle_escape(PicoState *s)
 static void handle_open(PicoState *s)
 {
     char prev_filename[13], prev_orig[13], errbuf[80];
-    int prev_default = s->file.is_default;
+    int  prev_default = s->file.is_default;
 
     strcpy(prev_filename, s->file.name);
     strcpy(prev_orig, s->file.orig);
@@ -270,7 +270,7 @@ static void handle_open(PicoState *s)
 
         FileInfo fi2;
         s->file.readonly = (find(s->file.name, &fi2) == 0 &&
-             (fi2.attrib & (FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM)));
+                            (fi2.attrib & (FILE_ATTR_READ_ONLY | FILE_ATTR_SYSTEM)));
 
         strcpy(s->file.orig, s->file.name);
         s->file.is_default = 0;

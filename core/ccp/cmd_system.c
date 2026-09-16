@@ -78,7 +78,7 @@ static CmdErr dir_list(FsContext *ctx, int argc, char **argv, int show_sys)
 
         SplitName sn = split_name83(di.name);
         char      base[NAME83_BASE + 1], ext[NAME83_EXT + 1];
-        
+
         pad_field(base, sn.base, sn.base_len, NAME83_BASE);
         pad_field(ext, sn.ext, sn.ext_len, NAME83_EXT);
         printf("%s %s", base, ext);

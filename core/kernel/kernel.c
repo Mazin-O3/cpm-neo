@@ -473,6 +473,7 @@ int sys_fsetattr(const char *name, uint8_t attrib)
 
     return bd_fsetattr(n83, ctx, attrib);
 }
+
 /*
  * Syscall: directory scan
  */
@@ -490,6 +491,7 @@ int sys_findfile(const char *pattern, FileInfo *out, uint16_t start_pos)
 
     return bd_find(n83, ctx, out, start_pos);
 }
+
 /*
  * Syscall: volume management
  */
@@ -526,6 +528,7 @@ int sys_vsetattr(int8_t vol_id, uint8_t attr)
 {
     return bd_vsetattr(vol_id, attr);
 }
+
 /*
  * Syscall: process / context
  */
@@ -594,6 +597,7 @@ int sys_setctx(FsContext ctx)
     g_kstate.fs_ctx = ctx;
     return EOK;
 }
+
 /*
  * Syscall: system services
  */

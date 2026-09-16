@@ -26,7 +26,7 @@ int var_aget(BasicState *s, int var_idx, int arr_idx, int *out_val)
         ctrl_error(s, "SUBSCRIPT OUT OF RANGE");
         return -1;
     }
-    
+
     *out_val = s->var.arr[var_idx][arr_idx];
     return 0;
 }

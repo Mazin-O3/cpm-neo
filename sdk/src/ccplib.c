@@ -9,6 +9,7 @@
 #include "ccplib.h"
 
 #include <string.h>
+
 /* Error helpers */
 
 void cmderr_print(CmdErr err)

@@ -29,17 +29,15 @@ typedef struct
     uint8_t  xip;                      /* 1 = XIP disk image         */
 } SysInfo;
 
-/*
- * Environment slots
- */
+/* Environment slots  */
+
 #define ENV_RETURN_CODE  0 /* Return code of last program/command */
 #define ENV_BATCH_OFFSET 1 /* Offset of batch file in CCP        */
 #define ENV_USER_DEFINED 2 /* User-defined environment slot      */
 #define ENV_SLOTS_MAX    3
 
-/*
- * Console controls
- */
+/* Console controls */
+
 /* Control-key conventions shared by the kernel, SDK and apps. */
 
 #define CH_BREAK 0x03 /* ^C — Break a running program                  */

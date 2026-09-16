@@ -108,7 +108,7 @@ int file_maybe_save(PicoState *s)
         return 0;
 
     printf(CSI_SHOW);
-    printf(CSI_CUP, SCREEN_ROWS, 1);
+    printf(CSI_CUP, CONSOLE_HEIGHT, 1);
     printf("\r" CSI_EL);
     printf("Save modified file? (Y/N) ");
 
@@ -180,9 +180,9 @@ void file_truncate_83(char *name)
 int file_prompt(PicoState *s, const char *prompt)
 {
     char newname[ARG_LEN_MAX];
-    int pos;
+    int  pos;
 
-    printf(CSI_CUP, SCREEN_ROWS, 1);
+    printf(CSI_CUP, CONSOLE_HEIGHT, 1);
     printf("\r" CSI_EL);
     printf("%s", prompt);
     printf(CSI_SHOW);

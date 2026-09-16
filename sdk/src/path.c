@@ -12,6 +12,7 @@
 
 #include <ctype.h>
 #include <string.h>
+
 /* Filespec parsing */
 
 /* Copy up to n chars of src into out, always NUL-terminated. */

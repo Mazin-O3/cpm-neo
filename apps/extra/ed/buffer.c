@@ -1,5 +1,12 @@
 #include "ed.h"
 
+int log_to_phys(Editor *e, int log_off)
+{
+    if (log_off < e->gap_start)
+        return log_off;
+    return log_off + (e->gap_end - e->gap_start);
+}
+
 /* Gap buffer operations */
 
 void gap_move(Editor *e, int log_pos)
@@ -47,7 +54,7 @@ int ed_put_line(Editor *e, int at, const char *text, int len)
     gap_move(e, insert_pos);
 
     if (e->gap_end - e->gap_start < len + 1)
-        return -1;
+        return ENOSPC;
 
     memcpy(e->buf + e->gap_start, text, len);
 
@@ -61,7 +68,7 @@ int ed_put_line(Editor *e, int at, const char *text, int len)
     e->line_off[at] = insert_pos;
     e->num_lines++;
 
-    return 0;
+    return EOK;
 }
 
 /* User interaction */
@@ -108,7 +115,7 @@ void ed_insert(Editor *e, int line)
         if (i == 0 && stop)
             break;
 
-        if (ed_put_line(e, insert_line, in, i) < 0)
+        if (ed_put_line(e, insert_line, in, i) != EOK)
         {
             printf("?FULL\n");
             break;
