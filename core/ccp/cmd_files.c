@@ -14,6 +14,7 @@ static const char *era_fmt = "f*";    /* ERA filespec */
 static const char *ren_fmt = "f* p*"; /* REN old new */
 static const char *type_fmt = "f";    /* TYPE filespec */
 
+/* REN wildcard matching */
 /*
  * RenMatch: holds the result of matching a source wildcard pattern against
  * a concrete filename.  nseg/seg_start/seg_len capture '*' segments (variable
@@ -143,6 +144,7 @@ static void ren_pattern_format(const char *dst_pat, const RenMatch *rm, char *ou
     out[o] = '\0';
 }
 
+/* ERA command */
 CmdErr cmd_era(FsContext *ctx, int argc, char **argv)
 {
     if (!check_fmt(argc, argv, era_fmt))
@@ -182,6 +184,7 @@ CmdErr cmd_era(FsContext *ctx, int argc, char **argv)
     return cmderr_ok();
 }
 
+/* REN command */
 CmdErr cmd_ren(FsContext *ctx, int argc, char **argv)
 {
     if (!check_fmt(argc, argv, ren_fmt))
@@ -199,6 +202,7 @@ CmdErr cmd_ren(FsContext *ctx, int argc, char **argv)
 
         const char *dn = dst.name[0] ? dst.name : src.name;
         char        src_full[FSPATH_MAX], dst_full[FSPATH_MAX];
+
         make_path(src_full, src.fs_ctx, src.name);
         make_path(dst_full, dst.fs_ctx, dn);
 
@@ -229,12 +233,14 @@ CmdErr cmd_ren(FsContext *ctx, int argc, char **argv)
     {
         char     new_name[FILENAME_MAX];
         RenMatch rm;
+
         ren_pattern_match(src_pat, di.name, &rm);
         ren_pattern_format(dst_pat, &rm, new_name, sizeof(new_name));
 
         char src_full[FSPATH_MAX], dst_full[FSPATH_MAX];
         make_path(src_full, src.fs_ctx, di.name);
         make_path(dst_full, dst.fs_ctx, new_name);
+
         int rc = rename(src_full, dst_full);
 
         if (rc != EOK)
@@ -248,6 +254,7 @@ CmdErr cmd_ren(FsContext *ctx, int argc, char **argv)
     return cmderr_ok();
 }
 
+/* TYPE command */
 CmdErr cmd_type(FsContext *ctx, int argc, char **argv)
 {
     if (!check_fmt(argc, argv, type_fmt))
@@ -303,5 +310,6 @@ CmdErr cmd_type(FsContext *ctx, int argc, char **argv)
 
     putchar('\n');
     close(fd);
+    
     return cmderr_ok();
 }

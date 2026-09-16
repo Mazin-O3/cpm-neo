@@ -1,5 +1,7 @@
-/* ANSI/VT100 escape-sequence mnemonics for the CP/M Neo console. */
-
+/*
+ * sdk/include/ansi.h — ANSI/VT100 escape-sequence mnemonics for the
+ * CP/M Neo console.
+ */
 #ifndef SDK_ANSI_H
 #define SDK_ANSI_H
 
@@ -16,13 +18,9 @@
 #define CSI_DL      "\x1B[%dM"      /* Delete N lines                 */
 #define CSI_DECSTBM "\x1B[%d;%dr"   /* Set scroll region (top,bottom) */
 #define CSI_RST_SCR "\x1B[r"        /* Reset scroll region to full scr */
-#define CSI_IND                                                                                    \
-    "\x1B"                                                                                         \
-    "D" /* Index — scroll up in region     */
-#define CSI_RI                                                                                     \
-    "\x1B"                                                                                         \
-    "M"                       /* Reverse index — scroll down     */
-#define CSI_REVERSE "\x1B[7m" /* Reverse video (SGR 7)           */
-#define CSI_RESET   "\x1B[0m" /* Reset attributes (SGR 0)        */
+#define CSI_IND     "\x1B" "D"      /* Index — scroll up in region    */
+#define CSI_RI      "\x1BM"         /* Reverse index — scroll down    */
+#define CSI_REVERSE "\x1B[7m"       /* Reverse video (SGR 7)          */
+#define CSI_RESET   "\x1B[0m"       /* Reset attributes (SGR 0)       */
 
 #endif /* SDK_ANSI_H */

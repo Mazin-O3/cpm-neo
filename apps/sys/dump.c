@@ -3,6 +3,8 @@
 
 #include <ccplib.h>
 
+/* Command implementation */
+
 static CmdErr cmd_dump(FsContext *ctx, int argc, char **argv)
 {
     if (!check_fmt(argc, argv, "f"))
@@ -73,6 +75,8 @@ static CmdErr cmd_dump(FsContext *ctx, int argc, char **argv)
     close(fd);
     return cmderr_ok();
 }
+
+/* Entry point */
 
 int main(int argc, char **argv)
 {

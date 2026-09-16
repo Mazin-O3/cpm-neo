@@ -2,6 +2,8 @@
 
 #define SUBMIT_LINE_MAX 128
 
+/* File extension handling */
+
 /* SUBMIT files are always type .SUB: append when missing, reject others. */
 static int sub_resolve_ext(char *name)
 {
@@ -19,6 +21,8 @@ static int sub_resolve_ext(char *name)
 
     return 0;
 }
+
+/* Parameter substitution */
 
 static int subst_params(char *dst, int dst_sz, const char *src, int argc, char **argv)
 {
@@ -59,6 +63,8 @@ static int subst_params(char *dst, int dst_sz, const char *src, int argc, char *
 
     return 0;
 }
+
+/* Batch line processing */
 
 static int write_batch_line(int dst_fd, const char *line, int argc, char **argv)
 {
@@ -124,6 +130,8 @@ static int sub_process(int8_t vol, const char *src_name, int argc, char **argv)
 
     return EOK;
 }
+
+/* Entry point */
 
 int main(int argc, char **argv)
 {

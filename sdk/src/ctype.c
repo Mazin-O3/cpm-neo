@@ -7,6 +7,7 @@
  */
 
 #include "ctype.h"
+/* Character classification / conversion */
 
 int toupper(int c)
 {

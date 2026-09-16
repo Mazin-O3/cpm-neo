@@ -6,15 +6,16 @@
  * the volume run lists.
  */
 
-#include <fsctx.h>
+#include "disk.h"
+#include "bios.h"
+#include "disk_format.h"
 #include <errno.h>
+#include <fsctx.h>
 #include <string.h>
 
-#include "bios.h"
-#include "disk.h"
-#include "disk_format.h"
-
 #define DISK_DEFAULT_MOUNT_BLOCKS 64
+
+/* Internal types */
 
 typedef struct
 {
@@ -45,7 +46,11 @@ typedef struct
     uint8_t  wb_valid;
 } DiskState;
 
+/* Static state */
+
 static DiskState g_disk;
+
+/* Internal helpers */
 
 /* True if vol_id is a valid volume id and the disk layer is initialized. */
 static inline int volume_valid(int8_t vol_id)
@@ -226,6 +231,8 @@ static int range_is_free(uint16_t start, uint16_t n)
     return 1;
 }
 
+/* Sector translation */
+
 /* Translate a volume-relative sector index through the volume's block runs
  * into a physical disk sector. */
 int disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec)
@@ -256,6 +263,8 @@ int disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec)
     return ENOENT;
 }
 
+/* VMAP persistence */
+
 /* Persist the current VolRec[4] + geometry to the VMAP sector. This is the
  * single atomic commit point for every volume operation. */
 static int vmap_persist(void)
@@ -270,6 +279,8 @@ static int vmap_persist(void)
 
     return bios_write(VMAP_SEC, buf) ? EIO : EOK;
 }
+
+/* Initialization */
 
 int disk_init(void)
 {
@@ -309,6 +320,8 @@ int disk_xip(void)
     return g_disk.initialized ? g_disk.xip : 0;
 }
 
+/* Write-back cache */
+
 /* Flush the write-back cache to the platform. On write failure the cache
  * stays dirty so a later disk_sync() can retry. */
 static int wb_flush(void)
@@ -322,6 +335,8 @@ static int wb_flush(void)
     g_disk.wb_valid = 0;
     return EOK;
 }
+
+/* Sector I/O */
 
 int volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf)
 {
@@ -387,6 +402,8 @@ int disk_sync(void)
 
     return bios_sync() ? EIO : EOK;
 }
+
+/* Volume lifecycle */
 
 int volume_mount(int8_t vol_id)
 {
@@ -567,6 +584,8 @@ int volume_unmount(int8_t vol_id)
 
     return EOK;
 }
+
+/* Volume queries */
 
 uint32_t volume_sectors(int8_t vol_id)
 {

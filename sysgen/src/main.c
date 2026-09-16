@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Usage */
+
 static void usage(void)
 {
     printf("\n*** CP/M Neo SYSGEN Utility ***\n\n"
@@ -31,6 +33,8 @@ static void usage(void)
            "<build_dir>/disk.img) [default: <build_dir>/disk.img]\n");
 }
 
+/* Command Table */
+
 typedef struct
 {
     const char *name;
@@ -44,6 +48,8 @@ static const SysgenCmd g_cmds[] = {{.name = "new", .fn = cmd_new},
                                    {.name = "extract", .fn = cmd_extract},
                                    {.name = "dir", .fn = cmd_dir},
                                    {0}};
+
+/* Entry Point */
 
 int main(int argc, char **argv)
 {

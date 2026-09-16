@@ -4,14 +4,16 @@
  */
 
 #include "bios.h"
+#include "errno.h"
 #include "sysgen.h"
 
-#include "errno.h"
 #include <stdio.h>
 #include <string.h>
 
 static uint8_t *g_disk;
 static uint32_t g_disk_size;
+
+/* Host BIOS Adapter */
 
 int bios_init(void)
 {
@@ -66,6 +68,8 @@ uint32_t bios_millis(void)
 {
     return 0;
 }
+
+/* Disk Image Access */
 
 void sysgen_set_disk(uint8_t *disk, uint32_t size)
 {

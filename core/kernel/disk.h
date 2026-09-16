@@ -1,6 +1,5 @@
 /*
- * core/kernel/disk.h
- * CP/M Neo — Block/run volume-map disk abstraction layer
+ * core/kernel/disk.h — Block/run volume-map disk abstraction layer
  *
  * Disk layout:
  *   Sector 0 : boot sector (geometry + kernel/CCP pointers)
@@ -30,42 +29,58 @@
 
 #include <stdint.h>
 
-#include "fsctx.h"
 #include "byteorder.h"
 #include "errno.h"
+#include "fsctx.h"
+/*
+ * Whole-disk functions
+ */
+int disk_init(void); /* Load VMAP       */
+int disk_xip(void);  /* 1 = XIP image   */
 
-int disk_init(void); /* Load and validate the VMAP from the platform */
-int disk_xip(void);  /* 1 = XIP disk image                          */
-
-/* Translate a volume-relative sector index through the volume's block runs
+/*
+ * Translate a volume-relative sector index through the volume's block runs
  * into a physical disk sector.  Returns 0 on success, EINVAL for an invalid
- * volume/sector, ENOENT if the sector lies beyond the volume's end. */
+ * volume/sector, ENOENT if the sector lies beyond the volume's end.
+ */
 int disk_translate(int8_t vol_id, uint16_t sec, uint16_t *phy_sec);
 
 uint16_t disk_block_count(void); /* Total 1 KB blocks on disk (constant) */
-uint16_t disk_base_sec(void);    /* Sector of block 0                   */
+uint16_t disk_base_sec(void);    /* Sector of block 0                    */
 uint16_t disk_free_blocks(void); /* Unallocated blocks in the grid       */
 
-/* Flush the disk-layer write-back cache and enforce physical persistence
- * via the BIOS barrier. */
+/*
+ * Flush the disk-layer write-back cache and enforce physical persistence
+ * via the BIOS barrier.
+ */
 int disk_sync(void);
 
-/* Sector-level I/O: sec is relative to the volume.
+/*
+ * Sector-level I/O
+ */
+/* sec is relative to the volume.
  * volume_write returns EVOLRO for a read-only volume. */
+
 int volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf);
 int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf);
 
-/* Volume lifecycle. */
-int volume_mount(int8_t vol_id); /* Mount at default blocks    */
+/*
+ * Volume lifecycle
+ */
+int volume_mount(int8_t vol_id); /* Mount at default blocks            */
 int volume_unmount(int8_t vol_id);
 
-/* Resize a volume by delta blocks. delta > 0 grows by delta, delta < 0
- * shrinks by |delta|, delta == 0 is a no-op. */
+/*
+ * Resize a volume by delta blocks.  delta > 0 grows by delta, delta < 0
+ * shrinks by |delta|, delta == 0 is a no-op.
+ */
 int volume_resize(int8_t vol_id, int16_t delta);
 
-/* Query helpers (0 when the volume is unmounted). */
-uint32_t volume_sectors(int8_t vol_id);   /* Capacity in sectors */
-uint8_t  volume_run_count(int8_t vol_id); /* Active runs count  */
+/*
+ * Volume queries
+ */
+uint32_t volume_sectors(int8_t vol_id);   /* Capacity in sectors (0=unmnt) */
+uint8_t  volume_run_count(int8_t vol_id); /* Active runs count             */
 int      volume_getattr(int8_t vol_id, uint8_t *attr);
 int      volume_setattr(int8_t vol_id, uint8_t attr);
 int      volume_readonly(int8_t vol_id);

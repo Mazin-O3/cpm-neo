@@ -1,5 +1,7 @@
 #include "ed.h"
 
+/* Gap buffer operations */
+
 void gap_move(Editor *e, int log_pos)
 {
     if (log_pos < 0)
@@ -16,6 +18,7 @@ void gap_move(Editor *e, int log_pos)
     {
         int move_size = old_gs - log_pos;
         memmove(e->buf + old_ge - move_size, e->buf + log_pos, move_size);
+
         e->gap_start = log_pos;
         e->gap_end = old_ge - move_size;
     }
@@ -23,10 +26,13 @@ void gap_move(Editor *e, int log_pos)
     {
         int move_size = log_pos - old_gs;
         memmove(e->buf + old_gs, e->buf + old_ge, move_size);
+
         e->gap_start = log_pos;
         e->gap_end = old_ge + move_size;
     }
 }
+
+/* Line operations */
 
 int ed_put_line(Editor *e, int at, const char *text, int len)
 {
@@ -46,20 +52,19 @@ int ed_put_line(Editor *e, int at, const char *text, int len)
     memcpy(e->buf + e->gap_start, text, len);
 
     e->buf[e->gap_start + len] = 0;
-
     e->gap_start += len + 1;
-
     e->logical_bytes += len + 1;
 
     for (int j = e->num_lines; j > at; j--)
         e->line_off[j] = e->line_off[j - 1] + len + 1;
 
     e->line_off[at] = insert_pos;
-
     e->num_lines++;
 
     return 0;
 }
+
+/* User interaction */
 
 void ed_insert(Editor *e, int line)
 {
@@ -119,6 +124,8 @@ void ed_insert(Editor *e, int line)
     e->cur = -1;
 }
 
+/* Line deletion */
+
 void ed_delete(Editor *e, int from, int to)
 {
     if (from < 0)
@@ -140,7 +147,6 @@ void ed_delete(Editor *e, int from, int to)
     gap_move(e, from_log);
 
     e->gap_end += del_len;
-
     e->logical_bytes -= del_len;
 
     int count = to - from + 1;

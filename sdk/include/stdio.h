@@ -1,5 +1,6 @@
-/* I/O via FD_STDIN/FD_STDOUT. */
-
+/*
+ * sdk/include/stdio.h — Standard input/output via FD_STDIN/FD_STDOUT.
+ */
 #ifndef SDK_STDIO_H
 #define SDK_STDIO_H
 

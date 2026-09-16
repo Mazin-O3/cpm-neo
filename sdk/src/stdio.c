@@ -3,6 +3,7 @@
 #include "errno.h"
 #include "string.h"
 #include "syscall.h"
+/* Output */
 
 int putchar(int c)
 {
@@ -20,128 +21,6 @@ int puts(const char *s)
 
     putchar('\n');
     return 0;
-}
-
-int peekchar(void)
-{
-    return sys_read(FD_STDIN, 0, 0) != 0;
-}
-
-int getchar(void)
-{
-    unsigned char c;
-    int           bytes_read = sys_read(FD_STDIN, &c, 1);
-
-    if (bytes_read <= 0)
-    {
-        return EOF;
-    }
-
-    return c;
-}
-
-int getline(char *buf, int maxlen)
-{
-    int pos = 0, ch;
-
-    while ((ch = getchar()) != EOF)
-    {
-        char c = (char)ch;
-
-        if (c == '\033')
-        {
-            if (!peekchar())
-            {
-                continue;
-            }
-
-            char next1 = (char)getchar();
-
-            if (next1 == '[' || next1 == 'O')
-            {
-                int next2;
-                do
-                {
-                    next2 = getchar();
-                } while (next2 != EOF && !isalpha((char)next2) && next2 != '~');
-            }
-
-            continue;
-        }
-
-        if (c == '\b' || c == 127)
-        {
-            if (pos > 0)
-            {
-                pos--;
-                putchar('\b');
-                putchar(' ');
-                putchar('\b');
-            }
-
-            continue;
-        }
-
-        if (c == '\n' || c == '\r')
-        {
-            putchar('\r');
-            putchar('\n');
-            break;
-        }
-
-        if (c < 0x20)
-            continue;
-
-        if (pos < maxlen - 1)
-        {
-            buf[pos++] = c;
-            putchar(c);
-        }
-    }
-
-    buf[pos] = '\0';
-    return (pos == 0 && ch == EOF) ? -1 : pos;
-}
-
-const char *strerror(int err)
-{
-    switch (err)
-    {
-    case 0:
-        return "OK";
-    case ENOENT:
-        return "No File";
-    case EEXIST:
-        return "File Exists";
-    case ENOSPC:
-        return "No Space";
-    case EVOLRO:
-        return "R/O";
-    case EFILERO:
-        return "File R/O";
-    case ENFILE:
-        return "No FCB";
-    case EIO:
-        return "Bad Sector";
-    case EINVAL:
-        return "Invalid";
-    case ENOEXEC:
-        return "Bad Load";
-    case E2BIG:
-        return "Too Big";
-    case EPERM:
-        return "Not Allowed";
-    case ENOVOL:
-        return "Not Mounted";
-    case EBADF:
-        return "Bad File Handle";
-    case EBADFS:
-        return "Bad FileSystem";
-    case EDIRFULL:
-        return "Directory Full";
-    default:
-        return "Unknown";
-    }
 }
 
 static char *fmt_uint(char *end, uint32_t val, int base, int upper)
@@ -400,6 +279,128 @@ int snprintf(char *buf, size_t size, const char *fmt, ...)
     int n = vsnprintf(buf, size, fmt, ap);
     va_end(ap);
     return n;
+}
+
+/* Input */
+
+int peekchar(void)
+{
+    return sys_read(FD_STDIN, 0, 0) != 0;
+}
+
+int getchar(void)
+{
+    unsigned char c;
+    int           bytes_read = sys_read(FD_STDIN, &c, 1);
+
+    if (bytes_read <= 0)
+    {
+        return EOF;
+    }
+    return c;
+}
+
+int getline(char *buf, int maxlen)
+{
+    int pos = 0, ch;
+
+    while ((ch = getchar()) != EOF)
+    {
+        char c = (char)ch;
+
+        if (c == '\033')
+        {
+            if (!peekchar())
+            {
+                continue;
+            }
+            char next1 = (char)getchar();
+
+            if (next1 == '[' || next1 == 'O')
+            {
+                int next2;
+
+                do
+                {
+                    next2 = getchar();
+                } while (next2 != EOF && !isalpha((char)next2) && next2 != '~');
+            }
+            continue;
+        }
+
+        if (c == '\b' || c == 127)
+        {
+            if (pos > 0)
+            {
+                pos--;
+                putchar('\b');
+                putchar(' ');
+                putchar('\b');
+            }
+            continue;
+        }
+
+        if (c == '\n' || c == '\r')
+        {
+            putchar('\r');
+            putchar('\n');
+            break;
+        }
+
+        if (c < 0x20)
+            continue;
+
+        if (pos < maxlen - 1)
+        {
+            buf[pos++] = c;
+            putchar(c);
+        }
+    }
+    buf[pos] = '\0';
+    return (pos == 0 && ch == EOF) ? -1 : pos;
+}
+
+/* Stdio helpers */
+
+const char *strerror(int err)
+{
+    switch (err)
+    {
+    case 0:
+        return "OK";
+    case ENOENT:
+        return "No File";
+    case EEXIST:
+        return "File Exists";
+    case ENOSPC:
+        return "No Space";
+    case EVOLRO:
+        return "R/O";
+    case EFILERO:
+        return "File R/O";
+    case ENFILE:
+        return "No FCB";
+    case EIO:
+        return "Bad Sector";
+    case EINVAL:
+        return "Invalid";
+    case ENOEXEC:
+        return "Bad Load";
+    case E2BIG:
+        return "Too Big";
+    case EPERM:
+        return "Not Allowed";
+    case ENOVOL:
+        return "Not Mounted";
+    case EBADF:
+        return "Bad File Handle";
+    case EBADFS:
+        return "Bad FileSystem";
+    case EDIRFULL:
+        return "Directory Full";
+    default:
+        return "Unknown";
+    }
 }
 
 int anykey(const char *msg, int *row, int screen_rows)

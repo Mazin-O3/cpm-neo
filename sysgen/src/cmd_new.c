@@ -6,10 +6,10 @@
  * seeds the fresh image with the bundled apps.
  */
 
+#include "bdos.h"
 #include "cmd.h"
 #include "commands.h"
 
-#include "bdos.h"
 #include "disk.h"
 #include "sysgen.h"
 #include "utility.h"
@@ -24,6 +24,8 @@
 #define KERN_VER             0x0100
 #define CCP_VER              0x0100
 #define SYSGEN_MAX_APP_NAMES 64
+
+/* Build Helpers */
 
 static uint32_t get_file_size(const char *path)
 {
@@ -106,6 +108,8 @@ static int run_build_script(const SysgenPaths *paths, const char *platform, int 
 
     return spawn_and_wait(argv);
 }
+
+/* Build Report */
 
 static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uint32_t size_kb,
                          uint32_t boot_size, uint32_t kern_size, uint32_t ccp_size,
@@ -199,6 +203,8 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
     printf("=============================================================\n\n");
 }
 
+/* CLI Helpers */
+
 /* Whitelist of flags accepted by `sysgen new` (NULL-terminated). */
 static const char *const FLAGS_NEW[] = {
     "--platform",
@@ -269,6 +275,8 @@ static bool validate_build_env(const SysgenPaths *paths)
 
     return true;
 }
+
+/* Command Entry */
 
 /*
  * cmd_new — Create a fresh disk image.
@@ -415,6 +423,7 @@ int cmd_new(int argc, char **argv)
         snprintf(xip_path, sizeof(xip_path), "%s/.xipsize", paths->build_dir);
 
         FILE *f = fopen(xip_path, "w");
+
         if (f == NULL)
         {
             err("cannot write .xipsize tag to %s", xip_path);

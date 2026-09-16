@@ -8,6 +8,8 @@
 
 #include <ccplib.h>
 
+/* Types and data */
+
 typedef struct
 {
     const char *name;
@@ -97,6 +99,8 @@ static const HelpRec g_recs[] = {
 
 };
 
+/* Category helpers */
+
 static int cat_of(const char *cat)
 {
     if (strcmp(cat, "file") == 0)
@@ -110,6 +114,8 @@ static int cat_of(const char *cat)
 
     return -1;
 }
+
+/* Display functions */
 
 /* Print detail for a named command.  Returns 1 if found, 0 if not. */
 static int print_one(const char *name)
@@ -164,6 +170,8 @@ static void print_all(void)
 
     printf("\n");
 }
+
+/* Entry point */
 
 int main(int argc, char **argv)
 {

@@ -1,3 +1,9 @@
+/*
+ * apps/extra/chip8/chip8.h — CHIP-8 interpreter
+ *
+ * CHIP-8 virtual machine constants, CPU state, and rendering keyset.
+ */
+
 #ifndef CHIP8_H
 #define CHIP8_H
 

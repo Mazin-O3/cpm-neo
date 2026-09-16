@@ -17,12 +17,13 @@
  * last free block was found.
  */
 
-#include <ctype.h>
-#include <string.h>
-
 #include "bdos.h"
 #include "disk.h"
 #include "disk_format.h"
+#include <ctype.h>
+#include <string.h>
+
+/* Macros */
 
 /* Volume-checked guard: resolves vol_id and returns ENOVOL if unmounted. */
 #define CHECK_VOLUME(v, vol_id)                                                                    \
@@ -36,6 +37,8 @@
     if (!f)                                                                                        \
         return EBADF;                                                                              \
     CHECK_VOLUME(v, f->ctx.vol_id);
+
+/* Internal types */
 
 typedef struct
 {
@@ -104,9 +107,13 @@ typedef struct
 
 typedef int (*dir_scan_fn)(Volume *v, const uint8_t *entry, uint16_t idx, void *ctx);
 
+/* Static state */
+
 static BDState g_bd;
 
 static int dir_scan(Volume *v, uint8_t user, dir_scan_fn fn, void *ctx);
+
+/* Name matching */
 
 static int name83_match(const uint8_t *dn, const char *n83)
 {
@@ -195,6 +202,8 @@ static void entry_fields(const uint8_t *entry, char *base, char *ext)
     ext[NAME83_EXT] = '\0';
 }
 
+/* Volume lookup */
+
 static Volume *vol_for(int8_t vol_id)
 {
     return (vol_id < 0 || vol_id >= MAX_VOLUMES) ? NULL : &g_bd.vol[vol_id];
@@ -209,6 +218,8 @@ static Volume *vol_checked(int8_t vol_id)
 
     return v;
 }
+
+/* Block allocation bitmap */
 
 static int bd_write_header(Volume *v)
 {
@@ -296,6 +307,8 @@ static uint16_t count_free(Volume *v)
     return c;
 }
 
+/* Block-to-sector mapping */
+
 static uint16_t block_sec(Volume *v, uint16_t block_num)
 {
     return v->data_start_sec + block_num * BD_BLOCK_SECS;
@@ -306,6 +319,8 @@ static uint16_t block_offset_sec(Volume *v, uint16_t block_num, uint32_t pos)
     uint32_t within = pos % BD_BLOCK_BYTES;
     return (uint16_t)(block_sec(v, block_num) + within / DISK_SECTOR_SIZE);
 }
+
+/* Directory sector access */
 
 /* Load the directory sector containing |idx| into sec_buf and return a
  * pointer to the entry at |idx|, or NULL on read failure. */
@@ -330,6 +345,8 @@ static void set_entry_block_list(uint8_t *entry, const uint16_t *blocks)
     for (int b = 0; b < BD_BLOCKS_PER_EXTENT; b++)
         put_le16(&entry[BD_DIR_BLOCKS + b * 2], blocks[b]);
 }
+
+/* Allocation map rebuild */
 
 static int rescan_alloc_cb(Volume *v, const uint8_t *entry, uint16_t idx, void *arg)
 {
@@ -371,6 +388,8 @@ static int bd_rescan_alloc_map(Volume *v)
     return (rc == ENOENT) ? EOK : rc;
 }
 
+/* FCB management */
+
 static int fcb_alloc(void)
 {
     for (int i = 0; i < BD_MAX_FCBS; i++)
@@ -410,6 +429,8 @@ static int bd_vol_has_writable_fcb(int8_t vol_id)
     return 0;
 }
 
+/* Directory scanning */
+
 /*
  * Pass BD_USER_INVALID to skip user-area filtering.
  * Stops early if fn returns non-zero (propagates that value).
@@ -448,6 +469,8 @@ static int dir_scan(Volume *v, uint8_t user, dir_scan_fn fn, void *ctx)
 
     return ENOENT;
 }
+
+/* Extent resolution */
 
 static int find_extent_cb(Volume *v, const uint8_t *entry, uint16_t idx, void *arg)
 {
@@ -612,6 +635,8 @@ static int fcb_flush(FCB *f, Volume *v)
 {
     return update_extent(v, &f->cur);
 }
+
+/* Volume lifecycle */
 
 int bd_bind(int8_t vol_id)
 {
@@ -880,6 +905,8 @@ int bd_unbind(int8_t vol_id)
     return EOK;
 }
 
+/* Volume queries */
+
 int bd_sync(void)
 {
     int rc = disk_sync();
@@ -933,6 +960,8 @@ int bd_vsetattr(int8_t vol_id, uint8_t attr)
 
     return EOK;
 }
+
+/* File I/O */
 
 int bd_open(const char *name83, FsContext ctx, uint8_t writable)
 {
@@ -1178,6 +1207,8 @@ int bd_seek(int fd, uint32_t offset)
 
     return EOK;
 }
+
+/* Directory management */
 
 int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos)
 {

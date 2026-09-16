@@ -1,3 +1,10 @@
+/*
+ * apps/extra/ed/ed.h — Line editor
+ *
+ * Buffer layout (gap buffer + line offsets), editor state, and the public
+ * load/save/edit operation API.
+ */
+
 #ifndef ED_H
 #define ED_H
 

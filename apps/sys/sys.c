@@ -1,5 +1,7 @@
 #include <ccplib.h>
 
+/* Command implementation */
+
 static CmdErr cmd_sys(FsContext *ctx, int argc, char **argv)
 {
     (void)ctx;
@@ -47,6 +49,8 @@ static CmdErr cmd_sys(FsContext *ctx, int argc, char **argv)
 
     return cmderr_ok();
 }
+
+/* Entry point */
 
 int main(int argc, char **argv)
 {

@@ -1,3 +1,11 @@
+/*
+ * sysgen/include/utility.h — Sysgen host paths, CLI parsing and image
+ * filesystem helpers
+ *
+ * Build/root path resolution, flag and positional argument parsing, and
+ * host-side disk image utilities shared across the command modules.
+ */
+
 #ifndef SYSGEN_UTILITY_H
 #define SYSGEN_UTILITY_H
 

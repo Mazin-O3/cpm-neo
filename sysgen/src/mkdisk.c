@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Sector Math */
+
 static uint32_t min_viable_blocks(void)
 {
     return (BD_MIN_VOL_SECS + BD_BLOCK_SECS - 1) / BD_BLOCK_SECS;
@@ -65,6 +67,8 @@ static uint32_t reserve_kernel_ccp(uint32_t kern_size, uint32_t ccp_size, int xi
     return kernel_sectors(kern_size, xip) + ccp_sectors(ccp_size);
 }
 
+/* Byte Helpers */
+
 static uint32_t read32(const uint8_t *p)
 {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
@@ -77,6 +81,8 @@ static void write32(uint8_t *p, uint32_t v)
     p[2] = (uint8_t)(v >> 16);
     p[3] = (uint8_t)(v >> 24);
 }
+
+/* ELF Parser */
 
 /*
  * elf32_symbol — Look up a symbol value in a 32-bit ELF binary.
@@ -153,6 +159,8 @@ int elf32_symbol(const uint8_t *e, size_t n, const char *name, uint32_t *value)
     return -1;
 }
 
+/* Filename Conversion */
+
 /*
  * to_name83 — Convert a filename string to padded 8.3 format.
  * If no extension is present, ".COM" is assumed.
@@ -212,6 +220,8 @@ void to_name83(const char *src, char *out83)
     memcpy(out83 + NAME83_BASE, ext, NAME83_EXT);
 }
 
+/* File I/O */
+
 int read_file(const char *path, uint8_t **out, uint32_t *out_len)
 {
     FILE *f = fopen(path, "rb");
@@ -268,6 +278,8 @@ int write_file(const char *path, const uint8_t *data, uint32_t len)
     return rc;
 }
 
+/* Disk Config */
+
 /*
  * sysgen_disk_cfg_default — Sane default = the host compile-time values.
  * Used when the platform's build tags are absent.
@@ -280,6 +292,8 @@ SysgenDiskCfg sysgen_disk_cfg_default(void)
     cfg.disk_size_kb = BD_VOL_MAX_BLOCKS;
     return cfg;
 }
+
+/* Disk Image Assembly */
 
 /*
  * mkdisk_build — Assemble a complete disk image in memory.
@@ -320,7 +334,7 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
 
     sysgen_set_disk(disk, total_secs * DISK_SECTOR_SIZE);
 
-    /* ── Sector 0 ─────────────────────────────────────────── */
+    /* Sector 0 */
     /* S0_DISK_SIZE_KB / S0_KERN_SIZE / S0_KERN_SECS are documented
      * on-disk metadata (docs/disk-format.md) reserved for host tools;
      * the bootloader and kernel read only the fields below. */
@@ -344,22 +358,21 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
 
     put_le16(disk + S0_SIG, BOOT_SIG);
 
-    /* ── Kernel image (padded; BOOT_MAGIC trailer on non-XIP only) ── */
+    /* Kernel image (padded; BOOT_MAGIC trailer on non-XIP only) */
     uint32_t kern_sect_bytes = num_kern_sects * DISK_SECTOR_SIZE;
     memcpy(disk + KERN_START_SEC * DISK_SECTOR_SIZE, kern, kern_size);
 
     if (!xip)
         write32(disk + KERN_START_SEC * DISK_SECTOR_SIZE + kern_sect_bytes - 4, BOOT_MAGIC);
 
-    /* ── CCP raw binary ────────────────────────────────────── */
-
+    /* CCP raw binary */
     if (ccp_size > 0)
     {
         uint16_t csec = KERN_START_SEC + num_kern_sects;
         memcpy(disk + csec * DISK_SECTOR_SIZE, ccp, ccp_size);
     }
 
-    /* ── VMAP @ sector 1: geometry + VolRec[cfg->vol_count] ── */
+    /* VMAP @ sector 1: geometry + VolRec[cfg->vol_count] */
     /* The block grid holds (size_kb*2 - (KERN_START_SEC + reserved))/2
      * blocks: the image is exactly CONFIG_DISK_SIZE KB (size_kb), with the
      * boot/VMAP and reserved kernel+CCP sectors taken out of that budget.
@@ -400,7 +413,7 @@ int mkdisk_build(const SysgenDiskCfg *cfg, uint32_t size_kb, const uint8_t *kern
         vmap[vr + VMAP_VR_RUN_COUNT] = 1;      /* Run count */
         vmap[vr + VMAP_VR_ATTR] = VOL_ATTR_RW; /* Attr */
 
-        /* ── Formatted filesystem: header + (already-zeroed) empty root ── */
+        /* Formatted filesystem: header + (already-zeroed) empty root */
         uint16_t v_secs = (uint16_t)(count * BD_BLOCK_SECS);
         uint16_t num_data = (uint16_t)((v_secs - BD_DATA_START) / BD_BLOCK_SECS);
         /* Count is already <= cfg->disk_size_kb above, and num_data <=

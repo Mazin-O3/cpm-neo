@@ -9,17 +9,18 @@
  * with an automatic fallback to A0: if not found on the current volume.
  */
 
+#include "bdos.h"
+#include "ccp.h"
 #include <ansi.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "bdos.h"
-#include "ccp.h"
 #include <string.h>
 
 static const char *dir_fmt = "p*";
 static const char *user_fmt = "n";
 
+/* Directory listing */
 static CmdErr dir_list(FsContext *ctx, int argc, char **argv, int show_sys)
 {
     if (argc > 1 && !check_fmt(argc, argv, dir_fmt))
@@ -77,6 +78,7 @@ static CmdErr dir_list(FsContext *ctx, int argc, char **argv, int show_sys)
 
         SplitName sn = split_name83(di.name);
         char      base[NAME83_BASE + 1], ext[NAME83_EXT + 1];
+        
         pad_field(base, sn.base, sn.base_len, NAME83_BASE);
         pad_field(ext, sn.ext, sn.ext_len, NAME83_EXT);
         printf("%s %s", base, ext);
@@ -113,6 +115,7 @@ CmdErr cmd_dirs(FsContext *ctx, int argc, char **argv)
     return dir_list(ctx, argc, argv, 1);
 }
 
+/* USER command */
 CmdErr cmd_user(FsContext *ctx, int argc, char **argv)
 {
     if (argc == 1)
@@ -140,6 +143,7 @@ CmdErr cmd_user(FsContext *ctx, int argc, char **argv)
     return cmderr_ok();
 }
 
+/* Transient program execution */
 /*
  * exec_if_sys — If the $SYS-marked .COM at |path| exists, execute it.
  * Returns 1 if the file was found (exec attempted, *out_rc set), 0 otherwise.
@@ -210,6 +214,7 @@ CmdErr try_implicit_run(FsContext *ctx, int argc, char **argv)
     return cmderr_bdos(vol_from_arg(argv[0], ctx->vol_id), rc);
 }
 
+/* Misc commands */
 CmdErr cmd_cls(FsContext *ctx, int argc, char **argv)
 {
     (void)ctx;

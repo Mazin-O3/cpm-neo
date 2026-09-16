@@ -20,6 +20,8 @@
 extern char **environ;
 #endif
 
+/* Path Configuration */
+
 static SysgenPaths g_paths = {
     .build_dir = "sysgen/build",
     .root_dir = ".",
@@ -57,6 +59,8 @@ void sysgen_default_disk(char *buf, size_t n)
     snprintf(buf, n, "%s/disk.img", g_paths.build_dir);
 }
 
+/* Error Handling */
+
 void err(const char *fmt, ...)
 {
     va_list ap;
@@ -83,6 +87,8 @@ const char *err_str(int rc)
         return "Error";
     }
 }
+
+/* CLI Argument Parsing */
 
 const char *flag_value(int argc, char **argv, const char *name, int *seen)
 {
@@ -157,6 +163,8 @@ int collect_positional(int argc, char **argv, const char **out, int max_out)
     return n;
 }
 
+/* Disk Resolution */
+
 /* Resolve the target disk path (--disk=..., else the default) into buf.
  * Always writes into buf and returns buf, so callers never need to
  * re-copy the returned pointer. */
@@ -205,6 +213,8 @@ int parse_vn(const char *s, int *vol, int *user)
     return 0;
 }
 
+/* Filesystem Utilities */
+
 #if defined(_WIN32)
 int dir_exists(const char *p)
 {
@@ -233,6 +243,8 @@ int file_exists(const char *p)
 
 #endif
 
+/* Formatting */
+
 void hr(char *out, size_t n, uint32_t bytes)
 {
     if (bytes >= 1024 * 1024)
@@ -258,6 +270,8 @@ void hr(char *out, size_t n, uint32_t bytes)
         snprintf(out, n, "%u B", bytes);
     }
 }
+
+/* Directory Scanning */
 
 typedef struct
 {
@@ -334,6 +348,8 @@ static int scan_dir(const char *dir, ComEntry *list, int cap)
     qsort(list, (size_t)n, sizeof(ComEntry), com_name_cmp);
     return n;
 }
+
+/* Directory Iteration */
 
 int has_source_ext(const char *name)
 {
@@ -427,6 +443,8 @@ int for_each_flat_file(const char *dir, SysgenCallback cb, void *ud)
 
     return files;
 }
+
+/* Disk I/O */
 
 int mkdir_p(const char *path)
 {
@@ -544,6 +562,8 @@ int mount_vol(int8_t vol)
 
     return 0;
 }
+
+/* Process Spawning */
 
 #if defined(_WIN32)
 

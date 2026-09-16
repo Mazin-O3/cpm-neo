@@ -5,6 +5,7 @@
 
 #include "string.h"
 #include "ctype.h"
+/* String helpers */
 
 void *memcpy(void *dst, const void *src, size_t n)
 {
@@ -48,6 +49,7 @@ void *memset(void *dst, int val, size_t n)
     {
         size_t v4 = (size_t)v | ((size_t)v << 8) | ((size_t)v << 16) | ((size_t)v << 24);
         size_t nw = (size_t)(n >> 2);
+
         do
         {
             *(size_t *)d = v4;

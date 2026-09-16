@@ -5,10 +5,10 @@
  * `sysgen extract` and `sysgen dir`, plus the local helpers they share.
  */
 
+#include "bdos.h"
 #include "cmd.h"
 #include "commands.h"
 
-#include "bdos.h"
 #include "disk.h"
 #include "sysgen.h"
 #include "utility.h"
@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+
+/* Flags & Types */
 
 /* Whitelists of flags accepted by each command (NULL-terminated). */
 static const char *const FLAGS_FILE[] = {
@@ -46,6 +48,8 @@ typedef struct
     int                added;
     int                skipped;
 } AddFolderScan;
+
+/* Local Helpers */
 
 /* Parse the shared add/install target options: the source positional, the
  * destination volume/user area, the file attributes, and the disk path.
@@ -111,6 +115,8 @@ static int add_file(const char *disk, const char *file, const AddFileOpts *opts)
     return save_disk(disk);
 }
 
+/* Commands */
+
 /*
  * cmd_add — Add a file or flat folder to the disk image.
  * Supports --dst=Vn for volume/user targeting, --attr for file attributes.
@@ -155,7 +161,7 @@ int cmd_add(int argc, char **argv)
         if (save_disk(disk_buf) != 0)
             return 1;
 
-        printf("\nAdded %d file(s) to %c:%u (%d already existed)\n", scan.added, 'A' + vol, user,
+        printf("\nAdded %d file(s) to %c:%u (%d skipped)\n", scan.added, 'A' + vol, user,
                scan.skipped);
         return 0;
     }

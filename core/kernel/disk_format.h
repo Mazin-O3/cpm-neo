@@ -21,43 +21,50 @@
 
 #include "config.h"
 
-/* ── Sector-0 (S0) layout ──────────────────────────────────────────────── */
-
-/* Sector size — The single source for sector-based I/O byte counts across
+/*
+ * Sector-0 (S0) layout
+ *
+ * Sector size — The single source for sector-based I/O byte counts across
  * the bootloader (boot.S + platform bios.c), the kernel disk layer,
  * sysgen, and user programs (re-exported via fsctx.h).  This is an on-disk
  * format *invariant*, not a CONFIG_* tunable: the block layer (1 KB = 2
  * sectors), the volume geometry, MKDSK, and the emulator's sector DMA
- * all assume 512. */
+ * all assume 512.
+ */
 #define DISK_SECTOR_SIZE 512
 
 /* Sector-0 identity markers. */
+
 #define BOOT_SEC       0      /* Sector 0 — boot sector             */
 #define DISK_MAGIC     0x4350 /* 'CP' — Sector-0 identity           */
 #define BOOT_SIG       0xAA55 /* Standard boot sector sig           */
 #define BOOT_MAGIC     DISK_MAGIC
 #define KERN_START_SEC 2 /* Kernel image start sector          */
 
-#define S0_MAGIC        0x000 /* u16   — Must equal DISK_MAGIC  */
-#define S0_DISK_VER     0x002 /* u16   — Disk format version    */
-#define S0_DISK_SIZE_KB 0x004 /* u16   — Total disk KB          */
-#define S0_KERN_LOAD    0x006 /* u32   — Kernel RAM load addr   */
-#define S0_KERN_SIZE    0x00A /* u32   — Kernel.bin raw bytes   */
-#define S0_KERN_SECTORS 0x00E /* u16   — Padded on-disk sectors */
-#define S0_KERN_SEC     0x010 /* u16   — Kernel start sector   */
-#define S0_OS_VER       0x012 /* u16   — OS version             */
-#define S0_KERN_VER     0x014 /* u16   — Kernel version         */
-#define S0_CCP_VER      0x016 /* u16   — CCP version            */
-#define S0_KERN_SECS    0x018 /* u16   — Kernel disk reservation */
+/* Sector-0 field offsets. */
+
+#define S0_MAGIC        0x000 /* u16   — Must equal DISK_MAGIC       */
+#define S0_DISK_VER     0x002 /* u16   — Disk format version         */
+#define S0_DISK_SIZE_KB 0x004 /* u16   — Total disk KB               */
+#define S0_KERN_LOAD    0x006 /* u32   — Kernel RAM load addr        */
+#define S0_KERN_SIZE    0x00A /* u32   — Kernel.bin raw bytes        */
+#define S0_KERN_SECTORS 0x00E /* u16   — Padded on-disk sectors      */
+#define S0_KERN_SEC     0x010 /* u16   — Kernel start sector         */
+#define S0_OS_VER       0x012 /* u16   — OS version                  */
+#define S0_KERN_VER     0x014 /* u16   — Kernel version              */
+#define S0_CCP_VER      0x016 /* u16   — CCP version                 */
+#define S0_KERN_SECS    0x018 /* u16   — Kernel disk reservation     */
 #define S0_CCP_SEC      0x01A /* u16   — CCP raw binary start sector */
 #define S0_CCP_SIZE     0x01C /* u16   — CCP raw binary sector count */
-#define S0_PLATFORM     0x01E /* u8[8] — Platform name, NUL-padded */
-#define S0_XIP          0x026 /* u8    — 1 = XIP disk image      */
-#define S0_SIG          0x1FE /* u16   — Must equal BOOT_SIG    */
+#define S0_PLATFORM     0x01E /* u8[8] — Platform name, NUL-padded   */
+#define S0_XIP          0x026 /* u8    — 1 = XIP disk image          */
+#define S0_SIG          0x1FE /* u16   — Must equal BOOT_SIG         */
 
-/* ── Volume-map (VMAP) format — Sector 1 ──────────────────────────────── */
-
-/* 0x000 u16 num_blocks  — Total 1K blocks on disk
+/*
+ * Volume-map (VMAP) format — Sector 1
+ */
+/*
+ * 0x000 u16 num_blocks  — Total 1K blocks on disk
  * 0x002 u16 base_sec    — Sector of block 0
  * 0x004 u16 magic       — VMAP_MAGIC
  * 0x006 VolRec[MAX_VOLUMES] — VMAP_VOLREC_SIZE each
@@ -65,34 +72,39 @@
  *
  * Block i occupies sectors [base_sec + i*2, +2) (1 KB = 2 sectors).
  * A volume's logical space is the concatenation of its ordered block
- * runs. Run_count == 0 means the volume is unmounted. */
+ * runs.  Run_count == 0 means the volume is unmounted.
+ */
 
-#define VMAP_SEC   1       /* Volume-map sector       */
-#define VMAP_MAGIC 0x4350u /* 'CP' identity           */
+#define VMAP_SEC   1       /* Volume-map sector                      */
+#define VMAP_MAGIC 0x4350u /* 'CP' identity                          */
 
-/* Max block runs per volume — Wire VolRec width (fixed format constant). */
-#define VOL_MAX_RUNS 4
+/* VolRec geometry. */
 
-#define VMAP_VOLREC_SIZE (4 * VOL_MAX_RUNS + 2) /* VolRec bytes */
+#define VOL_MAX_RUNS     4
+#define VMAP_VOLREC_SIZE (4 * VOL_MAX_RUNS + 2)
 
-#define VMAP_NUM_BLOCKS 0x000 /* u16 — Total 1K blocks on disk */
-#define VMAP_BASE_SEC   0x002 /* u16 — Sector of block 0       */
-#define VMAP_MAGIC_OFF  0x004 /* u16 — VMAP_MAGIC              */
-#define VMAP_VOLREC     0x006 /* VolRec[MAX_VOLUMES]               */
-#define VMAP_SIG        0x1FE /* u16 — BOOT_SIG                */
+/* VMAP field offsets. */
+
+#define VMAP_NUM_BLOCKS 0x000 /* u16 — Total 1K blocks on disk      */
+#define VMAP_BASE_SEC   0x002 /* u16 — Sector of block 0            */
+#define VMAP_MAGIC_OFF  0x004 /* u16 — VMAP_MAGIC                   */
+#define VMAP_VOLREC     0x006 /* VolRec[MAX_VOLUMES]                 */
+#define VMAP_SIG        0x1FE /* u16 — BOOT_SIG                     */
 
 /* VolRec wire layout (VMAP_VOLREC_SIZE bytes each):
  *   run[v] occupies bytes [4v, 4v+4): u16 start, u16 count
  *   +4*VOL_MAX_RUNS        u8 run_count
  *   +4*VOL_MAX_RUNS + 1    u8 attr (VOL_ATTR_RW / VOL_ATTR_RO) */
+
 #define VMAP_VR_RUN0_START 0
 #define VMAP_VR_RUN0_COUNT 2
 #define VMAP_VR_RUN_COUNT  (4 * VOL_MAX_RUNS)
 #define VMAP_VR_ATTR       (4 * VOL_MAX_RUNS + 1)
 
-/* ── Volume header — Logical sector 0 of each volume ──────────────────── */
-
-/* 0x000 u16 magic     — Must equal DISK_MAGIC
+/*
+ * Volume header — Logical sector 0 of each volume
+ *
+ * 0x000 u16 magic     — Must equal DISK_MAGIC
  * 0x002 u16 ver       — VHDR_VER
  * 0x004 u16 size_kb   — Volume size KB
  * 0x006 u16 root_sec  — Root directory sector
@@ -100,8 +112,9 @@
  * 0x00A u16 tot_blks  — Total data blocks
  * 0x1FE u16           — 0xAA55
  *
- * Block size is fixed at 2 sectors (1 KB). */
 
+ * Block size is fixed at 2 sectors (1 KB).
+ */
 #define VHDR_MAGIC_OFF    0x00
 #define VHDR_VER_OFF      0x02
 #define VHDR_SIZE_KB_OFF  0x04
@@ -111,35 +124,45 @@
 
 #define VHDR_VER 0x0001u /* Volume header format version */
 
-/* ── Block / volume geometry ──────────────────────────────────────────── */
-
-/* A data block is a fixed run of DISK_BLOCK_SECS sectors (1 KB).  The
+/*
+ * Block / volume geometry
+ *
+ * A data block is a fixed run of DISK_BLOCK_SECS sectors (1 KB).  The
  * block grid, every volume region calculation, and the BDOS allocator
  * all derive from these; they are the single source for 1-KB-block
- * arithmetic across the disk, bd, and sysgen layers. */
 
-#define DISK_BLOCK_SECS     2 /* 1 KB data block = 2 sectors */
+ * arithmetic across the disk, bd, and sysgen layers.
+ */
+#define DISK_BLOCK_SECS     2
 #define DISK_SECTORS_PER_KB (1024 / DISK_SECTOR_SIZE)
 #define DISK_BLOCK_BYTES    (DISK_BLOCK_SECS * DISK_SECTOR_SIZE)
 
-/* Per-volume region layout: header sector 0, then the root directory
+/*
+ * Per-volume region layout: header sector 0, then the root directory
  * (fixed 8 KB: 256 x 32-byte BDOS entries), then the data blocks.
- * DISK_DATA_START is the first sector of a volume's data area. */
+ * DISK_DATA_START is the first sector of a volume's data area.
+ */
 #define DISK_HEADER_SECS 1
 #define DISK_ROOT_SECS   16
 #define DISK_DATA_START  (DISK_HEADER_SECS + DISK_ROOT_SECS)
 
-/* Data block 0 of every volume is unusable (the BDOS allocator encodes
+/*
+ * Data block 0 of every volume is unusable (the BDOS allocator encodes
  * an absent directory extent slot as block 0), so the formatting rules
- * permanently reserve it. */
+ * permanently reserve it.
+ */
 #define DISK_RESERVED_BLOCKS 1
 
-/* Minimum volume size: header + root, plus the reserved block and at
- * least one usable data block. */
+/*
+ * Minimum volume size: header + root, plus the reserved block and at
+ * least one usable data block.
+ */
 #define DISK_MIN_VOL_SECS (DISK_DATA_START + (DISK_RESERVED_BLOCKS + 1) * DISK_BLOCK_SECS)
 
-/* Per-volume block cap (CONFIG_DISK_SIZE KB = blocks, since one block
- * is 1 KB).  The BDOS allocation bitmap is sized from this. */
+/*
+ * Per-volume block cap (CONFIG_DISK_SIZE KB = blocks, since one block
+ * is 1 KB).  The BDOS allocation bitmap is sized from this.
+ */
 #define DISK_VOL_MAX_BLOCKS CONFIG_DISK_SIZE
 
 #endif /* DISK_FORMAT_H */

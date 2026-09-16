@@ -1,5 +1,7 @@
 #include "pico.h"
 
+/* Gap buffer size utilities */
+
 int gap_text_len(PicoState *s)
 {
     return BUF_SIZE - (s->gap.end - s->gap.start);
@@ -9,6 +11,8 @@ int gap_buf_idx(const PicoState *s, int li)
 {
     return li < s->gap.start ? li : li + (s->gap.end - s->gap.start);
 }
+
+/* Initialization */
 
 void gap_init(PicoState *s)
 {
@@ -20,13 +24,17 @@ void gap_init(PicoState *s)
     s->flags.truncated = 0;
 }
 
+/* Line range operations */
+
 int gap_line_range(PicoState *s, int row, int *start, int *end)
 {
     int tl = gap_text_len(s);
     int count = 0, line_start = 0;
+
     for (int li = 0; li <= tl; li++)
     {
         int is_nl = (li < tl) && (s->gap.data[gap_buf_idx(s, li)] == '\n');
+
         if (is_nl || li == tl)
         {
             if (count == row)
@@ -45,24 +53,30 @@ int gap_line_range(PicoState *s, int row, int *start, int *end)
 int gap_get_line(PicoState *s, int row, char *out, int maxlen)
 {
     int start, end;
+
     if (!gap_line_range(s, row, &start, &end))
     {
         out[0] = '\0';
         return 0;
     }
     int len = end - start;
+
     if (len > maxlen - 1)
         len = maxlen - 1;
+
     for (int j = 0; j < len; j++)
         out[j] = s->gap.data[gap_buf_idx(s, start + j)];
     out[len] = '\0';
     return len;
 }
 
+/* Cursor and line count maintenance */
+
 void gap_recount_lines(PicoState *s)
 {
     int tl = gap_text_len(s);
     int count = 1;
+
     for (int li = 0; li < tl; li++)
     {
         if (s->gap.data[gap_buf_idx(s, li)] == '\n')
@@ -75,9 +89,11 @@ void gap_update_cursor(PicoState *s)
 {
     int tl = gap_text_len(s);
     int count = 0, line_start = 0;
+
     for (int li = 0; li <= tl; li++)
     {
         int is_nl = (li < tl) && (s->gap.data[gap_buf_idx(s, li)] == '\n');
+
         if (is_nl || li == tl)
         {
             if (li >= s->gap.start)
@@ -94,10 +110,13 @@ void gap_update_cursor(PicoState *s)
     s->cur.col = s->gap.start - line_start;
 }
 
+/* Gap movement */
+
 void gap_move_to(PicoState *s, int target)
 {
     if (target < 0)
         target = 0;
+
     if (target > gap_text_len(s))
         target = gap_text_len(s);
 

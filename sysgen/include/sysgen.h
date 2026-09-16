@@ -1,11 +1,17 @@
+/*
+ * sysgen/include/sysgen.h — Sysgen host image builder
+ *
+ * Disk image buffer, ELF32 symbol lookup, and platform disk configuration
+ * used by the 'new' command to assemble a fresh system image.
+ */
+
 #ifndef SYSGEN_H
 #define SYSGEN_H
 
+#include "disk_format.h"
+#include "fsctx.h"
 #include <stddef.h>
 #include <stdint.h>
-
-#include "fsctx.h"
-#include "disk_format.h"
 
 /* Image buffer owned by bios_host.c */
 void     sysgen_set_disk(uint8_t *disk, uint32_t size);

@@ -13,12 +13,8 @@
 
 #include <ccplib.h>
 
-/*
- * copy_one — Copy a single file from src to dst.
- * Preserves the source file's attributes on the destination.
- * Sets *err_vol to the volume where the error occurred (for error reporting).
- * Returns EOK on success, or a negative error code.
- */
+/* Single file copy */
+
 static int copy_one(const FileRef *src, const FileRef *dst, uint8_t src_attrib, int8_t *err_vol)
 {
     char spath[FSPATH_MAX];
@@ -49,6 +45,8 @@ static int copy_one(const FileRef *src, const FileRef *dst, uint8_t src_attrib, 
 
     return EOK;
 }
+
+/* Command implementation */
 
 static CmdErr cmd_copy(FsContext *ctx, int argc, char **argv)
 {
@@ -154,6 +152,8 @@ static CmdErr cmd_copy(FsContext *ctx, int argc, char **argv)
 
     return cmderr_ok();
 }
+
+/* Entry point */
 
 int main(int argc, char **argv)
 {

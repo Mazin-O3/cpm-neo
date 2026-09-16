@@ -2,21 +2,7 @@
 #include "syscall.h"
 
 #include <ctype.h>
-
-void exit(int status)
-{
-    sys_exit(status);
-}
-
-int exec(const char *path, int argc, char **argv)
-{
-    return sys_exec(path, argc, argv);
-}
-
-int getargs(ArgBlock *out)
-{
-    return sys_args(out);
-}
+/* Conversion */
 
 int atoi(const char *s)
 {
@@ -42,9 +28,9 @@ int atoi(const char *s)
 char *itoa(int value, char *str, int base)
 {
     static const char digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    char *p = str;
-    int   neg = (value < 0) && (base == 10);
-    unsigned int v = neg ? ((unsigned int)(-(value + 1)) + 1u) : (unsigned int)value;
+    char             *p = str;
+    int               neg = (value < 0) && (base == 10);
+    unsigned int      v = neg ? ((unsigned int)(-(value + 1)) + 1u) : (unsigned int)value;
 
     if (base < 2 || base > 36)
     {
@@ -74,6 +60,8 @@ char *itoa(int value, char *str, int base)
     return str;
 }
 
+/* Random */
+
 static uint32_t rnd_seed = 1;
 
 void srand(uint32_t seed)
@@ -85,6 +73,23 @@ int rand(void)
 {
     rnd_seed = rnd_seed * 1103515245UL + 12345;
     return (int)((rnd_seed >> 16) & 0x7FFF);
+}
+
+/* Process */
+
+void exit(int status)
+{
+    sys_exit(status);
+}
+
+int exec(const char *path, int argc, char **argv)
+{
+    return sys_exec(path, argc, argv);
+}
+
+int getargs(ArgBlock *out)
+{
+    return sys_args(out);
 }
 
 void delay(uint32_t ms)

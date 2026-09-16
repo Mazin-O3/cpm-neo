@@ -8,8 +8,12 @@
 
 #include <ccplib.h>
 
+/* Format strings and helpers */
+
 static const char *stat_vol_fmt = "v";   /* STAT B: — Volume stats, no user digits */
 static const char *stat_file_fmt = "f*"; /* STAT FOO.TXT — File stats */
+
+/* Volume status */
 
 static CmdErr stat_vol_single(int8_t vol)
 {
@@ -45,6 +49,8 @@ static CmdErr stat_vol(int8_t vol)
     return cmderr_ok();
 }
 
+/* File status display */
+
 static void stat_file(int8_t vol_id, FileInfo *di)
 {
     uint16_t secs = (uint16_t)((di->size + DISK_SECTOR_SIZE - 1) / DISK_SECTOR_SIZE);
@@ -62,6 +68,8 @@ static void stat_file(int8_t vol_id, FileInfo *di)
     printf(" %4u%6uK%5u %s %-2s         %c:%s.%s\n", secs, kb, di->extents, cls, acc, 'A' + vol_id,
            base, ext);
 }
+
+/* Disk statistics display */
 
 static CmdErr stat_dsk(void)
 {
@@ -111,6 +119,8 @@ static CmdErr stat_dsk(void)
 
     return cmderr_ok();
 }
+
+/* Command implementation */
 
 static CmdErr cmd_stat(FsContext *ctx, int argc, char **argv)
 {
@@ -171,6 +181,8 @@ static CmdErr cmd_stat(FsContext *ctx, int argc, char **argv)
 
     return stat_vol(vol_id);
 }
+
+/* Entry point */
 
 int main(int argc, char **argv)
 {

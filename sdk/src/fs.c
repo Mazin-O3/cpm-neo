@@ -17,6 +17,7 @@
 #define O_WRONLY 0x02
 #define O_CREAT  0x04
 #define O_APPEND 0x10
+/* Filesystem wrappers */
 
 static int g_find_pos = 0;
 
@@ -157,6 +158,42 @@ int fsetattr(const char *path, uint8_t attrib)
     return sys_fsetattr(path, attrib);
 }
 
+int fcopy(const char *dst_path, const char *src_path)
+{
+    int src_fd = open(src_path, "r");
+
+    if (src_fd < 0)
+        return src_fd;
+    int dst_fd = open(dst_path, "w");
+
+    if (dst_fd < 0)
+    {
+        close(src_fd);
+        return dst_fd;
+    }
+    uint8_t buf[512];
+    int     n, rc = EOK;
+
+    while ((n = read(src_fd, buf, sizeof(buf))) > 0)
+    {
+        int w = write(dst_fd, buf, n);
+
+        if (w != n)
+        {
+            rc = (w < 0) ? w : ENOSPC;
+            break;
+        }
+    }
+
+    if (n < 0)
+        rc = n;
+    close(src_fd);
+    close(dst_fd);
+    return rc;
+}
+
+/* Directory scan */
+
 /*
  * find — Find the first matching file.  Resets on success.
  * Returns EOK if found, ENOENT if not.
@@ -192,44 +229,7 @@ void find_reset(void)
     g_find_pos = 0;
 }
 
-int fcopy(const char *dst_path, const char *src_path)
-{
-    int src_fd = open(src_path, "r");
-
-    if (src_fd < 0)
-        return src_fd;
-
-    int dst_fd = open(dst_path, "w");
-
-    if (dst_fd < 0)
-    {
-        close(src_fd);
-        return dst_fd;
-    }
-
-    uint8_t buf[512];
-
-    int n, rc = EOK;
-
-    while ((n = read(src_fd, buf, sizeof(buf))) > 0)
-    {
-        int w = write(dst_fd, buf, n);
-
-        if (w != n)
-        {
-            rc = (w < 0) ? w : ENOSPC;
-            break;
-        }
-    }
-
-    if (n < 0)
-        rc = n;
-
-    close(src_fd);
-    close(dst_fd);
-
-    return rc;
-}
+/* Volume management */
 
 int vstat(int8_t vol, VolStat *out)
 {

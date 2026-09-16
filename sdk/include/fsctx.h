@@ -2,11 +2,10 @@
  * sdk/include/fsctx.h — CP/M Neo filesystem context and process ABI
  *
  * Volume/user context, filename conventions, file types, file descriptors,
- * argument passing.  The single source of
- * truth for the types and constants shared by the kernel, the SDK, the CCP,
- * and user programs.
-*/
- 
+ * argument passing.  The single source of truth for the types and constants
+ * shared by the kernel, the SDK, the CCP, and user programs.
+ */
+
 #ifndef SDK_FSCTX_H
 #define SDK_FSCTX_H
 
@@ -14,20 +13,24 @@
 
 #include "disk_format.h"
 
-/* DISK_SECTOR_SIZE (via disk_format.h above) is a disk *property* user
+/*
+ * DISK_SECTOR_SIZE (via disk_format.h above) is a disk *property* user
  * programs observe (disk-size math); the canonical value lives in
  * core/kernel/disk_format.h so boot, kernel, sysgen, and user programs
- * all agree on one number. */
 
-/* ── File naming ───────────────────────────────────────────────── */
-
+ * all agree on one number.
+ */
+/*
+ * File naming
+ */
 #define NAME83_BASE  8
 #define NAME83_EXT   3
 #define NAME83_LEN   (NAME83_BASE + NAME83_EXT)
 #define FILENAME_MAX 13 /* 8.3 name + NUL terminator */
 
-/* ── Volume / user context ──────────────────────────────────────── */
-
+/*
+ * Volume / user context
+ */
 #define VOL_A       0
 #define VOL_B       1
 #define VOL_C       2
@@ -43,8 +46,9 @@ typedef struct
     uint8_t user_area; /* Current user area (0..USER_AREA_MAX)              */
 } FsContext;
 
-/* ── Volume / file statistics ──────────────────────────────────── */
-
+/*
+ * Volume statistics
+ */
 #define VOL_ATTR_RW 0
 #define VOL_ATTR_RO 1
 
@@ -55,6 +59,9 @@ typedef struct
     int      read_only;    /* VOL_ATTR_RO or VOL_ATTR_RW  */
 } VolStat;
 
+/*
+ * File statistics
+ */
 #define FILE_ATTR_READ_ONLY 0x01
 #define FILE_ATTR_SYSTEM    0x02
 
@@ -68,8 +75,9 @@ typedef struct
     uint32_t alloc_bytes;        /* Allocated space in bytes */
 } FileInfo;
 
-/* ── File descriptors ───────────────────────────────────────────── */
-
+/*
+ * File descriptors
+ */
 #define FD_STDIN     0
 #define FD_STDOUT    1
 #define FD_STDERR    2
@@ -79,13 +87,15 @@ static inline int fd_is_console(int fd)
 {
     return fd < FD_FILE_BASE;
 }
+
 static inline int fd_is_stdin(int fd)
 {
     return fd == FD_STDIN;
 }
 
-/* ── Argument passing ───────────────────────────────────────────── */
-
+/*
+ * Argument passing
+ */
 #define ARGS_MAX    8
 #define ARG_LEN_MAX 32
 

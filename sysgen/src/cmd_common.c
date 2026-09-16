@@ -19,9 +19,7 @@
 #include <string.h>
 #include <strings.h>
 
-/* ========================================================================= *
- * Shared Path/Name Helpers
- * ========================================================================= */
+/* Path/Name Helpers */
 
 /* Handles both POSIX and Windows path separators; returns a pointer
  * into the original string (no allocation). */
@@ -68,9 +66,7 @@ void n83_dot(const char *n83, char *out, size_t n)
     out[o] = '\0';
 }
 
-/* ========================================================================= *
- * CLI Option Parsers & Target Context
- * ========================================================================= */
+/* CLI Option Parsers */
 
 int parse_dst(int argc, char **argv, int *vol, int *user)
 {
@@ -186,9 +182,7 @@ int check_positionals(int argc, char **argv, int min_pos, int max_pos)
     return 0;
 }
 
-/* ========================================================================= *
- * Disk & File Write Primitive
- * ========================================================================= */
+/* Disk & File Write Primitive */
 
 /* Add a single host file to the currently mounted volume/user area.
  * Returns 0 on success, 1 on error, 2 on skip (already exists). */

@@ -16,12 +16,16 @@
 
 #include <ccplib.h>
 
+/* Format strings */
+
 /* Volume subcommands: "v" rejects user digits (B5: is invalid). */
 static const char *set_vol_fmt = "v a";     /* SET B: RO, MT, UM */
 static const char *set_vol_n_fmt = "v a n"; /* SET B: RZ 10, RZ -5 */
 
 /* File attribute: "f" accepts optional user digits (B5:FOO.TXT). */
 static const char *set_file_attr_fmt = "f a"; /* SET FOO.TXT RO */
+
+/* Helpers */
 
 static void print_vol_size(int8_t vol_id)
 {
@@ -30,6 +34,8 @@ static void print_vol_size(int8_t vol_id)
     if (vstat(vol_id, &ds) == EOK)
         printf("%c: %uK\n", 'A' + vol_id, ds.total_blocks);
 }
+
+/* Volume operations */
 
 static CmdErr set_mount(int8_t vol_id)
 {
@@ -90,6 +96,8 @@ static CmdErr set_vol_attr(int8_t vol_id, const char *attrarg)
     return cmderr_ok();
 }
 
+/* File attribute operations */
+
 static CmdErr set_matching_file_attr(FsContext ctx, const char *name, int8_t mask, int set)
 {
     FileInfo di;
@@ -134,6 +142,8 @@ static CmdErr set_file_attr(FsContext ctx, const char *path, const char *attrarg
     return cmderr_syntax(attrarg);
 }
 
+/* Command implementation */
+
 static CmdErr cmd_set(FsContext *ctx, int argc, char **argv)
 {
     if (argc < 2)
@@ -173,6 +183,8 @@ static CmdErr cmd_set(FsContext *ctx, int argc, char **argv)
 
     return cmderr_syntax(NULL);
 }
+
+/* Entry point */
 
 int main(int argc, char **argv)
 {

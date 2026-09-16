@@ -21,12 +21,11 @@
  * Do not depend on libc.
  */
 
-#include <errno.h>
-
 #include "bios.h"
 #include "board.h"
 #include "config.h"
 
+#include <errno.h>
 #define MS_PER_SEC_DIV  96000UL
 #define UART_BRR_115200 (96000000UL / 115200U)
 
@@ -125,9 +124,9 @@ typedef struct
     uint16_t rx_in;
     uint16_t rx_out;
     uint16_t rx_count;
-} uart_port;
+} Uart;
 
-static uart_port uart;
+static Uart uart;
 
 static void uart_init(void)
 {

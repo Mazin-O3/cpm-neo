@@ -1,3 +1,10 @@
+/*
+ * sysgen/include/commands.h — Sysgen host CLI commands
+ *
+ * Dispatches the top-level sysgen verbs: new, add, era, install, extract
+ * and dir.
+ */
+
 #ifndef SYSGEN_COMMANDS_H
 #define SYSGEN_COMMANDS_H
 

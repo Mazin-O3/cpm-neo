@@ -1,4 +1,4 @@
-# Contributing to CP/M Neo
+#Contributing to CP / M Neo
 
 Thanks for your interest! This guide gets you from a fresh checkout to your first build and contribution.
 
@@ -46,5 +46,5 @@ For significant features, kernel changes, or new architecture ports, **open an i
 
 ## Pull requests
 
-- Branch from `main`, keep changes focused and commits concise.
+- Keep changes focused and commits concise.
 - Thanks for contributing!

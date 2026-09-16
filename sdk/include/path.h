@@ -15,7 +15,7 @@
 
 #include "fsctx.h"
 
-/* A parsed file reference: the filesystem context (volume + user area) plus
+/* Parsed file reference: the filesystem context (volume + user area) plus
  * the raw 8.3 name (possibly containing wildcards). */
 typedef struct
 {
@@ -26,30 +26,23 @@ typedef struct
 /* Full path buffer size: "V15:" prefix + 8.3 name + NUL. */
 #define FSPATH_MAX (ARG_LEN_MAX + 4)
 
-/* True if the 8.3 name contains '*' or '?'. */
-int has_wildcard(const char *name);
-
-/* Copy up to n chars of src into out, always NUL-terminated. */
-void name_copy(char *out, const char *src, size_t n);
+/* Prefix parsing */
 
 /* Length of a leading volume/user prefix ("V:", "VU:", "U:"), or 0. */
 int vu_prefix_len(const char *arg);
 
 /* split_prefix — split an optional volume/user prefix off a filespec.
- *
- * Grammar:
- *   "X:"  — volume only
- *   "Xn:" — volume + user area
- *   "n:"  — user area only
- *
- * Returns a pointer past the ':' when a valid prefix was consumed (ctx is
- * updated in place, bounded to MAX_VOLUMES / USER_AREA_MAX).  Returns p
- * unchanged for anything else (plain filename); ctx is left untouched. */
+ * Grammar: "X:" (volume only), "Xn:" (volume + user area), "n:" (user
+ * area only).  Returns a pointer past the ':' when a valid prefix was
+ * consumed (ctx updated in place, bounded to MAX_VOLUMES/USER_AREA_MAX);
+ * returns p unchanged, ctx untouched otherwise. */
 const char *split_prefix(const char *p, FsContext *ctx);
 
 /* Volume id from a bare "X:" volume argument, or |def| when the argument
  * does not name a volume. */
 int8_t vol_from_arg(const char *arg, int8_t def);
+
+/* Filespec / path building */
 
 /* Split an argument into a FileRef: full prefix grammar, remainder copied
  * into out->name (FILENAME_MAX - 1 chars, NUL-terminated). */
@@ -59,8 +52,13 @@ int parse_fileref(FsContext *ctx, const char *arg, FileRef *out);
  * must hold at least FSPATH_MAX bytes.  Returns buf. */
 char *make_path(char *buf, FsContext ctx, const char *name);
 
-/* An 8.3 name split into base/extension views. The pointers alias |name|
- * and the fields are NOT NUL-terminated; lengths are capped at
+/* 8.3 name helpers */
+
+/* True if the 8.3 name contains '*' or '?'. */
+int has_wildcard(const char *name);
+
+/* An 8.3 name split into base/extension views.  The pointers alias
+ * |name| and the fields are NOT NUL-terminated; lengths are capped at
  * NAME83_BASE/NAME83_EXT so printf "%.*s" is always in range. */
 typedef struct
 {
@@ -72,8 +70,15 @@ typedef struct
 
 SplitName split_name83(const char *name);
 
-/* Batch-file convention: "$$$.SUB" addressed as "<vol>0:" so it lives in
- * user 0 where the resident CCP finds it after USER switches. */
+/* String helpers */
+
+/* Copy up to n chars of src into out, always NUL-terminated. */
+void name_copy(char *out, const char *src, size_t n);
+
+/* Batch path convention */
+
+/* "$$$.SUB" addressed as "<vol>0:" so it lives in user 0 where the
+ * resident CCP finds it after USER switches. */
 #define BATCH_NAME     "$$$.SUB"
 #define BATCH_PATH_LEN 12 /* "A0:" + "$$$.SUB" + NUL */
 

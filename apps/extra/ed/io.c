@@ -1,5 +1,7 @@
 #include "ed.h"
 
+/* File I/O */
+
 int ed_load(Editor *e, const char *path)
 {
     strcpy(e->name, path);
@@ -35,7 +37,6 @@ int ed_load(Editor *e, const char *path)
     close(fd);
 
     e->gap_start = e->logical_bytes;
-
     e->gap_end = EDIT_BUF_SIZE;
 
     return 0;
@@ -79,6 +80,8 @@ int ed_save(Editor *e)
 
     return 0;
 }
+
+/* External file read */
 
 int ed_read(Editor *e, int line, const char *path)
 {

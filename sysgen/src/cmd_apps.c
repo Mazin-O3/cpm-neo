@@ -19,6 +19,8 @@
 #include <string.h>
 #include <strings.h>
 
+/* Bundled App Scan State */
+
 /* Walk-state for installing bundled apps.  `names` selects a subset of the
  * bundled apps (NULL = install all); each requested name must be found, or
  * the install fails so a typo can never silently drop an app. */
@@ -58,6 +60,8 @@ static void mark_found(BundledScan *scan, const char *name)
             return;
         }
 }
+
+/* Build Helpers */
 
 int build_folder_com(const SysgenPaths *paths, const char *src, const BuildFolderOpts *opts)
 {
@@ -252,6 +256,8 @@ static int run_install(const SysgenPaths *paths, const AddFileOpts *opts, const 
     free(found);
     return rc;
 }
+
+/* Public API */
 
 int install_sys_apps(const SysgenPaths *paths, const AddFileOpts *opts, const char *const *names,
                      size_t nnames)

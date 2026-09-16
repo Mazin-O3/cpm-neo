@@ -1,11 +1,17 @@
+/*
+ * sysgen/include/cmd.h — Shared command-line parsing and app install
+ *
+ * Common flag/positional parsing and disk-target helpers used by the
+ * sysgen commands, plus the bundled-app build & install entry points.
+ */
+
 #ifndef SYSGEN_CMD_H
 #define SYSGEN_CMD_H
 
-#include <stdbool.h>
-#include <stdint.h>
-
 #include "bdos.h"
 #include "utility.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 /* Disk image path + filesystem context for host-side operations. */
 typedef struct

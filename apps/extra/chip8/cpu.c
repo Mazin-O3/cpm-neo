@@ -1,5 +1,7 @@
 #include "chip8.h"
 
+/* ALU operations */
+
 static void alu_ld(Chip8State *s, uint8_t x, uint8_t y)
 {
     s->v[x] = s->v[y];
@@ -62,6 +64,8 @@ static const AluFn alu_tab[16] = {
     [0x0] = alu_ld,  [0x1] = alu_or,  [0x2] = alu_and,  [0x3] = alu_xor, [0x4] = alu_add,
     [0x5] = alu_sub, [0x6] = alu_shr, [0x7] = alu_subn, [0xE] = alu_shl,
 };
+
+/* FX prefix instructions */
 
 static void fx_delay_get(Chip8State *s, uint8_t x, uint8_t op)
 {
@@ -136,6 +140,8 @@ static const FxRow fx_tab[] = {
     {0x07, fx_delay_get}, {0x0A, fx_wait_key}, {0x15, fx_delay_set}, {0x1E, fx_i_add_vx},
     {0x29, fx_i_digit},   {0x33, fx_bcd},      {0x55, fx_store},     {0x65, fx_load},
 };
+
+/* Opcode handlers */
 
 static void op_zero(Chip8State *s, uint16_t op)
 {
@@ -286,6 +292,8 @@ static const OpFn op_tab[16] = {
     [0x8] = op_alu,     [0x9] = op_skip_ne_r, [0xA] = op_ld_i, [0xB] = op_jp_v0,
     [0xC] = op_rnd,     [0xD] = op_draw,      [0xE] = op_key,  [0xF] = op_fx,
 };
+
+/* Public interface */
 
 void chip8_reset(Chip8State *s)
 {

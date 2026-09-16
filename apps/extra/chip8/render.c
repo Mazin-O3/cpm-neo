@@ -1,5 +1,7 @@
 #include "chip8.h"
 
+/* Display constants */
+
 /* One terminal row: CH8_W cells x up to 3 UTF-8 bytes each + newline. */
 #define ROW_BUF (CH8_W * 3 + 2)
 
@@ -13,6 +15,8 @@ static const struct
     {"\xE2\x96\x80", 3}, /* 2: on  / off (▀ U+2580) */
     {"\xE2\x96\x88", 3}, /* 3: on  / on  (█ U+2588) */
 };
+
+/* Graphics operations */
 
 void chip8_clear(Chip8State *s)
 {
@@ -28,17 +32,17 @@ void chip8_draw(Chip8State *s, uint8_t x, uint8_t y, uint8_t n)
     uint8_t start_y = y % CH8_H;
 
     uint8_t b1 = start_x >> 3;
-    uint8_t b2 = (b1 + 1) % (CH8_W / 8); 
+    uint8_t b2 = (b1 + 1) % (CH8_W / 8);
     uint8_t shift = start_x & 7;
 
     for (uint8_t r = 0; r < n; r++)
     {
         uint8_t sprite = s->ram[(s->i + r) & 0xFFF];
-        
+
         if (!sprite)
             continue;
 
-        uint8_t py = (start_y + r) % CH8_H; 
+        uint8_t py = (start_y + r) % CH8_H;
         uint8_t p1 = sprite >> shift;
         uint8_t p2 = (uint8_t)(shift == 0 ? 0 : (sprite << (8 - shift)));
 
@@ -61,6 +65,8 @@ void chip8_draw(Chip8State *s, uint8_t x, uint8_t y, uint8_t n)
     s->v[0xF] = vf;
     s->dirty = 1;
 }
+
+/* Screen rendering */
 
 void chip8_render(Chip8State *s)
 {

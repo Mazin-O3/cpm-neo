@@ -12,6 +12,7 @@
 
 #include <ctype.h>
 #include <string.h>
+/* Filespec parsing */
 
 /* Copy up to n chars of src into out, always NUL-terminated. */
 void name_copy(char *out, const char *src, size_t n)
@@ -66,8 +67,8 @@ int vu_prefix_len(const char *arg)
 static const char *parse_ua_run(const char *p, int max, int *ua)
 {
     const char *start = p;
-    int count = 0;
-    int value = 0;
+    int         count = 0;
+    int         value = 0;
 
     while ((max < 0 || count < max) && isdigit((unsigned char)p[count]))
     {
@@ -125,7 +126,7 @@ static const char *parse_alpha_prefix(const char *p, FsContext *ctx)
 /* "n:" — a user area on its own (stays on the current volume). */
 static const char *parse_digit_prefix(const char *p, FsContext *ctx)
 {
-    int ua;
+    int         ua;
     const char *end = parse_ua_run(p, -1, &ua);
 
     if (end == p || *end != ':')
@@ -146,6 +147,8 @@ const char *split_prefix(const char *p, FsContext *ctx)
 
     return p;
 }
+
+/* Path and name building */
 
 char *make_path(char *buf, FsContext ctx, const char *name)
 {

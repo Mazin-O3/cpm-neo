@@ -15,16 +15,18 @@
 
 #include <ctype.h>
 #include <limits.h>
+#include <path.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syscall.h>
-
-#include <path.h>
 
 #include "bios.h"
 #include "disk.h"
 #include "kernel.h"
 
+/*
+ * State and static helpers
+ */
 __attribute__((weak)) void kjump(uintptr_t addr)
 {
     ((void (*)(void))addr)();
@@ -52,10 +54,9 @@ static KernelState g_kstate = {0};
 /*
  * Volume/user prefixes are optional and position-dependent.  The grammar
  * ("X:", "Xn:", "n:") is owned by split_prefix (sdk/include/path.h) and
- * shared with
- * the CCP's filespec parsing so both layers agree on one rule.  This lets
- * the CCP accept bare filenames transparently — only an explicit "X:" or
- * "Xn:" triggers a context switch.
+ * shared with the CCP's filespec parsing so both layers agree on one rule.
+ * This lets the CCP accept bare filenames transparently — only an
+ * explicit "X:" or "Xn:" triggers a context switch.
  */
 static FsContext parse_prefix(const char **path_ptr)
 {
@@ -82,7 +83,8 @@ static inline int resolve_file_fd(int sys_fd)
 /*
  * Directory entries store filenames as fixed-width 8.3 with space
  * padding; callers must produce this format before passing to bd_*.
- * Splitting on the last '.' lets the base and extension be padded independently.
+ * Splitting on the last '.' lets the base and extension be padded
+ * independently.
  */
 static int make_name83(const char *src, char *out)
 {
@@ -137,6 +139,9 @@ static int make_name83(const char *src, char *out)
 }
 
 /*
+ * Boot and program loader
+ */
+/*
  * Boot-time initialisation.
  * Binds every available volume; the first successfully bound volume
  * becomes the default cwd.
@@ -158,14 +163,12 @@ int kernel_init(void)
 }
 
 /*
- * Load a .COM program into the TPA and jump to it.
- * Fails with E2BIG if the file exceeds available TPA space.
- */
-/* XIP address for code at raw physical sector phy_sec, or 0 if the disk is
+ * XIP address for code at raw physical sector phy_sec, or 0 if the disk is
  * not XIP-formatted.  Single place that gates on disk_xip() and owns the
  * XIP_BASE + sec*512 formula.  User .com files are always RAM-loaded (see
  * kexec); this is used only for the CCP, which is placed exactly at its link
- * origin so it runs in place. */
+ * origin so it runs in place.
+ */
 static uint32_t xip_addr(uint16_t phy_sec)
 {
     if (!disk_xip())
@@ -174,6 +177,10 @@ static uint32_t xip_addr(uint16_t phy_sec)
     return (uintptr_t)XIP_BASE + (uint32_t)phy_sec * DISK_SECTOR_SIZE;
 }
 
+/*
+ * Load a .COM program into the TPA and jump to it.
+ * Fails with E2BIG if the file exceeds available TPA space.
+ */
 int kexec(const char *name83, int argc, char **argv, FsContext ctx)
 {
     int fd = bd_open(name83, ctx, 0);
@@ -257,8 +264,8 @@ void kexec_ccp(void)
     if (bios_read(0, s0) != 0)
         goto err;
 
-    uint16_t sec = *(uint16_t *)(s0 + S0_CCP_SEC);
-    uint16_t nsecs = *(uint16_t *)(s0 + S0_CCP_SIZE);
+    uint16_t sec = get_le16(&s0[S0_CCP_SEC]);
+    uint16_t nsecs = get_le16(&s0[S0_CCP_SIZE]);
 
     /* Sector 0 (boot sector) and sector 1 (volume map) can never be the
      * CCP or kernel location.  Reject a corrupt or stale header that would
@@ -298,6 +305,9 @@ err:
         ;
 }
 
+/*
+ * Syscall: file operations
+ */
 int sys_open(const char *name, uint8_t writable)
 {
     FsContext ctx = parse_prefix(&name);
@@ -308,6 +318,21 @@ int sys_open(const char *name, uint8_t writable)
         return err;
 
     int rc = bd_open(n83, ctx, writable);
+
+    return (rc < 0) ? rc : rc + FD_FILE_BASE;
+}
+
+int sys_create(const char *name)
+{
+    FsContext ctx = parse_prefix(&name);
+    char      n83[12];
+    int       err = make_name83(name, n83);
+
+    if (err != EOK)
+        return err;
+
+    int rc = bd_create(n83, ctx);
+
     return (rc < 0) ? rc : rc + FD_FILE_BASE;
 }
 
@@ -323,9 +348,7 @@ int sys_read(int fd, void *buf, uint32_t len)
         uint32_t i = 0;
 
         while (i < len)
-        {
             p[i++] = (uint8_t)bios_conin();
-        }
 
         return (int)i;
     }
@@ -357,9 +380,7 @@ int sys_write(int fd, const void *buf, uint32_t len)
     if (fd_is_console(fd))
     {
         for (uint32_t i = 0; i < len; i++)
-        {
             bios_conout((char)p[i]);
-        }
 
         return (int)len;
     }
@@ -388,53 +409,21 @@ int sys_close(int fd)
 {
     if (!fd_is_console(fd))
         return bd_close(resolve_file_fd(fd));
+
     return 0;
 }
 
-void sys_exit(int rc)
+int sys_seek(int fd, uint32_t offset)
 {
-    g_kstate.kenv.env[ENV_RETURN_CODE] = (uint32_t)rc;
-    bd_sync();
-    kexec_ccp();
-}
+    if (fd_is_console(fd))
+        return EINVAL;
 
-int sys_args(ArgBlock *out)
-{
-    memcpy(out, &g_kstate.args, sizeof(ArgBlock));
-    return g_kstate.args.argc;
-}
-
-int sys_findfile(const char *pattern, FileInfo *out, uint16_t start_pos)
-{
-    if (!pattern)
-        return EOK;
-
-    FsContext ctx = parse_prefix(&pattern);
-    char      n83[12];
-    int       err = make_name83(pattern, n83);
-
-    if (err != EOK)
-        return err;
-
-    return bd_find(n83, ctx, out, start_pos);
+    return bd_seek(resolve_file_fd(fd), offset);
 }
 
 uint32_t sys_getsize(int fd)
 {
     return bd_size(resolve_file_fd(fd));
-}
-
-int sys_create(const char *name)
-{
-    FsContext ctx = parse_prefix(&name);
-    char      n83[12];
-    int       err = make_name83(name, n83);
-
-    if (err != EOK)
-        return err;
-
-    int rc = bd_create(n83, ctx);
-    return (rc < 0) ? rc : rc + FD_FILE_BASE;
 }
 
 int sys_erase(const char *name)
@@ -473,43 +462,6 @@ int sys_rename(const char *old, const char *new)
     return bd_rename(old83, new83, octx);
 }
 
-int sys_seek(int fd, uint32_t offset)
-{
-    if (fd_is_console(fd))
-        return EINVAL;
-
-    return bd_seek(resolve_file_fd(fd), offset);
-}
-
-int sys_vstat(int8_t vol_id, VolStat *stat)
-{
-    return bd_vstat(vol_id, stat);
-}
-
-/*
- * sys_exec — Execute a program.  If the name has no extension,
- * ".COM" is appended automatically.
- */
-int sys_exec(const char *name, int argc, char **argv)
-{
-    FsContext ctx = parse_prefix(&name);
-
-    char n83[FILENAME_MAX];
-    int  err = make_name83(name, n83);
-
-    if (err != EOK)
-        return err;
-
-    if (n83[8] == ' ')
-    {
-        n83[8] = 'C';
-        n83[9] = 'O';
-        n83[10] = 'M';
-    }
-
-    return kexec(n83, argc, argv, ctx);
-}
-
 int sys_fsetattr(const char *name, uint8_t attrib)
 {
     FsContext ctx = parse_prefix(&name);
@@ -521,12 +473,26 @@ int sys_fsetattr(const char *name, uint8_t attrib)
 
     return bd_fsetattr(n83, ctx, attrib);
 }
-
-int sys_vsetattr(int8_t vol_id, uint8_t attr)
+/*
+ * Syscall: directory scan
+ */
+int sys_findfile(const char *pattern, FileInfo *out, uint16_t start_pos)
 {
-    return bd_vsetattr(vol_id, attr);
-}
+    if (!pattern)
+        return EOK;
 
+    FsContext ctx = parse_prefix(&pattern);
+    char      n83[12];
+    int       err = make_name83(pattern, n83);
+
+    if (err != EOK)
+        return err;
+
+    return bd_find(n83, ctx, out, start_pos);
+}
+/*
+ * Syscall: volume management
+ */
 int sys_mount(int8_t vol_id)
 {
     if (vol_id < 0 || vol_id >= MAX_VOLUMES)
@@ -551,31 +517,53 @@ int sys_unmount(int8_t vol_id)
     return bd_unbind(vol_id);
 }
 
-int sys_info(SysInfo *out)
+int sys_vstat(int8_t vol_id, VolStat *stat)
 {
-    uint8_t s0[DISK_SECTOR_SIZE];
+    return bd_vstat(vol_id, stat);
+}
 
-    if (bios_read(0, s0) != 0)
-        return EIO;
+int sys_vsetattr(int8_t vol_id, uint8_t attr)
+{
+    return bd_vsetattr(vol_id, attr);
+}
+/*
+ * Syscall: process / context
+ */
+/*
+ * sys_exec — Execute a program.  If the name has no extension,
+ * ".COM" is appended automatically.
+ */
+int sys_exec(const char *name, int argc, char **argv)
+{
+    FsContext ctx = parse_prefix(&name);
 
-    out->os_version = get_le16(&s0[S0_OS_VER]);
-    out->kern_version = get_le16(&s0[S0_KERN_VER]);
-    out->ccp_version = get_le16(&s0[S0_CCP_VER]);
+    char n83[FILENAME_MAX];
+    int  err = make_name83(name, n83);
 
-    memcpy(out->platform, &s0[S0_PLATFORM], 8);
-    out->platform[8] = '\0';
-    strupr(out->platform);
+    if (err != EOK)
+        return err;
 
-    out->tpa = ((uint32_t)__kernel_base - (uintptr_t)__tpa_base) / 1024;
+    if (n83[8] == ' ')
+    {
+        n83[8] = 'C';
+        n83[9] = 'O';
+        n83[10] = 'M';
+    }
 
-    for (int8_t v = 0; v < MAX_VOLUMES; v++)
-        out->vol_mounted[v] = (volume_run_count((int8_t)v) > 0) ? 1 : 0;
+    return kexec(n83, argc, argv, ctx);
+}
 
-    out->disk_size_kb = disk_block_count();
-    out->disk_unalloc_kb = disk_free_blocks();
-    out->xip = disk_xip();
+void sys_exit(int rc)
+{
+    g_kstate.kenv.env[ENV_RETURN_CODE] = (uint32_t)rc;
+    bd_sync();
+    kexec_ccp();
+}
 
-    return EOK;
+int sys_args(ArgBlock *out)
+{
+    memcpy(out, &g_kstate.args, sizeof(ArgBlock));
+    return g_kstate.args.argc;
 }
 
 int sys_getctx(FsContext *out)
@@ -604,6 +592,34 @@ int sys_setctx(FsContext ctx)
     }
 
     g_kstate.fs_ctx = ctx;
+    return EOK;
+}
+/*
+ * Syscall: system services
+ */
+int sys_info(SysInfo *out)
+{
+    uint8_t s0[DISK_SECTOR_SIZE];
+
+    if (bios_read(0, s0) != 0)
+        return EIO;
+
+    out->os_version = get_le16(&s0[S0_OS_VER]);
+    out->kern_version = get_le16(&s0[S0_KERN_VER]);
+    out->ccp_version = get_le16(&s0[S0_CCP_VER]);
+
+    memcpy(out->platform, &s0[S0_PLATFORM], 8);
+    out->platform[8] = '\0';
+    strupr(out->platform);
+
+    out->tpa = ((uint32_t)__kernel_base - (uintptr_t)__tpa_base) / 1024;
+
+    for (int8_t v = 0; v < MAX_VOLUMES; v++)
+        out->vol_mounted[v] = (volume_run_count((int8_t)v) > 0) ? 1 : 0;
+
+    out->disk_size_kb = disk_block_count();
+    out->disk_unalloc_kb = disk_free_blocks();
+    out->xip = disk_xip();
 
     return EOK;
 }
@@ -638,12 +654,12 @@ int sys_setenv(uint8_t slot, uint32_t value)
     return 0;
 }
 
-int sys_sync(void)
-{
-    return bd_sync();
-}
-
 uint32_t sys_millis(void)
 {
     return bios_millis();
+}
+
+int sys_sync(void)
+{
+    return bd_sync();
 }

@@ -10,11 +10,12 @@
 #include "ccp.h"
 
 #include <ctype.h>
+#include <path.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <path.h>
 
+/* Internal state */
 typedef struct
 {
     FsContext ctx;
@@ -25,19 +26,21 @@ typedef struct
 
 static CCPState g_ccp;
 
+/* Command registration */
 static void init_commands(void)
 {
-    g_ccp.cmds[0] = (CmdEntry){.name = "DIR",  .fn = cmd_dir};
+    g_ccp.cmds[0] = (CmdEntry){.name = "DIR", .fn = cmd_dir};
     g_ccp.cmds[1] = (CmdEntry){.name = "DIRS", .fn = cmd_dirs};
-    g_ccp.cmds[2] = (CmdEntry){.name = "ERA",  .fn = cmd_era};
-    g_ccp.cmds[3] = (CmdEntry){.name = "REN",  .fn = cmd_ren};
+    g_ccp.cmds[2] = (CmdEntry){.name = "ERA", .fn = cmd_era};
+    g_ccp.cmds[3] = (CmdEntry){.name = "REN", .fn = cmd_ren};
     g_ccp.cmds[4] = (CmdEntry){.name = "TYPE", .fn = cmd_type};
     g_ccp.cmds[5] = (CmdEntry){.name = "USER", .fn = cmd_user};
     g_ccp.cmds[6] = (CmdEntry){.name = "ECHO", .fn = cmd_echo};
-    g_ccp.cmds[7] = (CmdEntry){.name = "CLS",  .fn = cmd_cls};
+    g_ccp.cmds[7] = (CmdEntry){.name = "CLS", .fn = cmd_cls};
     g_ccp.cmds[8] = (CmdEntry){.name = "SYNC", .fn = cmd_sync};
 }
 
+/* Input handling */
 /*
  * Splits input in-place into space-delimited tokens.
  * Argv pointers alias directly into line, which is modified with NUL terminators.
@@ -67,24 +70,6 @@ static int tokenise(char *line)
     return argc;
 }
 
-static CmdErr try_ctx_switch(const char *tok)
-{
-    FsContext  new_ctx = g_ccp.ctx;
-    const char *endptr = split_prefix(tok, &new_ctx);
-
-    if (endptr == tok || *endptr != '\0')
-        return cmderr_syntax(NULL);
-
-    int rc = fs_setctx(new_ctx);
-    
-    if (rc != EOK)
-        return cmderr_bdos(new_ctx.vol_id, rc);
-
-    g_ccp.ctx = new_ctx;
-
-    return cmderr_ok();
-}
-
 static void print_prompt(void)
 {
     putchar('A' + g_ccp.ctx.vol_id);
@@ -93,13 +78,31 @@ static void print_prompt(void)
     {
         if (g_ccp.ctx.user_area >= 10)
             putchar('0' + g_ccp.ctx.user_area / 10);
-
         putchar('0' + g_ccp.ctx.user_area % 10);
     }
-
     putchar('>');
 }
 
+/* Context switching */
+static CmdErr try_ctx_switch(const char *tok)
+{
+    FsContext   new_ctx = g_ccp.ctx;
+    const char *endptr = split_prefix(tok, &new_ctx);
+
+    if (endptr == tok || *endptr != '\0')
+        return cmderr_syntax(NULL);
+
+    int rc = fs_setctx(new_ctx);
+
+    if (rc != EOK)
+        return cmderr_bdos(new_ctx.vol_id, rc);
+
+    g_ccp.ctx = new_ctx;
+
+    return cmderr_ok();
+}
+
+/* Initialization / batch mode */
 static void ccp_init(void)
 {
     init_commands();
@@ -138,7 +141,7 @@ void try_run_batch(FsContext *ctx)
         }
 
         uint32_t offset = sys_getenv(ENV_BATCH_OFFSET);
-        int fd = open(batch_path, "r");
+        int      fd = open(batch_path, "r");
 
         if (fd < 0)
         {
@@ -176,6 +179,7 @@ void try_run_batch(FsContext *ctx)
     }
 }
 
+/* Command dispatch */
 CmdErr ccp_dispatch(char *line)
 {
     sys_setenv(ENV_RETURN_CODE, 0);
@@ -224,6 +228,7 @@ CmdErr ccp_dispatch(char *line)
     return se;
 }
 
+/* Entry point */
 int main(void)
 {
     ccp_init();

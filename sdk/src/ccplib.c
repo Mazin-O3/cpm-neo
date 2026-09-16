@@ -9,6 +9,30 @@
 #include "ccplib.h"
 
 #include <string.h>
+/* Error helpers */
+
+void cmderr_print(CmdErr err)
+{
+    if (err.err_code == CMDERR_SYNTAX)
+    {
+        if (err.token)
+            printf("%s?\n", err.token);
+        else
+            printf("?\n");
+    }
+    else
+    {
+        /* ENOENT/EEXIST are plain errno errors even when a volume is
+         * attached; any other volume-scoped failure is a BDOS error. */
+        if (err.vol_id >= 0 && err.err_code != ENOENT && err.err_code != EEXIST)
+            printf("Bdos Err On %c: %s\n", 'A' + err.vol_id, strerror(err.err_code));
+        else
+            printf("%s\n", strerror(err.err_code));
+    }
+    sys_setenv(ENV_RETURN_CODE, (uint32_t)err.err_code);
+}
+
+/* Argument validation */
 
 /* Validate argument shape against a format string.
  * Tokens (space-separated, keywords case-insensitive):
@@ -217,6 +241,20 @@ void pad_field(char *out, const char *src, int len, int w)
     out[w] = '\0';
 }
 
+/* Command dispatch */
+
+const CmdEntry *cmd_lookup(const CmdEntry *table, const char *name)
+{
+    for (int i = 0; i < CCP_NUM_CMDS; i++)
+    {
+        if (!strcasecmp(table[i].name, name))
+            return &table[i];
+    }
+    return NULL;
+}
+
+/* Console pagination */
+
 Pager pager_start(void)
 {
     Pager p = {.cols = CONSOLE_WIDTH, .rows = CONSOLE_HEIGHT, .line_count = 0};
@@ -228,39 +266,7 @@ int pager_line(Pager *p)
     return anykey("...", &p->line_count, p->rows);
 }
 
-void cmderr_print(CmdErr err)
-{
-    if (err.err_code == CMDERR_SYNTAX)
-    {
-        if (err.token)
-            printf("%s?\n", err.token);
-        else
-            printf("?\n");
-    }
-    else
-    {
-        /* ENOENT/EEXIST are plain errno errors even when a volume is
-         * attached; any other volume-scoped failure is a BDOS error. */
-
-        if (err.vol_id >= 0 && err.err_code != ENOENT && err.err_code != EEXIST)
-            printf("Bdos Err On %c: %s\n", 'A' + err.vol_id, strerror(err.err_code));
-        else
-            printf("%s\n", strerror(err.err_code));
-    }
-
-    sys_setenv(ENV_RETURN_CODE, (uint32_t)err.err_code);
-}
-
-const CmdEntry *cmd_lookup(const CmdEntry *table, const char *name)
-{
-    for (int i = 0; i < CCP_NUM_CMDS; i++)
-    {
-        if (!strcasecmp(table[i].name, name))
-            return &table[i];
-    }
-
-    return NULL;
-}
+/* App entry */
 
 int ccp_run_app(cmd_fn_t fn, int argc, char **argv)
 {
