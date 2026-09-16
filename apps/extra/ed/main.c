@@ -58,11 +58,13 @@ int main(int argc, char **argv)
             c = (unsigned char)cmd[i++];
         }
 
-        while (isdigit(c))
+        if (isdigit(c))
         {
             has_from = 1;
-            from = from * 10 + (c - '0');
-            c = (unsigned char)cmd[i++];
+            from = atoi(cmd + i - 1);
+
+            while (isdigit(c))
+                c = (unsigned char)cmd[i++];
         }
 
         if (neg)
@@ -75,11 +77,13 @@ int main(int argc, char **argv)
             has_comma = 1;
             c = (unsigned char)cmd[i++];
 
-            while (isdigit(c))
+            if (isdigit(c))
             {
                 has_to = 1;
-                to = to * 10 + (c - '0');
-                c = (unsigned char)cmd[i++];
+                to = atoi(cmd + i - 1);
+
+                while (isdigit(c))
+                    c = (unsigned char)cmd[i++];
             }
         }
 
