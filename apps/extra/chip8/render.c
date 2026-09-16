@@ -28,30 +28,32 @@ void chip8_draw(Chip8State *s, uint8_t x, uint8_t y, uint8_t n)
     uint8_t start_y = y % CH8_H;
 
     uint8_t b1 = start_x >> 3;
-    uint8_t b2 = b1 + 1; // Clip overflow off right edge instead of wrapping
+    uint8_t b2 = (b1 + 1) % (CH8_W / 8); 
     uint8_t shift = start_x & 7;
 
     for (uint8_t r = 0; r < n; r++)
     {
         uint8_t sprite = s->ram[(s->i + r) & 0xFFF];
+        
         if (!sprite)
             continue;
 
-        uint8_t py = (start_y + r) % CH8_H;
-
+        uint8_t py = (start_y + r) % CH8_H; 
         uint8_t p1 = sprite >> shift;
-        uint8_t p2 = shift == 0 ? 0 : (sprite << (8 - shift));
+        uint8_t p2 = (uint8_t)(shift == 0 ? 0 : (sprite << (8 - shift)));
 
         uint8_t *row_ptr = &s->gfx[py * (CH8_W / 8)];
 
         if (row_ptr[b1] & p1)
             vf = 1;
+
         row_ptr[b1] ^= p1;
 
-        if (b2 < (CH8_W / 8) && p2)
+        if (p2)
         {
             if (row_ptr[b2] & p2)
                 vf = 1;
+
             row_ptr[b2] ^= p2;
         }
     }

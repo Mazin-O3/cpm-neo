@@ -41,7 +41,7 @@ typedef struct
 
 /* VM */
 void chip8_reset(Chip8State *s);
-void chip8_frame(Chip8State *s);
+void chip8_tick(Chip8State *s);
 
 /* Video */
 void chip8_clear(Chip8State *s);

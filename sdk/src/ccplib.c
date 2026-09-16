@@ -253,7 +253,7 @@ void cmderr_print(CmdErr err)
 
 const CmdEntry *cmd_lookup(const CmdEntry *table, const char *name)
 {
-    for (int i = 0; table[i].name; i++)
+    for (int i = 0; i < CCP_NUM_CMDS; i++)
     {
         if (!strcasecmp(table[i].name, name))
             return &table[i];

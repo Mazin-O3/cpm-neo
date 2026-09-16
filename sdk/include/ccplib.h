@@ -49,6 +49,8 @@ void cmderr_print(CmdErr se);
  * embedded in apps/sys/help.c, so the table is just the dispatch mapping. */
 typedef CmdErr (*cmd_fn_t)(FsContext *ctx, int argc, char **argv);
 
+#define CCP_NUM_CMDS 9
+
 typedef struct
 {
     const char *name;

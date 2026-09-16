@@ -313,9 +313,11 @@ void chip8_reset(Chip8State *s)
 
     s->pc = CH8_PROG;
     s->step = CH8_DEFAULT_STEP;
+
+    srand(0);
 }
 
-void chip8_frame(Chip8State *s)
+void chip8_tick(Chip8State *s)
 {
     if (s->waiting)
     {

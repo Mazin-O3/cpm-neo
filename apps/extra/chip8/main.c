@@ -53,6 +53,27 @@ int chip8_mapkey(int c)
     return -1;
 }
 
+int chip8_getinput()
+{
+    while (peekchar())
+    {
+        int c = getchar();
+
+        if (c == CH_ESC)
+        {
+            printf(CSI_CLS CSI_HOME CSI_SHOW);
+            return 1;
+        }
+
+        int key = chip8_mapkey(c);
+
+        if (key >= 0)
+            s.keys[key] = 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2 || argc > 3)
@@ -68,8 +89,6 @@ int main(int argc, char **argv)
     }
 
     chip8_reset(&s);
-
-    srand(0);
 
     if (argc == 3)
     {
@@ -92,29 +111,26 @@ int main(int argc, char **argv)
 
     s.dirty = 1;
 
-    for (;;)
+    int should_quit = 0;
+    
+    uint32_t last_time = sys_millis();
+    
+    while (!should_quit)
     {
-        chip8_frame(&s);
-        chip8_render(&s);
-
-        memset(s.keys, 0, CH8_NKEYS);
-
-        while (peekchar())
+        uint32_t cur_time = sys_millis();
+        
+        if (cur_time - last_time >= CH8_FRAME_MS)
         {
-            int c = getchar();
+            last_time += CH8_FRAME_MS;
 
-            if (c == CH_ESC)
-            {
-                printf(CSI_CLS CSI_HOME CSI_SHOW);
-                return 0;
-            }
+            chip8_tick(&s);
+            chip8_render(&s);
 
-            int key = chip8_mapkey(c);
-
-            if (key >= 0)
-                s.keys[key] = 1;
+            memset(s.keys, 0, CH8_NKEYS);
         }
 
-        delay(CH8_FRAME_MS);
+        should_quit = chip8_getinput();
     }
+
+    return 0;
 }

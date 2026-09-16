@@ -20,7 +20,7 @@ typedef struct
     FsContext ctx;
     char      input[CCP_LINE_MAX];
     char     *argv[CCP_ARGC_MAX];
-    CmdEntry  cmds[CCP_MAX_CMDS];
+    CmdEntry  cmds[CCP_NUM_CMDS];
 } CCPState;
 
 static CCPState g_ccp;
@@ -36,20 +36,18 @@ static void init_commands(void)
     g_ccp.cmds[6] = (CmdEntry){.name = "ECHO", .fn = cmd_echo};
     g_ccp.cmds[7] = (CmdEntry){.name = "CLS",  .fn = cmd_cls};
     g_ccp.cmds[8] = (CmdEntry){.name = "SYNC", .fn = cmd_sync};
-
-    g_ccp.cmds[CCP_MAX_CMDS - 1] = (CmdEntry){0};
 }
 
 /*
  * Splits input in-place into space-delimited tokens.
  * Argv pointers alias directly into line, which is modified with NUL terminators.
  */
-static int tokenise(char *line, char *argv[], int max)
+static int tokenise(char *line)
 {
     int   argc = 0;
     char *p = line;
 
-    while (*p && argc < max)
+    while (*p && argc < CCP_ARGC_MAX)
     {
         while (*p == ' ')
             p++;
@@ -57,7 +55,7 @@ static int tokenise(char *line, char *argv[], int max)
         if (!*p)
             break;
 
-        argv[argc++] = p;
+        g_ccp.argv[argc++] = p;
 
         while (*p && *p != ' ')
             p++;
@@ -83,6 +81,7 @@ static CmdErr try_ctx_switch(const char *tok)
         return cmderr_bdos(new_ctx.vol_id, rc);
 
     g_ccp.ctx = new_ctx;
+
     return cmderr_ok();
 }
 
@@ -94,6 +93,7 @@ static void print_prompt(void)
     {
         if (g_ccp.ctx.user_area >= 10)
             putchar('0' + g_ccp.ctx.user_area / 10);
+
         putchar('0' + g_ccp.ctx.user_area % 10);
     }
 
@@ -180,7 +180,7 @@ CmdErr ccp_dispatch(char *line)
 {
     sys_setenv(ENV_RETURN_CODE, 0);
 
-    int argc = tokenise(line, g_ccp.argv, CCP_ARGC_MAX);
+    int argc = tokenise(line);
 
     if (argc == 0)
         return cmderr_ok();
