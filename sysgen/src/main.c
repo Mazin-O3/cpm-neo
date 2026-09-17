@@ -14,7 +14,9 @@
 
 static void usage(void)
 {
-    printf("\n*** CP/M Neo SYSGEN v%u.%u ***\n\n"
+    char vstr[8];
+    ver_fmt(vstr, sizeof(vstr), SYSGEN_VER);
+    printf("\n*** CP/M Neo SYSGEN v%s ***\n\n"
            "Usage:\n\n"
            "  sysgen new <args> [opts]        Create a new disk image\n"
            "      --platform=<ID>   Platform id (8-char max; declared by ID= in\n"
@@ -31,8 +33,7 @@ static void usage(void)
            "  --dst=<Vn>    Volume & user area (e.g., A0) [default: A0]\n"
            "  --attr=<val>  RO, RW, SYS, or SYS+RO [default: RW for add; RO for install]\n"
            "  --disk=<path>  Target disk (all commands except new; new writes to "
-           "<build_dir>/disk.img) [default: <build_dir>/disk.img]\n",
-           SYSGEN_VER >> 8, SYSGEN_VER & 0xFF);
+           "<build_dir>/disk.img) [default: <build_dir>/disk.img]\n", vstr);
 }
 
 /* Command Table */

@@ -259,7 +259,15 @@ compile() {
 mkdir -p "$BUILD" "$INT" "$SDK_LIB"
 
 ver() {
-    awk -v sym="$1" '$2 == sym { split($3, a, "x"); printf "%u.%u", strtonum("0x" substr(a[2],1,2)), strtonum("0x" substr(a[2],3,2)); exit }' sysgen/include/version.h
+    awk -v sym="$1" '$2 == sym {
+        split($3, a, "x");
+        major = strtonum("0x" substr(a[2],1,2));
+        minor = strtonum("0x" substr(a[2],3,2));
+        if (minor == 0) printf "%u.0", major;
+        else if (minor < 10) printf "%u.0%u", major, minor;
+        else printf "%u.%u", major, minor;
+        exit
+    }' sysgen/include/version.h
 }
 
 # ── Bootloader ─────────────────────────────────────────────

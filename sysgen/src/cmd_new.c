@@ -118,8 +118,10 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
     const uint8_t *vmap = sysgen_disk() + (uint32_t)VMAP_SEC * DISK_SECTOR_SIZE;
     char           tmp[32];
 
+    char vstr[8];
+    ver_fmt(vstr, sizeof(vstr), OS_VER);
     printf("\n=============================================================\n");
-    printf("  CP/M Neo v%u.%u Disk Build Report\n", OS_VER >> 8, OS_VER & 0xFF);
+    printf("  CP/M Neo v%s Disk Build Report\n", vstr);
     printf("=============================================================\n");
     printf("  Output file      : %s\n", out_disk_path);
 
