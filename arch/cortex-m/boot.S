@@ -102,9 +102,6 @@ _reset_handler:
     cmp r0, #0
     beq err_disk
 
-    ldr r0, =msg_loading
-    bl print_str
-
     ldr r0, =msg_kernel_ok
     bl print_str
 

@@ -54,8 +54,6 @@ _boot_start:
     lui  t0, %hi(__xip_base)
     addi t0, t0, %lo(__xip_base)
     beqz t0, err_disk          /* Safety: no XIP base wired into boot */
-    la   a0, msg_loading
-    jal  ra, print_str
     la   a0, msg_kernel_ok
     jal  ra, print_str
     jalr zero, t0, 0           /* Take off to the XIP entry — No return */
