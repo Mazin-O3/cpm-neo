@@ -213,8 +213,10 @@ int add_data_open(const char *file, const AddFileOpts *opts)
     if (bd_find(n83, ctx, &fi, 0) > 0)
     {
         free(data);
-        printf("  %s %-13s -> %c:%u  (already exists, skipped)\n", opts->verb, dot, 'A' + opts->vol,
-               opts->user);
+        char h[24];
+        hr(h, sizeof(h), len);
+        printf("  %s %-13s %9s  -> %c:%u  (Already exists, skipped)\n", opts->verb, dot, h,
+               'A' + opts->vol, opts->user);
         return 2;
     }
 

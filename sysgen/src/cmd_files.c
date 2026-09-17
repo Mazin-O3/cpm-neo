@@ -235,7 +235,9 @@ int cmd_era(int argc, char **argv)
 
     char dot[NAME83_LEN + 2];
     n83_dot(n83, dot, sizeof(dot));
-    printf("  Erased %-13s -> %c:%u\n", dot, 'A' + vol, user);
+    char h[24];
+    hr(h, sizeof(h), fi.size);
+    printf("  Erased %-13s %9s  -> %c:%u\n", dot, h, 'A' + vol, user);
     return 0;
 }
 

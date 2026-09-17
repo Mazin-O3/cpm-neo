@@ -258,8 +258,12 @@ compile() {
 
 mkdir -p "$BUILD" "$INT" "$SDK_LIB"
 
+ver() {
+    awk -v sym="$1" '$2 == sym { split($3, a, "x"); printf "%u.%u", strtonum("0x" substr(a[2],1,2)), strtonum("0x" substr(a[2],3,2)); exit }' sysgen/include/version.h
+}
+
 # ── Bootloader ─────────────────────────────────────────────
-echo "  Building bootloader..."
+echo "  Building bootloader"
 $CC $CFLAGS $BOOT_INC \
     -c "platform/$PLATFORM_DIR/bios.c" -o "$INT/boot_plat.o"
 
@@ -332,7 +336,7 @@ if [ "$SIZE" -gt "$BOOT_SIZE_DEC" ]; then
 fi
 
 # ── Kernel (two-pass) ──────────────────────────────────────
-echo "  Building kernel..."
+echo "  Building kernel v$(ver KERN_VER)"
 KERNEL_C="core/kernel/main.c core/kernel/kernel.c core/kernel/bdos.c \
           core/kernel/disk.c platform/$PLATFORM_DIR/bios.c \
           sdk/src/path.c sdk/src/ctype.c sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"
@@ -402,7 +406,7 @@ if [ "$IS_XIP" = "1" ]; then
 fi
 
 # ── SDK libc ───────────────────────────────────────────────
-echo "  Building SDK libc..."
+echo "  Building SDK    v$(ver SDK_VER)"
 SDK_LIBC_SRCS="sdk/src/path.c sdk/src/ctype.c sdk/src/stdio.c sdk/src/string.c sdk/src/stdlib.c sdk/src/fs.c sdk/src/ccplib.c sdk/src/start.c"
 SDK_LIBC_OBJS=
 for src in $SDK_LIBC_SRCS; do
@@ -414,7 +418,7 @@ compile "$CFLAGS $SDK_INC" arch/$CONFIG_ARCH/crt0.S "$SDK_OBJ/crt0.o"
 $AR rcs "$SDK_LIB/libc.a" $SDK_LIBC_OBJS
 
 # ── CCP ───────────────────────────────────────────────────
-echo "  Building CCP..."
+echo "  Building CCP    v$(ver CCP_VER)"
 CCP_C="sdk/src/start.c sdk/src/path.c sdk/src/ccplib.c \
        core/ccp/ccp.c core/ccp/cmd_files.c core/ccp/cmd_system.c \
        sdk/src/ctype.c sdk/src/string.c sdk/src/stdio.c sdk/src/fs.c sdk/src/stdlib.c"

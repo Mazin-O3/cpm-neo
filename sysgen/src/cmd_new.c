@@ -20,9 +20,8 @@
 #include <string.h>
 #include <strings.h>
 
-#define OS_VER               0x0100
-#define KERN_VER             0x0100
-#define CCP_VER              0x0100
+#include "version.h"
+
 #define SYSGEN_MAX_APP_NAMES 64
 
 /* Build Helpers */
@@ -120,7 +119,7 @@ static void report_build(const SysgenPaths *paths, const SysgenDiskCfg *cfg, uin
     char           tmp[32];
 
     printf("\n=============================================================\n");
-    printf("  CP/M Neo Disk Build Report\n");
+    printf("  CP/M Neo v%u.%u Disk Build Report\n", OS_VER >> 8, OS_VER & 0xFF);
     printf("=============================================================\n");
     printf("  Output file      : %s\n", out_disk_path);
 

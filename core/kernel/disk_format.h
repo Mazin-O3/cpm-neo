@@ -44,7 +44,6 @@
 /* Sector-0 field offsets. */
 
 #define S0_MAGIC        0x000 /* u16   — Must equal DISK_MAGIC       */
-#define S0_DISK_VER     0x002 /* u16   — Disk format version         */
 #define S0_DISK_SIZE_KB 0x004 /* u16   — Total disk KB               */
 #define S0_KERN_LOAD    0x006 /* u32   — Kernel RAM load addr        */
 #define S0_KERN_SIZE    0x00A /* u32   — Kernel.bin raw bytes        */

@@ -9,9 +9,7 @@
 <em> A CP/M-inspired operating system </em>
 
 [![Run Emulator](https://img.shields.io/badge/Run_Emulator-green?style=flat-square&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCc%2BPHBhdGggZmlsbD0nd2hpdGUnIGQ9J004IDV2MTRsMTEtN3onLz48L3N2Zz4=)](https://mazin-o3.github.io/vemu/)
-[![GitHub Repo stars](https://img.shields.io/github/stars/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo)
-[![GitHub forks](https://img.shields.io/github/forks/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo)
-[![GitHub contributors](https://img.shields.io/github/contributors/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo)
+[![Release](https://img.shields.io/github/v/release/Mazin-O3/cpm-neo?style=flat-square&color=blue)](https://github.com/Mazin-O3/cpm-neo/releases)
 [![License](https://img.shields.io/github/license/Mazin-O3/cpm-neo?style=flat-square&color=yellow)](LICENSE)
 
 <img src="docs/images/cpm-neo-main.png" alt="cpm-neo main" width="100%">
