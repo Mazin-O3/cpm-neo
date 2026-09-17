@@ -1,9 +1,15 @@
 /*
  * sysgen/include/version.h — CP/M Neo version numbers
  *
- * Single source of truth for all component versions.
- * Sysgen stamps OS/KERN/CCP into sector 0; the kernel reads the
- * constants directly at runtime.  SDK_VER is tracked for future use.
+ * Version scheme: 0xMMNN
+ *   MM = major
+ *   NN = minor: feature (tens) + patch (ones)
+ *
+ *   0x0100 = 1.0  - major
+ *   0x0101 = 1.01 - patch fix
+ *   0x0110 = 1.1  - new feature
+ *   0x0141 = 1.41 - feature 4, patch 1
+ *   0x0200 = 2.0  - next major
  */
 
 #ifndef SYSGEN_VERSION_H
