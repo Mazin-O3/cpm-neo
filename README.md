@@ -65,6 +65,7 @@ See the [User Guide](docs/user-guide.md) for the full build and execution walkth
 - Kernel syscall interface
 - BDOS-inspired filesystem
 - Hardware-independent architecture
+- XIP (Execute in Place) support
 - Application SDK
 - sysgen tool for building and managing disk images
 
