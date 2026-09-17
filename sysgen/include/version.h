@@ -9,10 +9,10 @@
 #ifndef SYSGEN_VERSION_H
 #define SYSGEN_VERSION_H
 
-#define OS_VER      0x0001 /* 0.1 — Release          */
-#define KERN_VER    0x0001 /* 0.1 — Kernel ABI       */
-#define CCP_VER     0x0001 /* 0.1 — CCP commands     */
-#define SDK_VER     0x0001 /* 0.1 — User API         */
-#define SYSGEN_VER  0x0001 /* 0.1 — Build tool       */
+#define OS_VER      0x0100 /* 1.0 — Release          */
+#define KERN_VER    0x0100 /* 1.0 — Kernel ABI       */
+#define CCP_VER     0x0100 /* 1.0 — CCP commands     */
+#define SDK_VER     0x0100 /* 1.0 — User API         */
+#define SYSGEN_VER  0x0100 /* 1.0 — Build tool       */
 
 #endif /* SYSGEN_VERSION_H */
