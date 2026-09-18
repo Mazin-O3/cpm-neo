@@ -1,11 +1,22 @@
+/*
+ * apps/extra/basic/lex.c — Lexer and tokenizer
+ *
+ * Keyword table, source-to-token conversion (tokenize_line), program
+ * entry traversal, and the streaming lexer (lexer_next) that feeds
+ * tokens to the evaluator and statement executor.
+ */
+
 #include "basic.h"
+
+#include <ctype.h>
+#include <string.h>
 
 /* Keyword table */
 
 static const char *kw_names[] = {
-    "LET",  "PRINT", "INPUT", "GOTO", "GOSUB", "RETURN", "IF",   "THEN", "FOR", "TO",   "STEP",
-    "NEXT", "END",   "REM",   "AND",  "OR",    "LIST",   "LOAD", "RUN",  "NEW", "POKE", "EXIT",
-    "PEEK", "ABS",   "SGN",   "RND",  "DEF",   "DIM",    "FRE",  "CLR",  "SAVE"};
+    "LET",  "PRINT", "INPUT", "GOTO", "GOSUB", "RETURN", "IF",   "THEN", "FOR",  "TO",   "STEP",
+    "NEXT", "END",   "REM",   "AND",  "OR",    "LIST",   "LOAD", "RUN",  "NEW",  "POKE", "EXIT",
+    "PEEK", "ABS",   "SGN",   "RND",  "DEF",   "DIM",    "FRE",  "CLR",  "SAVE", "MOD",  "NOT"};
 
 static int kw_count(void)
 {
@@ -28,6 +39,132 @@ const char *lexer_kw_name(int kw)
     return kw_names[kw];
 }
 
+/* Tokenization */
+
+void tokenize_line(char *dst, unsigned max_dst, const char *src)
+{
+    unsigned n = 0;
+
+    while (*src && n + 1 < max_dst)
+    {
+        if (*src == '"')
+        {
+            *dst++ = *src++;
+            n++;
+
+            while (*src && *src != '"' && n + 1 < max_dst)
+            {
+                *dst++ = *src++;
+                n++;
+            }
+
+            if (*src == '"' && n + 1 < max_dst)
+            {
+                *dst++ = *src++;
+                n++;
+            }
+
+            continue;
+        }
+
+        if (isalpha((unsigned char)*src))
+        {
+            char word[64];
+            int  i = 0;
+
+            while (i < 63 && src[i] && isalpha((unsigned char)src[i]))
+            {
+                word[i] = src[i];
+                i++;
+            }
+
+            word[i] = 0;
+            strupr(word);
+            int kw = lexer_kw_id(word);
+
+            if (kw >= 0)
+            {
+                if (n + 1 >= max_dst)
+                    break;
+                *dst++ = (unsigned char)(BASIC_TOKEN_BASE + kw);
+                n++;
+                src += i;
+
+                if (kw == K_REM)
+                {
+                    while (*src && n + 1 < max_dst)
+                    {
+                        *dst++ = *src++;
+                        n++;
+                    }
+                    *dst = 0;
+                    return;
+                }
+            }
+            else
+            {
+                if (n + (unsigned)i >= max_dst)
+                    break;
+                memcpy(dst, src, i);
+                dst += i;
+                n += i;
+                src += i;
+            }
+
+            continue;
+        }
+
+        if (n + 1 >= max_dst)
+            break;
+        *dst++ = *src++;
+        n++;
+    }
+    *dst = 0;
+}
+
+/* Program entry traversal */
+
+char *entry_next(char *p)
+{
+    p += 2;
+
+    return p + strlen(p) + 1;
+}
+
+
+/* Lexer helpers */
+
+int lex_chk_sym(BasicState *s, char ch)
+{
+    if (s->lex.type != T_SYM || s->lex.buf[0] != ch)
+    {
+        ctrl_error(s, "SYNTAX ERROR");
+        return 0;
+    }
+
+    return 1;
+}
+
+int lex_expect_sym(BasicState *s, char ch)
+{
+    if (!lex_chk_sym(s, ch))
+        return 0;
+
+    return lexer_next(s) && !s->ctrl.stopped;
+}
+
+int lex_expect_key(BasicState *s, int kw)
+{
+    if (s->lex.type != T_KEY || s->lex.kw != kw)
+    {
+        ctrl_error(s, "SYNTAX ERROR");
+        return 0;
+    }
+
+    return lexer_next(s) && !s->ctrl.stopped;
+}
+
+
 /* Lexer */
 
 int lexer_next(BasicState *s)
@@ -42,6 +179,7 @@ int lexer_next(BasicState *s)
         return 1;
     }
 
+    /* Tokenized keyword */
     if ((unsigned char)*s->lex.ptr >= BASIC_TOKEN_BASE)
     {
         int kw = (unsigned char)*s->lex.ptr - BASIC_TOKEN_BASE;
@@ -52,6 +190,7 @@ int lexer_next(BasicState *s)
         return 1;
     }
 
+    /* Number */
     if (isdigit((unsigned char)*s->lex.ptr))
     {
         int i = 0, v = 0;
@@ -63,7 +202,7 @@ int lexer_next(BasicState *s)
             int d = s->lex.ptr[i] - '0';
 
             if (v > (INT_MAX - d) / 10)
-                v = INT_MAX; /* Saturate rather than overflow */
+                v = INT_MAX;
             else
                 v = v * 10 + d;
             i++;
@@ -76,6 +215,7 @@ int lexer_next(BasicState *s)
         return 1;
     }
 
+    /* Identifier or keyword */
     if (isalpha((unsigned char)*s->lex.ptr))
     {
         int i = 0;
@@ -90,6 +230,7 @@ int lexer_next(BasicState *s)
         strupr(s->lex.buf);
         s->lex.ptr += i;
 
+        /* Single letter = variable */
         if (i == 1)
         {
             s->lex.type = T_VAR;
@@ -105,6 +246,7 @@ int lexer_next(BasicState *s)
             return 1;
         }
 
+        /* FNX = user-defined function */
         if (i == 3 && s->lex.buf[0] == 'F' && s->lex.buf[1] == 'N' && isalpha(s->lex.buf[2]))
         {
             s->lex.type = T_FN;
@@ -112,6 +254,7 @@ int lexer_next(BasicState *s)
             return 1;
         }
 
+        /* Keyword */
         int k = lexer_kw_id(s->lex.buf);
 
         if (k >= 0)
@@ -127,6 +270,7 @@ int lexer_next(BasicState *s)
         return 0;
     }
 
+    /* String literal */
     if (*s->lex.ptr == '"')
     {
         s->lex.ptr++;
@@ -149,6 +293,7 @@ int lexer_next(BasicState *s)
         return 0;
     }
 
+    /* Symbol (single or two-char: <=, >=, <>) */
     s->lex.buf[0] = *s->lex.ptr;
     s->lex.buf[1] = 0;
 
@@ -161,10 +306,13 @@ int lexer_next(BasicState *s)
         s->lex.ptr += 2;
     }
     else
-    {
         s->lex.ptr++;
-    }
 
     s->lex.type = T_SYM;
     return 1;
+}
+
+void lexer_skip_line(BasicState *s)
+{
+    s->lex.ptr += strlen(s->lex.ptr);
 }

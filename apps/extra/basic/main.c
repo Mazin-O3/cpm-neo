@@ -1,74 +1,25 @@
+/*
+ * apps/extra/basic/main.c — BASIC entry point
+ *
+ * Owns the interpreter state, the interactive REPL, batch mode
+ * (running a .bas file from the command line), and direct-mode
+ * commands (LIST, LOAD, SAVE, RUN, NEW, CLR, FRE, EXIT).
+ */
+
 #include "basic.h"
 
-static BasicState s;
+#include <byteorder.h>
+#include <string.h>
 
-/* Program loading helpers */
+static BasicState g_bs;
 
-static void load_line(BasicState *s, const char *p)
-{
-    while (*p == ' ')
-        p++;
-
-    if (*p < '0' || *p > '9')
-        return;
-
-    int num = atoi(p);
-
-    while (*p >= '0' && *p <= '9')
-        p++;
-
-    while (*p == ' ')
-        p++;
-
-    int src_len = strlen(p);
-
-    if (s->prog.free_ptr + 2 + src_len + 1 > s->prog.data + BASIC_PROG_MAX)
-        return;
-
-    tokenize_line(s->prog.free_ptr + 2, src_len + 1, p);
-
-    int entry_len = 2 + strlen(s->prog.free_ptr + 2) + 1;
-
-    s->prog.free_ptr[0] = num & 0xFF;
-
-    s->prog.free_ptr[1] = (num >> 8) & 0xFF;
-
-    s->prog.free_ptr += entry_len;
-}
-
-int prog_load(BasicState *s, const char *path)
-{
-    int fd = open(path, "r");
-
-    if (fd < 0)
-    {
-        printf("?FILE NOT FOUND\n");
-        return -1;
-    }
-
-    char line[BASIC_LINE_LEN];
-
-    while (readline(fd, line, sizeof(line)) > 0)
-        load_line(s, line);
-
-    close(fd);
-
-    return 0;
-}
-
-static int do_load(BasicState *s, char *path)
-{
-    prog_new(s);
-    return prog_load(s, path);
-}
-
-/* Command-line parsing */
+/* Program line input */
 
 static int parse_input_line(BasicState *s, const char *p)
 {
     int n = 0;
 
-    while (isdigit(p[n]))
+    while (p[n] >= '0' && p[n] <= '9')
         n++;
 
     if (n == 0)
@@ -84,14 +35,28 @@ static int parse_input_line(BasicState *s, const char *p)
     return 1;
 }
 
+static void do_load(BasicState *s, const char *path)
+{
+    prog_new(s);
+    prog_load(s, path);
+}
+
+/* Direct-mode arguments */
+
 static int get_filename_arg(BasicState *s, char **out)
 {
     if (!lexer_next(s))
         return 0;
 
-    if (s->lex.type != T_STR)
+    if (s->lex.type == T_EOF)
     {
         printf("?FILENAME REQUIRED\n");
+        return 0;
+    }
+
+    if (s->lex.type != T_STR)
+    {
+        ctrl_error(s, "SYNTAX ERROR");
         return 0;
     }
 
@@ -106,7 +71,7 @@ static int get_filename_arg(BasicState *s, char **out)
         return 0;
     }
 
-    const char *dot = strrchr(s->lex.buf, '.');
+    const char *dot = strrchr(p, '.');
     const char *ext = (dot && dot[1] != '\0') ? dot + 1 : NULL;
 
     if (!ext || strcasecmp(ext, "bas"))
@@ -120,13 +85,10 @@ static int get_filename_arg(BasicState *s, char **out)
     return 1;
 }
 
-/* Direct command execution */
+/* Direct-mode commands */
 
 static int exec_direct(BasicState *s)
 {
-    if (s->lex.type != T_KEY)
-        return 0;
-
     switch (s->lex.kw)
     {
     case K_LIST:
@@ -139,11 +101,23 @@ static int exec_direct(BasicState *s)
         if (!get_filename_arg(s, &path))
             return 1;
 
+        BasicLex saved = s->lex;
+
+        lexer_next(s);
+
+        if (s->lex.type != T_EOF)
+        {
+            ctrl_error(s, "SYNTAX ERROR");
+
+            return 1;
+        }
+
+        s->lex = saved;
+
         do_load(s, path);
 
         return 1;
     }
-
     case K_RUN:
         prog_run(s);
         return 1;
@@ -158,16 +132,29 @@ static int exec_direct(BasicState *s)
         return 1;
     case K_SAVE:
     {
+        char *path;
+
+        if (!get_filename_arg(s, &path))
+            return 1;
+
+        BasicLex saved = s->lex;
+
+        lexer_next(s);
+
+        if (s->lex.type != T_EOF)
+        {
+            ctrl_error(s, "SYNTAX ERROR");
+
+            return 1;
+        }
+
+        s->lex = saved;
+
         if (s->prog.free_ptr == s->prog.data)
         {
             printf("?NO PROGRAM\n");
             return 1;
         }
-
-        char *path;
-
-        if (!get_filename_arg(s, &path))
-            return 1;
 
         int fd = open(path, "w");
 
@@ -183,7 +170,8 @@ static int exec_direct(BasicState *s)
         {
             char line_buf[256];
             int  pos = 0;
-            int  num = (unsigned char)p[0] | ((unsigned char)p[1] << 8);
+            int  num = get_le16((const uint8_t *)p);
+
             pos += snprintf(line_buf + pos, sizeof(line_buf) - pos, "%d ", num);
             p += 2;
 
@@ -192,11 +180,11 @@ static int exec_direct(BasicState *s)
                 if ((unsigned char)*p >= BASIC_TOKEN_BASE)
                 {
                     const char *kw = lexer_kw_name((unsigned char)*p - BASIC_TOKEN_BASE);
-                    int         klen = strlen(kw);
+                    int         klen = (int)strlen(kw);
 
                     if (pos + klen + 1 < (int)sizeof(line_buf))
                     {
-                        memcpy(line_buf + pos, kw, klen);
+                        memcpy(line_buf + pos, kw, (size_t)klen);
                         pos += klen;
                         line_buf[pos++] = ' ';
                     }
@@ -210,15 +198,15 @@ static int exec_direct(BasicState *s)
             while (*p)
                 p++;
             p++;
+
             line_buf[pos++] = '\n';
-            write(fd, line_buf, pos);
+            write(fd, line_buf, (unsigned)pos);
         }
 
         close(fd);
 
         return 1;
     }
-
     case K_EXIT:
         return -1;
     default:
@@ -232,6 +220,8 @@ int main(int argc, char **argv)
 {
     srand(0);
 
+    BasicState *s = &g_bs;
+
     if (argc > 2)
     {
         printf("Use: BASIC <FILENAME.BAS>\n");
@@ -240,15 +230,17 @@ int main(int argc, char **argv)
 
     if (argc > 1)
     {
-        if (do_load(&s, argv[1]) == 0)
-            prog_run(&s);
+        do_load(s, argv[1]);
+
+        if (s->prog.free_ptr != s->prog.data)
+            prog_run(s);
 
         return 0;
     }
 
-    prog_new(&s);
+    prog_new(s);
 
-    printf("%d Bytes free\n\n", BASIC_PROG_MAX);
+    printf("*** TinyBasic ***\n%d bytes free\n\n", BASIC_PROG_MAX);
 
     char buf[BASIC_LINE_LEN];
 
@@ -267,7 +259,7 @@ int main(int argc, char **argv)
         while (*p == ' ')
             p++;
 
-        int len = strlen(p);
+        int len = (int)strlen(p);
 
         while (len > 0 && p[len - 1] == ' ')
             p[--len] = 0;
@@ -275,39 +267,55 @@ int main(int argc, char **argv)
         if (len == 0)
             continue;
 
-        s.ctrl.stopped = 0;
+        s->ctrl.stopped = 0;
+        s->ctrl.lineno = 0;
 
-        s.ctrl.lineno = 0;
-
-        if (parse_input_line(&s, p))
+        if (parse_input_line(s, p))
             continue;
 
-        s.lex.ptr = p;
+        s->lex.ptr = p;
 
-        if (!lexer_next(&s))
+        if (!lexer_next(s))
             continue;
 
-        int r = exec_direct(&s);
-
-        if (r < 0)
+        if (s->lex.type == T_KEY)
         {
-            return 0;
+            int kw = s->lex.kw;
+
+            /* No-argument commands: reject trailing garbage first. */
+            if (kw != K_LOAD && kw != K_SAVE)
+            {
+                BasicLex saved = s->lex;
+
+                lexer_next(s);
+
+                if (s->lex.type != T_EOF)
+                {
+                    ctrl_error(s, "SYNTAX ERROR");
+
+                    continue;
+                }
+
+                s->lex = saved;
+            }
+
+            int r = exec_direct(s);
+
+            if (r < 0)
+                return 0;
+
+            if (r)
+                continue;
         }
 
-        if (r > 0)
+        if (s->ctrl.stopped)
             continue;
 
-        if (s.ctrl.stopped)
-            continue;
+        /* Not a direct-mode command — execute the line immediately. */
+        s->lex.ptr = p;
+        s->ctrl.instr_ptr = NULL;
+        s->ctrl.lineno = 0;
 
-        s.lex.ptr = p;
-
-        s.ctrl.instr_ptr = NULL;
-
-        s.ctrl.lineno = 0;
-
-        exec_line(&s, p);
+        exec_line(s, p);
     }
-
-    return 0;
 }

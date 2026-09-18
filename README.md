@@ -19,7 +19,7 @@
 
 ## What is CP/M Neo?
 
-CP/M Neo is a lightweight, CP/M-inspired operating system designed around simplicity and portability. It aims to provide an experience close to classic CP/M while adapting its architecture to modern hardware and different computing environments.
+CP/M Neo is a lightweight, CP/M-inspired operating system focused on simplicity and portability. It aims to provide an experience close to classic CP/M while adapting its architecture to modern hardware and different computing environments.
 
 ## Port Status
 

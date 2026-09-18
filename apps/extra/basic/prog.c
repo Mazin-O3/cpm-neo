@@ -1,98 +1,18 @@
+/*
+ * apps/extra/basic/prog.c — Program storage and state
+ *
+ * Tokenized program management (add/delete/find/list/load), the RUN
+ * driver, and variable/function-space initialization.  Program entries
+ * carry their line number as a little-endian u16 headed by tokenized
+ * text, so reads/writes go through the SDK byte-order helpers.
+ */
+
 #include "basic.h"
 
-/* Tokenization */
+#include <byteorder.h>
+#include <string.h>
 
-void tokenize_line(char *dst, unsigned max_dst, const char *src)
-{
-    unsigned n = 0;
-
-    while (*src && n + 1 < max_dst)
-    {
-        if (*src == '"')
-        {
-            *dst++ = *src++;
-            n++;
-
-            while (*src && *src != '"' && n + 1 < max_dst)
-            {
-                *dst++ = *src++;
-                n++;
-            }
-
-            if (*src == '"' && n + 1 < max_dst)
-            {
-                *dst++ = *src++;
-                n++;
-            }
-
-            continue;
-        }
-
-        if (isalpha((unsigned char)*src))
-        {
-            char word[64];
-            int  i = 0;
-
-            while (i < 63 && src[i] && isalpha((unsigned char)src[i]))
-            {
-                word[i] = src[i];
-                i++;
-            }
-
-            word[i] = 0;
-            strupr(word);
-            int kw = lexer_kw_id(word);
-
-            if (kw >= 0)
-            {
-                if (n + 1 >= max_dst)
-                    break;
-                *dst++ = (unsigned char)(BASIC_TOKEN_BASE + kw);
-                n++;
-                src += i;
-
-                if (kw == K_REM)
-                {
-                    while (*src && n + 1 < max_dst)
-                    {
-                        *dst++ = *src++;
-                        n++;
-                    }
-                    *dst = 0;
-                    return;
-                }
-            }
-            else
-            {
-                if (n + (unsigned)i >= max_dst)
-                    break;
-                memcpy(dst, src, i);
-                dst += i;
-                n += i;
-                src += i;
-            }
-
-            continue;
-        }
-
-        if (n + 1 >= max_dst)
-            break;
-        *dst++ = *src++;
-        n++;
-    }
-    *dst = 0;
-}
-
-/* Program entry traversal */
-
-char *entry_next(char *p)
-{
-    p += 2;
-
-    while (*p)
-        p++;
-    return p + 1;
-}
+/* Program line management */
 
 char *prog_find_line(BasicState *s, int n)
 {
@@ -100,17 +20,16 @@ char *prog_find_line(BasicState *s, int n)
 
     while (p < s->prog.free_ptr)
     {
-        int num = (unsigned char)p[0] | ((unsigned char)p[1] << 8);
+        int num = get_le16((const uint8_t *)p);
 
         if (num == n)
             return p;
+
         p = entry_next(p);
     }
 
     return NULL;
 }
-
-/* Program line management */
 
 void prog_del_line(BasicState *s, int n)
 {
@@ -139,17 +58,18 @@ void prog_add_line(BasicState *s, int n, const char *t)
 
     tokenize_line(tokened, sizeof(tokened), t);
 
-    int len = 2 + strlen(tokened) + 1;
+    int len = 2 + (int)strlen(tokened) + 1;
 
     char *prev = s->prog.data;
     char *ins = s->prog.data;
 
     while (ins < s->prog.free_ptr)
     {
-        int num = (unsigned char)ins[0] | ((unsigned char)ins[1] << 8);
+        int num = get_le16((const uint8_t *)ins);
 
         if (num > n)
             break;
+
         prev = entry_next(ins);
         ins = prev;
     }
@@ -164,11 +84,8 @@ void prog_add_line(BasicState *s, int n, const char *t)
 
     memmove(ins + len, ins, rest);
 
-    ins[0] = n & 0xFF;
-
-    ins[1] = (n >> 8) & 0xFF;
-
-    memcpy(ins + 2, tokened, len - 2);
+    put_le16((uint8_t *)ins, (uint16_t)n);
+    memcpy(ins + 2, tokened, (size_t)len - 2);
 
     s->prog.free_ptr += len;
 }
@@ -183,8 +100,10 @@ void prog_list(BasicState *s)
 
     while (p < s->prog.free_ptr)
     {
-        int num = (unsigned char)p[0] | ((unsigned char)p[1] << 8);
+        int num = get_le16((const uint8_t *)p);
+
         printf("%d ", num);
+
         const char *text = p + 2;
 
         while (*text)
@@ -215,17 +134,13 @@ void prog_list(BasicState *s)
 static void clear_vars_and_fns(BasicState *s)
 {
     s->loop.stack_ptr = -1;
-
     s->gosub.stack_ptr = -1;
 
-    for (int i = 0; i < BASIC_NUM_VARS; i++)
-    {
-        s->var.val[i] = 0;
-        s->var.str[i][0] = 0;
-        s->var.dim[i] = 0;
-        s->fn.param_var_idx[i] = -1;
-        s->fn.body[i] = 0;
-    }
+    memset(s->var.val, 0, sizeof(s->var.val));
+    memset(s->var.str, 0, sizeof(s->var.str));
+    memset(s->var.dim, 0, sizeof(s->var.dim));
+    memset(s->fn.param_var_idx, -1, sizeof(s->fn.param_var_idx));
+    memset(s->fn.body, 0, sizeof(s->fn.body));
 
     s->loop.resume = 0;
 }
@@ -244,8 +159,6 @@ void clr_vars(BasicState *s)
     clear_vars_and_fns(s);
 }
 
-/* Program execution */
-
 void prog_run(BasicState *s)
 {
     if (s->prog.free_ptr == s->prog.data)
@@ -256,12 +169,9 @@ void prog_run(BasicState *s)
 
     /* RUN clears variables but keeps DEF FN definitions (classic BASIC). */
 
-    for (int i = 0; i < BASIC_NUM_VARS; i++)
-    {
-        s->var.val[i] = 0;
-        s->var.str[i][0] = 0;
-        s->var.dim[i] = 0;
-    }
+    memset(s->var.val, 0, sizeof(s->var.val));
+    memset(s->var.str, 0, sizeof(s->var.str));
+    memset(s->var.dim, 0, sizeof(s->var.dim));
 
     s->loop.stack_ptr = -1;
     s->gosub.stack_ptr = -1;
@@ -273,7 +183,7 @@ void prog_run(BasicState *s)
     {
         char *cur = s->ctrl.instr_ptr;
 
-        s->ctrl.lineno = (unsigned char)cur[0] | ((unsigned char)cur[1] << 8);
+        s->ctrl.lineno = get_le16((const uint8_t *)cur);
 
         exec_line(s, cur + 2);
 
@@ -285,4 +195,55 @@ void prog_run(BasicState *s)
     }
 
     s->ctrl.lineno = 0;
+}
+
+/* Program loading */
+
+int prog_load(BasicState *s, const char *path)
+{
+    int fd = open(path, "r");
+
+    if (fd < 0)
+    {
+        printf("?FILE NOT FOUND\n");
+        return -1;
+    }
+
+    char line[BASIC_LINE_LEN];
+
+    while (readline(fd, line, sizeof(line)) > 0)
+    {
+        char *p = line;
+
+        while (*p == ' ')
+            p++;
+
+        if (*p < '0' || *p > '9')
+            continue;
+
+        int num = atoi(p);
+
+        while (*p >= '0' && *p <= '9')
+            p++;
+
+        while (*p == ' ')
+            p++;
+
+        int src_len = (int)strlen(p);
+
+        if (s->prog.free_ptr + 2 + src_len + 1 > s->prog.data + BASIC_PROG_MAX)
+            continue;
+
+        tokenize_line(s->prog.free_ptr + 2, (unsigned)src_len + 1, p);
+
+        int entry_len = 2 + (int)strlen(s->prog.free_ptr + 2) + 1;
+
+        put_le16((uint8_t *)s->prog.free_ptr, (uint16_t)num);
+
+        s->prog.free_ptr += entry_len;
+    }
+
+    close(fd);
+
+    return 0;
 }

@@ -1,8 +1,9 @@
 /*
- * apps/extra/basic/basic.h — BASIC interpreter
+ * apps/extra/basic/basic.h — Tiny BASIC interpreter
  *
- * Token/keyword enums, state structures, and the lexer / expression /
- * statement / program-management API.
+ * Token-based interpreter with Pratt parser expression evaluator.
+ * Supports 26 numeric + 26 string variables, DIM arrays, PEEK/POKE,
+ * DEF FN, and tokenized program storage for compact memory usage.
  */
 
 #ifndef BASIC_H
@@ -10,6 +11,7 @@
 
 #include <cpmneo.h>
 
+/* Limits */
 #define BASIC_PROG_MAX    4096
 #define BASIC_FOR_DEPTH   8
 #define BASIC_GOSUB_DEPTH 32
@@ -21,6 +23,7 @@
 #define BASIC_MAX_DIM    (BASIC_ARR_SZ - 1)
 #define BASIC_TOKEN_BASE 0x80
 
+/* Token types */
 enum
 {
     T_NUM,
@@ -32,6 +35,7 @@ enum
     T_EOF
 };
 
+/* Keywords — order must match kw_names[] table in lex.c */
 enum
 {
     K_LET,
@@ -64,12 +68,16 @@ enum
     K_DIM,
     K_FRE,
     K_CLR,
-    K_SAVE
+    K_SAVE,
+    K_MOD,
+    K_NOT
 };
 
 /* Keyword table access */
 int         lexer_kw_id(const char *w);
 const char *lexer_kw_name(int kw);
+
+/* State structures */
 
 typedef struct
 {
@@ -123,7 +131,7 @@ typedef struct
     int   type;
     int   num;
     int   kw;
-    int   is_string; /* Replaced ambiguous 'quote' */
+    int   is_string;
 } BasicLex;
 
 typedef struct
@@ -140,20 +148,17 @@ typedef struct
 /* Error and control */
 void ctrl_error(BasicState *s, const char *msg);
 int  ctrl_break_key(BasicState *s);
-void exec_syntax_err(BasicState *s);
 
 /* Lexer */
 int  lexer_next(BasicState *s);
 void lexer_skip_line(BasicState *s);
-
-/* Variables */
-int var_aget(BasicState *s, int var_idx, int arr_idx, int *out_val);
-int var_aset(BasicState *s, int var_idx, int arr_idx, int val);
-int var_read_str(BasicState *s, char *buf, size_t buf_size);
+int  lex_chk_sym(BasicState *s, char ch);
+int  lex_expect_sym(BasicState *s, char ch);
+int  lex_expect_key(BasicState *s, int kw);
 
 /* Expression evaluation */
-int expr_parse_paren(BasicState *s);
 int expr_eval(BasicState *s);
+int expr_parse_paren(BasicState *s);
 
 /* Statement execution */
 void exec_line(BasicState *s, const char *text);
