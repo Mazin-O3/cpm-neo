@@ -84,7 +84,7 @@ typedef struct
 
 typedef struct
 {
-    Volume  vol[MAX_VOLUMES];
+    Volume  vols[MAX_VOLUMES];
     FCB     fcb[BD_MAX_FCBS];
     uint8_t sec_buf[DISK_SECTOR_SIZE];
 } BDState;
@@ -206,7 +206,7 @@ static void entry_fields(const uint8_t *entry, char *base, char *ext)
 
 static Volume *vol_for(int8_t vol_id)
 {
-    return (vol_id < 0 || vol_id >= MAX_VOLUMES) ? NULL : &g_bd.vol[vol_id];
+    return (vol_id < 0 || vol_id >= MAX_VOLUMES) ? NULL : &g_bd.vols[vol_id];
 }
 
 static Volume *vol_checked(int8_t vol_id)
@@ -916,7 +916,7 @@ int bd_sync(void)
 
     for (int8_t v = 0; v < MAX_VOLUMES; v++)
     {
-        Volume *vol = &g_bd.vol[v];
+        Volume *vol = &g_bd.vols[v];
 
         if (!vol->mounted || bd_vol_has_writable_fcb(v))
             continue;

@@ -26,7 +26,7 @@
 # 508 is the largest size leaving the 4 KB boot budget.
 
 # Platform identity and architecture
-CONFIG_ID="BPF411"
+CONFIG_ID="BP-F411"
 CONFIG_ARCH=cortex-m
 
 # Memory configuration

@@ -6,22 +6,20 @@
 
 <h1>CP/M Neo</h1>
 
-<em> A CP/M-inspired operating system </em>
+<em>A CP/M-inspired operating system </em>
 
 [![Run Emulator](https://img.shields.io/badge/Run_Emulator-green?style=flat-square&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCc%2BPHBhdGggZmlsbD0nd2hpdGUnIGQ9J004IDV2MTRsMTEtN3onLz48L3N2Zz4=)](https://mazin-o3.github.io/vemu/)
 [![GitHub stars](https://img.shields.io/github/stars/Mazin-O3/cpm-neo?style=flat-square&color=orange)](https://github.com/Mazin-O3/cpm-neo/stargazers)
 [![Release](https://img.shields.io/github/v/release/Mazin-O3/cpm-neo?style=flat-square)](https://github.com/Mazin-O3/cpm-neo/releases)
 [![License](https://img.shields.io/github/license/Mazin-O3/cpm-neo?style=flat-square&color=yellow)](LICENSE)
 
-<img src="docs/images/cpm-neo-main.png" alt="cpm-neo main" width="100%">
+<img src="docs/images/cpm-neo-preview.png" alt="cpm-neo main" width="100%">
 
 </div>
 
 ## What is CP/M Neo?
 
-CP/M Neo is a small CP/M-inspired operating system, designed around simplicity, portability, and a clear separation between the operating system and platform-specific hardware.
-
-It provides a CP/M-style command environment, filesystem, system calls, application SDK, and platform interface for different hardware platforms.
+CP/M Neo is a lightweight, CP/M-inspired operating system designed around simplicity and portability. It aims to provide an experience close to classic CP/M while adapting its architecture to modern hardware and different computing environments.
 
 ## Port Status
 
@@ -69,22 +67,6 @@ See the [User Guide](docs/user-guide.md) for the full build and execution walkth
 - XIP (Execute in Place) support
 - Application SDK
 - sysgen tool for building and managing disk images
-
-## The Sysgen Tool
-
-`sysgen` is the host utility for building and inspecting CP/M Neo disk images. Commands other than `new` support appending `--disk=path` to target a specific image; `new` always writes to `sysgen/build/disk.img`.
-
-| Command | Description |
-| --- | --- |
-| `new --platform=NAME` | Build the OS and create a disk image of exactly `CONFIG_DISK_SIZE` KB (overhead included; the disk is divided into 1 KB blocks). `NAME` is the 8-char max platform id declared by `CONFIG_ID=` in a platform's `config.sh`; the platform provides the ISA, `CONFIG_RAM_SIZE`, and — via `CONFIG_SYS_APPS`/`CONFIG_EXTRA_APPS` — which bundled apps to install (`*` or unset = all, `""` = none, a list = those only) |
-| `add <file> [--dst=Vn] [--attr=R/W\|R/O\|SYS]` | Add an external file to an image |
-| `install <folder> [--dst=Vn] [--attr=...]` | Compile a source folder and install the binaries |
-| `dir [Vn]` | List files on a volume |
-
-Platforms are defined in `platform/<name>/`: `config.sh` plus `bios.c`
-implementing the console and storage functions from `core/kernel/bios.h`.
-
-See the [Developer Guide](docs/developer-guide.md) to add your own.
 
 ## Documentation Library
 

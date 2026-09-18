@@ -38,4 +38,4 @@ if ! [ -x "$SYSGEN" ]; then
     exit 1
 fi
 
-"$SYSGEN" new --platform=BPF411 --xip
+"$SYSGEN" new --platform=BP-F411 --xip
