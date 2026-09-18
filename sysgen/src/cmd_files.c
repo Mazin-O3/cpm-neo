@@ -241,9 +241,7 @@ int cmd_era(int argc, char **argv)
     return 0;
 }
 
-/*
- * cmd_install — Compile a folder/file.c to .COM and add it to the image.
- */
+/* cmd_install — Compile a folder/file.c to .COM and add it to the image. */
 int cmd_install(int argc, char **argv)
 {
     const char *src;
@@ -427,10 +425,7 @@ int cmd_extract(int argc, char **argv)
     return errors ? 1 : 0;
 }
 
-/*
- * cmd_dir — List files on the host-side disk image (like the CCP's DIR
- * but operates on the raw image file).
- */
+/* cmd_dir — List files on the host-side disk image. */
 int cmd_dir(int argc, char **argv)
 {
     const char *pos[3];

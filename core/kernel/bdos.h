@@ -21,76 +21,49 @@
 #include "errno.h"
 
 #include "fsctx.h"
-/*
- * Limits
- */
+/* Limits */
 #define BD_MAX_FCBS      CONFIG_FCB_MAX
 #define BD_DISK_MAX_SECS 65535
 
-/*
- * Allocation geometry
- *
- * On-disk block/volume invariants (1 KB block, reserved block, volume
- * region, per-volume cap) are owned by disk_format.h; the BD_* names below
- * alias them.  Eight blocks form one extent, and the allocation bitmap
- * supports up to DISK_VOL_MAX_BLOCKS blocks per volume. */
-
+/* Allocation geometry — on-disk block/volume invariants owned by disk_format.h;
+ * BD_* aliases them. Eight blocks form one extent. */
 #define BD_BLOCK_SECS        DISK_BLOCK_SECS
 #define BD_BLOCK_BYTES       DISK_BLOCK_BYTES
 #define BD_BLOCKS_PER_EXTENT 8
 
 #define BD_BLOCK_MAP_BYTES ((CONFIG_DISK_SIZE + 7) / 8)
 #define BD_VOL_MAX_BLOCKS  DISK_VOL_MAX_BLOCKS
-/*
- * Extent / directory geometry
- *
- * The extent index is a uint8_t on disk, so at most 256 extents (2 MB) are
- * representable per file; the shared 256-entry root directory bounds
- * this further. */
 
+/* Extent / directory geometry — 256 extents (2 MB) max per file. */
 #define BD_ENTRY_SIZE   32
 #define BD_ROOT_ENTRIES 256
 #define BD_MAX_EXTENTS  256
 
 #define BD_ENTRIES_PER_SEC (DISK_SECTOR_SIZE / BD_ENTRY_SIZE)
 #define BD_EXTENT_BYTES    (BD_BLOCKS_PER_EXTENT * BD_BLOCK_BYTES)
-/*
- * Per-volume metadata layout
- *
- * Header sector 0, then the root directory.  BD_DATA_START is the first
- * sector of a volume's data blocks. */
 
+/* Per-volume metadata layout — header sector 0, then root directory. */
 #define BD_HEADER_SECS DISK_HEADER_SECS
 #define BD_ROOT_SECS   DISK_ROOT_SECS
 #define BD_DATA_START  DISK_DATA_START
-/*
- * Minimum volume size
- *
- * Header + root, plus the reserved block and at least one usable
- * data block.
- */
 
+/* Minimum volume size — header + root + reserved block + 1 data block. */
 #define BD_MIN_VOL_SECS DISK_MIN_VOL_SECS
 
-/*
- * Directory entry offsets
- */
+/* Directory entry offsets */
 #define BD_DIR_ATTR         11
 #define BD_DIR_USER         12
 #define BD_DIR_EXTENT_IDX   13
 #define BD_DIR_EXTENT_BYTES 14
 #define BD_DIR_BLOCKS       16
 
-/*
- * Directory entry markers
- */
+/* Directory entry markers */
 #define BD_ENTRY_EMPTY   0x00
 #define BD_ENTRY_DELETED 0xE5
 
 #define BD_USER_INVALID 0xFF
-/*
- * Bitmap / block constants
- */
+
+/* Bitmap / block constants */
 #define BD_BITS_PER_BYTE      8
 #define BD_BITMAP_FULL        UINT8_MAX
 #define BD_RESERVED_BLOCK     0
@@ -159,9 +132,7 @@ int bd_read(int fd, uint8_t *buf, uint16_t len);
  */
 int bd_write(int fd, const uint8_t *buf, uint16_t len);
 
-/*
- * Close a file descriptor, flushing any dirty data.
- */
+/* Close a file descriptor, flushing any dirty data. */
 int bd_close(int fd);
 
 /*
@@ -169,9 +140,7 @@ int bd_close(int fd);
  */
 uint32_t bd_size(int fd);
 
-/*
- * Erase a file.  Returns EPERM if the file is read-only.
- */
+/* Erase a file. Returns EPERM if the file is read-only. */
 int bd_erase(const char *name83, FsContext ctx);
 
 /*
@@ -196,9 +165,7 @@ int bd_find(const char *pat, FsContext ctx, FileInfo *out, uint16_t start_pos);
  */
 int bd_vstat(int8_t vol_id, VolStat *stat);
 
-/*
- * Set the file position for the next read or write.
- */
+/* Set the file position for the next read or write. */
 int bd_seek(int fd, uint32_t offset);
 
 /*
@@ -207,9 +174,7 @@ int bd_seek(int fd, uint32_t offset);
  */
 int bd_fsetattr(const char *name83, FsContext ctx, uint8_t attrib);
 
-/*
- * Set the attribute byte on a mounted volume.
- */
+/* Set the attribute byte on a mounted volume. */
 int bd_vsetattr(int8_t vol_id, uint8_t attr);
 
 #endif /* BDOS_H */

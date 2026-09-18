@@ -32,9 +32,8 @@
 #include "byteorder.h"
 #include "errno.h"
 #include "fsctx.h"
-/*
- * Whole-disk functions
- */
+
+/* Whole-disk functions */
 int disk_init(void); /* Load VMAP       */
 int disk_xip(void);  /* 1 = XIP image   */
 
@@ -55,18 +54,11 @@ uint16_t disk_free_blocks(void); /* Unallocated blocks in the grid       */
  */
 int disk_sync(void);
 
-/*
- * Sector-level I/O
- */
-/* sec is relative to the volume.
- * volume_write returns EVOLRO for a read-only volume. */
-
+/* Sector-level I/O — sec is relative to the volume. */
 int volume_read(int8_t vol_id, uint16_t sec, uint8_t *buf);
 int volume_write(int8_t vol_id, uint16_t sec, const uint8_t *buf);
 
-/*
- * Volume lifecycle
- */
+/* Volume lifecycle */
 int volume_mount(int8_t vol_id); /* Mount at default blocks            */
 int volume_unmount(int8_t vol_id);
 
@@ -76,9 +68,7 @@ int volume_unmount(int8_t vol_id);
  */
 int volume_resize(int8_t vol_id, int16_t delta);
 
-/*
- * Volume queries
- */
+/* Volume queries */
 uint32_t volume_sectors(int8_t vol_id);   /* Capacity in sectors (0=unmnt) */
 uint8_t  volume_run_count(int8_t vol_id); /* Active runs count             */
 int      volume_getattr(int8_t vol_id, uint8_t *attr);

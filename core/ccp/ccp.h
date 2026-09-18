@@ -1,21 +1,18 @@
 /*
  * core/ccp/ccp.h — Console Command Processor
- */
+*/
+
 #ifndef CCP_H
 #define CCP_H
 
 #include <ccplib.h>
 #include <cpmneo.h>
 
-/*
- * Limits
- */
+/* Limits */
 #define CCP_LINE_MAX 128
 #define CCP_ARGC_MAX 32
 
-/*
- * CCP core
- */
+/* CCP core */
 int main(void);
 
 CmdErr ccp_dispatch(char *line);
@@ -24,9 +21,7 @@ int    ccp_setuser(FsContext *ctx, uint8_t ua);
 CmdErr try_implicit_run(FsContext *ctx, int argc, char **argv);
 void   try_run_batch(FsContext *ctx);
 
-/*
- * Resident commands
- */
+/* Resident commands */
 CmdErr cmd_era(FsContext *ctx, int argc, char **argv);
 CmdErr cmd_ren(FsContext *ctx, int argc, char **argv);
 CmdErr cmd_type(FsContext *ctx, int argc, char **argv);

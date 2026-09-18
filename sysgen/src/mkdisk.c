@@ -280,10 +280,7 @@ int write_file(const char *path, const uint8_t *data, uint32_t len)
 
 /* Disk Config */
 
-/*
- * sysgen_disk_cfg_default — Sane default = the host compile-time values.
- * Used when the platform's build tags are absent.
- */
+/* sysgen_disk_cfg_default — Sane default = the host compile-time values. */
 SysgenDiskCfg sysgen_disk_cfg_default(void)
 {
     SysgenDiskCfg cfg;

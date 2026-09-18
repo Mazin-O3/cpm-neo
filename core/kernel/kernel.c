@@ -24,9 +24,7 @@
 #include "disk.h"
 #include "kernel.h"
 
-/*
- * State and static helpers
- */
+/* State and static helpers */
 __attribute__((weak)) void kjump(uintptr_t addr)
 {
     ((void (*)(void))addr)();
@@ -138,9 +136,7 @@ static int make_name83(const char *src, char *out)
     return EOK;
 }
 
-/*
- * Boot and program loader
- */
+/* Boot and program loader */
 /*
  * Boot-time initialisation.
  * Binds every available volume; the first successfully bound volume
@@ -305,9 +301,7 @@ err:
         ;
 }
 
-/*
- * Syscall: file operations
- */
+/* Syscall: file operations */
 int sys_open(const char *name, uint8_t writable)
 {
     FsContext ctx = parse_prefix(&name);
@@ -474,9 +468,7 @@ int sys_fsetattr(const char *name, uint8_t attrib)
     return bd_fsetattr(n83, ctx, attrib);
 }
 
-/*
- * Syscall: directory scan
- */
+/* Syscall: directory scan */
 int sys_findfile(const char *pattern, FileInfo *out, uint16_t start_pos)
 {
     if (!pattern)
@@ -492,9 +484,7 @@ int sys_findfile(const char *pattern, FileInfo *out, uint16_t start_pos)
     return bd_find(n83, ctx, out, start_pos);
 }
 
-/*
- * Syscall: volume management
- */
+/* Syscall: volume management */
 int sys_mount(int8_t vol_id)
 {
     if (vol_id < 0 || vol_id >= MAX_VOLUMES)
@@ -529,9 +519,7 @@ int sys_vsetattr(int8_t vol_id, uint8_t attr)
     return bd_vsetattr(vol_id, attr);
 }
 
-/*
- * Syscall: process / context
- */
+/* Syscall: process / context */
 /*
  * sys_exec — Execute a program.  If the name has no extension,
  * ".COM" is appended automatically.

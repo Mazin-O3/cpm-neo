@@ -361,11 +361,8 @@ static int rescan_alloc_cb(Volume *v, const uint8_t *entry, uint16_t idx, void *
         if (!blocks[b])
             continue;
 
-        /*
-         * A reference outside the volume or shared between two extents
-         * means the directory is corrupt; mounting it would let the
-         * allocator hand those blocks to new files and destroy data.
-         */
+        /* A reference outside the volume or shared between two extents means
+         * the directory is corrupt; mounting would destroy data. */
 
         if (blocks[b] >= v->total_blocks)
             return EBADFS;
