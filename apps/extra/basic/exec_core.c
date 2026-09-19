@@ -6,7 +6,7 @@
  * exec_flow.c and program storage in prog.c.
  */
 
-#include "exec.h"
+#include "basic.h"
 
 #include <string.h>
 

@@ -5,7 +5,7 @@
  * FOR/NEXT, POKE, DIM, DEF) dispatched from exec_stmt() in exec_core.c.
  */
 
-#include "exec.h"
+#include "basic.h"
 
 #include <string.h>
 

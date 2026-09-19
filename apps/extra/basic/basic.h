@@ -12,7 +12,7 @@
 #include <cpmneo.h>
 
 /* Limits */
-#define BASIC_PROG_MAX    4096
+#define BASIC_PROG_MAX    8192
 #define BASIC_FOR_DEPTH   8
 #define BASIC_GOSUB_DEPTH 32
 #define BASIC_FN_DEPTH    8
@@ -181,6 +181,18 @@ int expr_parse_paren(BasicState *s);
 /* Statement execution */
 void exec_line(BasicState *s, const char *text);
 void exec_stmt(BasicState *s);
+
+/* Statement handlers (exec_flow.c) */
+void exec_print(BasicState *s);
+void exec_input(BasicState *s);
+void exec_goto(BasicState *s);
+void exec_gosub(BasicState *s);
+void exec_return(BasicState *s);
+void exec_for(BasicState *s);
+void exec_next(BasicState *s);
+void exec_poke(BasicState *s);
+void exec_dim(BasicState *s);
+void exec_def(BasicState *s);
 
 /* Program management */
 void  tokenize_line(char *dst, unsigned max_dst, const char *src);

@@ -237,7 +237,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    printf("*** TinyBasic ***\n%d bytes free\n\n", BASIC_PROG_MAX);
+    printf("*** NeoBasic ***\n%d bytes free\n\n", BASIC_PROG_MAX);
 
     char buf[BASIC_LINE_LEN];
 
