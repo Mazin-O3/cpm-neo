@@ -41,9 +41,20 @@ const char *lexer_kw_name(int kw)
 
 /* Tokenization */
 
+/* Bytes >= BASIC_TOKEN_BASE mean "keyword token" in stored text, so any such
+ * byte typed by the user (e.g. UTF-8) must never be stored verbatim — LIST,
+ * SAVE and the lexer would all misread it as a keyword. */
+static char tok_ch(char c)
+{
+    return (unsigned char)c >= BASIC_TOKEN_BASE ? '?' : c;
+}
+
 void tokenize_line(char *dst, unsigned max_dst, const char *src)
 {
     unsigned n = 0;
+
+    if (max_dst == 0)
+        return;
 
     while (*src && n + 1 < max_dst)
     {
@@ -54,7 +65,7 @@ void tokenize_line(char *dst, unsigned max_dst, const char *src)
 
             while (*src && *src != '"' && n + 1 < max_dst)
             {
-                *dst++ = *src++;
+                *dst++ = tok_ch(*src++);
                 n++;
             }
 
@@ -86,7 +97,8 @@ void tokenize_line(char *dst, unsigned max_dst, const char *src)
             {
                 if (n + 1 >= max_dst)
                     break;
-                *dst++ = (unsigned char)(BASIC_TOKEN_BASE + kw);
+
+                *dst++ = (char)(unsigned char)(BASIC_TOKEN_BASE + kw);
                 n++;
                 src += i;
 
@@ -94,9 +106,10 @@ void tokenize_line(char *dst, unsigned max_dst, const char *src)
                 {
                     while (*src && n + 1 < max_dst)
                     {
-                        *dst++ = *src++;
+                        *dst++ = tok_ch(*src++);
                         n++;
                     }
+
                     *dst = 0;
                     return;
                 }
@@ -105,6 +118,7 @@ void tokenize_line(char *dst, unsigned max_dst, const char *src)
             {
                 if (n + (unsigned)i >= max_dst)
                     break;
+
                 memcpy(dst, src, i);
                 dst += i;
                 n += i;
@@ -116,7 +130,8 @@ void tokenize_line(char *dst, unsigned max_dst, const char *src)
 
         if (n + 1 >= max_dst)
             break;
-        *dst++ = *src++;
+
+        *dst++ = tok_ch(*src++);
         n++;
     }
     *dst = 0;
@@ -167,6 +182,15 @@ int lex_expect_key(BasicState *s, int kw)
 
 /* Lexer */
 
+static int lex_fail(BasicState *s)
+{
+    ctrl_error(s, "SYNTAX ERROR");
+    s->lex.type = T_EOF;
+    s->lex.buf[0] = 0;
+    s->ctrl.stopped = 1;
+    return 0;
+}
+
 int lexer_next(BasicState *s)
 {
     while (*s->lex.ptr && (unsigned char)*s->lex.ptr <= ' ')
@@ -183,6 +207,11 @@ int lexer_next(BasicState *s)
     if ((unsigned char)*s->lex.ptr >= BASIC_TOKEN_BASE)
     {
         int kw = (unsigned char)*s->lex.ptr - BASIC_TOKEN_BASE;
+
+        /* Raw (untokenized) direct-mode input can contain any byte. */
+        if (kw >= kw_count())
+            return lex_fail(s);
+
         strcpy(s->lex.buf, kw_names[kw]);
         s->lex.type = T_KEY;
         s->lex.kw = kw;
@@ -197,7 +226,7 @@ int lexer_next(BasicState *s)
 
         while (isdigit((unsigned char)s->lex.ptr[i]))
         {
-            if (i < BASIC_STR_LEN - 1)
+            if (i < (int)sizeof(s->lex.buf) - 1)
                 s->lex.buf[i] = s->lex.ptr[i];
             int d = s->lex.ptr[i] - '0';
 
@@ -208,7 +237,7 @@ int lexer_next(BasicState *s)
             i++;
         }
 
-        s->lex.buf[i < BASIC_STR_LEN - 1 ? i : BASIC_STR_LEN - 1] = 0;
+        s->lex.buf[i < (int)sizeof(s->lex.buf) - 1 ? i : (int)sizeof(s->lex.buf) - 1] = 0;
         s->lex.num = v;
         s->lex.ptr += i;
         s->lex.type = T_NUM;
@@ -220,7 +249,7 @@ int lexer_next(BasicState *s)
     {
         int i = 0;
 
-        while (isalpha((unsigned char)s->lex.ptr[i]) && i < BASIC_STR_LEN - 1)
+        while (isalpha((unsigned char)s->lex.ptr[i]) && i < (int)sizeof(s->lex.buf) - 1)
         {
             s->lex.buf[i] = s->lex.ptr[i];
             i++;
@@ -264,10 +293,7 @@ int lexer_next(BasicState *s)
             return 1;
         }
 
-        ctrl_error(s, "SYNTAX ERROR");
-        s->lex.type = T_EOF;
-        s->ctrl.stopped = 1;
-        return 0;
+        return lex_fail(s);
     }
 
     /* String literal */
@@ -276,8 +302,12 @@ int lexer_next(BasicState *s)
         s->lex.ptr++;
         int i = 0;
 
-        while (*s->lex.ptr && *s->lex.ptr != '"' && i < 63)
-            s->lex.buf[i++] = *s->lex.ptr++;
+        while (*s->lex.ptr && *s->lex.ptr != '"')
+        {
+            if (i < (int)sizeof(s->lex.buf) - 1)
+                s->lex.buf[i++] = *s->lex.ptr;
+            s->lex.ptr++;
+        }
         s->lex.buf[i] = 0;
 
         if (*s->lex.ptr == '"')
@@ -287,10 +317,7 @@ int lexer_next(BasicState *s)
             return 1;
         }
 
-        ctrl_error(s, "SYNTAX ERROR");
-        s->lex.type = T_EOF;
-        s->ctrl.stopped = 1;
-        return 0;
+        return lex_fail(s);
     }
 
     /* Symbol (single or two-char: <=, >=, <>) */
@@ -312,7 +339,11 @@ int lexer_next(BasicState *s)
     return 1;
 }
 
+/* Discard the rest of the text.  Leaves the lexer at end-of-line so callers
+ * never see a stale token afterwards. */
 void lexer_skip_line(BasicState *s)
 {
     s->lex.ptr += strlen(s->lex.ptr);
+    s->lex.type = T_EOF;
+    s->lex.buf[0] = 0;
 }

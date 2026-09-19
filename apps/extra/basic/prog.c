@@ -47,38 +47,41 @@ void prog_del_line(BasicState *s, int n)
     s->prog.free_ptr -= (int)(next - p);
 }
 
-void prog_add_line(BasicState *s, int n, const char *t)
+/* Insert or replace line n.  An empty text deletes it.  Returns 0 on
+ * success, -1 if the program is full (the old line is then left intact). */
+
+int prog_add_line(BasicState *s, int n, const char *t)
 {
-    prog_del_line(s, n);
-
     if (!*t)
-        return;
+    {
+        prog_del_line(s, n);
+        return 0;
+    }
 
-    char tokened[512];
+    char tokened[BASIC_LINE_LEN];
 
     tokenize_line(tokened, sizeof(tokened), t);
 
-    int len = 2 + (int)strlen(tokened) + 1;
+    int   len = 2 + (int)strlen(tokened) + 1;
+    char *old = prog_find_line(s, n);
+    int   old_len = old ? (int)(entry_next(old) - old) : 0;
+    int   used = (int)(s->prog.free_ptr - s->prog.data);
 
-    char *prev = s->prog.data;
-    char *ins = s->prog.data;
-
-    while (ins < s->prog.free_ptr)
-    {
-        int num = get_le16((const uint8_t *)ins);
-
-        if (num > n)
-            break;
-
-        prev = entry_next(ins);
-        ins = prev;
-    }
-
-    if (s->prog.free_ptr + len > s->prog.data + BASIC_PROG_MAX)
+    /* Check the space *before* deleting so a too-long replacement cannot
+     * destroy the line it was meant to replace. */
+    if (used - old_len + len > BASIC_PROG_MAX)
     {
         printf("\n?PROGRAM FULL\n");
-        return;
+        return -1;
     }
+
+    if (old)
+        prog_del_line(s, n);
+
+    char *ins = s->prog.data;
+
+    while (ins < s->prog.free_ptr && get_le16((const uint8_t *)ins) < n)
+        ins = entry_next(ins);
 
     int rest = (int)(s->prog.free_ptr - ins);
 
@@ -88,6 +91,52 @@ void prog_add_line(BasicState *s, int n, const char *t)
     memcpy(ins + 2, tokened, (size_t)len - 2);
 
     s->prog.free_ptr += len;
+
+    return 0;
+}
+
+/*
+ * Handle one line of "NNN text" (typed at the prompt or read from a file).
+ * Returns 0 if the line has no leading line number (caller decides what to
+ * do with it), 1 if it was stored/deleted, -1 on error (already reported).
+ */
+
+int prog_enter_line(BasicState *s, char *line)
+{
+    char *p = line;
+    long  num = 0;
+    int   digits = 0;
+
+    while (*p == ' ')
+        p++;
+
+    while (*p >= '0' && *p <= '9')
+    {
+        if (num <= BASIC_MAX_LINE)
+            num = num * 10 + (*p - '0');
+        p++;
+        digits++;
+    }
+
+    if (!digits)
+        return 0;
+
+    if (num > BASIC_MAX_LINE)
+    {
+        printf("?BAD LINE NUMBER\n");
+        return -1;
+    }
+
+    while (*p == ' ')
+        p++;
+
+    /* Strip trailing blanks / CR so CRLF files don't smuggle \r into lines. */
+    int len = (int)strlen(p);
+
+    while (len > 0 && (unsigned char)p[len - 1] <= ' ')
+        p[--len] = 0;
+
+    return prog_add_line(s, (int)num, p) < 0 ? -1 : 1;
 }
 
 /* Program listing */
@@ -142,7 +191,9 @@ static void clear_vars_and_fns(BasicState *s)
     memset(s->fn.param_var_idx, -1, sizeof(s->fn.param_var_idx));
     memset(s->fn.body, 0, sizeof(s->fn.body));
 
+    s->fn.depth = 0;
     s->loop.resume = 0;
+    s->ctrl.jump = 0;
 }
 
 void prog_new(BasicState *s)
@@ -157,6 +208,33 @@ void prog_new(BasicState *s)
 void clr_vars(BasicState *s)
 {
     clear_vars_and_fns(s);
+}
+
+/*
+ * Execute program lines starting at ctrl.instr_ptr until the program ends,
+ * stops, or errors.  A line either falls through to the next one or, when a
+ * statement set ctrl.jump, continues at whatever instr_ptr (and, for
+ * FOR/NEXT and RETURN, loop.resume) it left behind.
+ */
+
+static void run_loop(BasicState *s)
+{
+    while (s->ctrl.instr_ptr && s->ctrl.instr_ptr < s->prog.free_ptr && !s->ctrl.stopped)
+    {
+        char *cur = s->ctrl.instr_ptr;
+
+        s->ctrl.lineno = get_le16((const uint8_t *)cur);
+
+        exec_line(s, cur + 2);
+
+        if (!s->ctrl.stopped && !s->ctrl.jump)
+            s->ctrl.instr_ptr = entry_next(cur);
+    }
+
+    s->ctrl.lineno = 0;
+    s->ctrl.jump = 0;
+    s->loop.resume = 0;
+    s->ctrl.instr_ptr = NULL;
 }
 
 void prog_run(BasicState *s)
@@ -175,29 +253,28 @@ void prog_run(BasicState *s)
 
     s->loop.stack_ptr = -1;
     s->gosub.stack_ptr = -1;
+    s->fn.depth = 0;
     s->ctrl.instr_ptr = s->prog.data;
     s->ctrl.stopped = 0;
+    s->ctrl.jump = 0;
     s->loop.resume = 0;
 
-    while (s->ctrl.instr_ptr && s->ctrl.instr_ptr < s->prog.free_ptr && !s->ctrl.stopped)
-    {
-        char *cur = s->ctrl.instr_ptr;
-
-        s->ctrl.lineno = get_le16((const uint8_t *)cur);
-
-        exec_line(s, cur + 2);
-
-        if (!s->ctrl.stopped)
-        {
-            if (s->ctrl.instr_ptr == cur && !s->loop.resume)
-                s->ctrl.instr_ptr = entry_next(cur);
-        }
-    }
-
-    s->ctrl.lineno = 0;
+    run_loop(s);
 }
 
-/* Program loading */
+/* Direct-mode GOTO/GOSUB: keep running the program from the line the
+ * direct statement jumped to, without clearing anything. */
+
+void prog_continue(BasicState *s)
+{
+    run_loop(s);
+}
+
+/* Program loading
+ *
+ * Lines go through prog_enter_line(), so out-of-order and duplicate line
+ * numbers behave exactly as if typed.  The current program is only wiped
+ * once the file has actually opened. */
 
 int prog_load(BasicState *s, const char *path)
 {
@@ -209,38 +286,14 @@ int prog_load(BasicState *s, const char *path)
         return -1;
     }
 
+    prog_new(s);
+
     char line[BASIC_LINE_LEN];
 
     while (readline(fd, line, sizeof(line)) > 0)
     {
-        char *p = line;
-
-        while (*p == ' ')
-            p++;
-
-        if (*p < '0' || *p > '9')
-            continue;
-
-        int num = atoi(p);
-
-        while (*p >= '0' && *p <= '9')
-            p++;
-
-        while (*p == ' ')
-            p++;
-
-        int src_len = (int)strlen(p);
-
-        if (s->prog.free_ptr + 2 + src_len + 1 > s->prog.data + BASIC_PROG_MAX)
-            continue;
-
-        tokenize_line(s->prog.free_ptr + 2, (unsigned)src_len + 1, p);
-
-        int entry_len = 2 + (int)strlen(s->prog.free_ptr + 2) + 1;
-
-        put_le16((uint8_t *)s->prog.free_ptr, (uint16_t)num);
-
-        s->prog.free_ptr += entry_len;
+        if (prog_enter_line(s, line) < 0)
+            break;
     }
 
     close(fd);

@@ -13,34 +13,6 @@
 
 static BasicState g_bs;
 
-/* Program line input */
-
-static int parse_input_line(BasicState *s, const char *p)
-{
-    int n = 0;
-
-    while (p[n] >= '0' && p[n] <= '9')
-        n++;
-
-    if (n == 0)
-        return 0;
-
-    int num = atoi(p);
-
-    while (p[n] == ' ')
-        n++;
-
-    prog_add_line(s, num, p[n] ? p + n : "");
-
-    return 1;
-}
-
-static void do_load(BasicState *s, const char *path)
-{
-    prog_new(s);
-    prog_load(s, path);
-}
-
 /* Direct-mode arguments */
 
 static int get_filename_arg(BasicState *s, char **out)
@@ -103,7 +75,10 @@ static int exec_direct(BasicState *s)
 
         BasicLex saved = s->lex;
 
-        lexer_next(s);
+        /* A lexer failure (e.g. a stray quote) already reported its error
+         * and reads back as T_EOF, so it must be checked separately. */
+        if (!lexer_next(s))
+            return 1;
 
         if (s->lex.type != T_EOF)
         {
@@ -114,22 +89,26 @@ static int exec_direct(BasicState *s)
 
         s->lex = saved;
 
-        do_load(s, path);
+        prog_load(s, path);
 
         return 1;
     }
     case K_RUN:
         prog_run(s);
         return 1;
+
     case K_FRE:
         printf("  %d BYTES FREE\n\n", BASIC_PROG_MAX - (int)(s->prog.free_ptr - s->prog.data));
         return 1;
+
     case K_NEW:
         prog_new(s);
         return 1;
+
     case K_CLR:
         clr_vars(s);
         return 1;
+
     case K_SAVE:
     {
         char *path;
@@ -139,7 +118,10 @@ static int exec_direct(BasicState *s)
 
         BasicLex saved = s->lex;
 
-        lexer_next(s);
+        /* A lexer failure (e.g. a stray quote) already reported its error
+         * and reads back as T_EOF, so it must be checked separately. */
+        if (!lexer_next(s))
+            return 1;
 
         if (s->lex.type != T_EOF)
         {
@@ -182,11 +164,13 @@ static int exec_direct(BasicState *s)
                     const char *kw = lexer_kw_name((unsigned char)*p - BASIC_TOKEN_BASE);
                     int         klen = (int)strlen(kw);
 
-                    if (pos + klen + 1 < (int)sizeof(line_buf))
+                    /* No extra space: the source text already carries
+                     * whatever followed the keyword, and adding one made
+                     * the file grow on every LOAD/SAVE round trip. */
+                    if (pos + klen < (int)sizeof(line_buf) - 1)
                     {
                         memcpy(line_buf + pos, kw, (size_t)klen);
                         pos += klen;
-                        line_buf[pos++] = ' ';
                     }
 
                     p++;
@@ -209,9 +193,19 @@ static int exec_direct(BasicState *s)
     }
     case K_EXIT:
         return -1;
+
     default:
         return 0;
     }
+}
+
+/* True for the commands that take no argument and so must be alone on the
+ * line.  (Statements like PRINT/IF/FOR/GOTO obviously must not be checked.) */
+
+static int is_bare_command(int kw)
+{
+    return kw == K_LIST || kw == K_RUN || kw == K_NEW || kw == K_CLR || kw == K_FRE ||
+           kw == K_EXIT;
 }
 
 /* Entry point */
@@ -222,6 +216,11 @@ int main(int argc, char **argv)
 
     BasicState *s = &g_bs;
 
+    /* Static state starts zeroed (stack_ptr 0, free_ptr NULL); initialise
+     * it properly before anything — including a failed batch-mode load —
+     * looks at it. */
+    prog_new(s);
+
     if (argc > 2)
     {
         printf("Use: BASIC <FILENAME.BAS>\n");
@@ -230,15 +229,13 @@ int main(int argc, char **argv)
 
     if (argc > 1)
     {
-        do_load(s, argv[1]);
+        prog_load(s, argv[1]);
 
         if (s->prog.free_ptr != s->prog.data)
             prog_run(s);
 
         return 0;
     }
-
-    prog_new(s);
 
     printf("*** TinyBasic ***\n%d bytes free\n\n", BASIC_PROG_MAX);
 
@@ -270,7 +267,8 @@ int main(int argc, char **argv)
         s->ctrl.stopped = 0;
         s->ctrl.lineno = 0;
 
-        if (parse_input_line(s, p))
+        /* "NNN text" enters/replaces/deletes a program line. */
+        if (prog_enter_line(s, p))
             continue;
 
         s->lex.ptr = p;
@@ -282,12 +280,17 @@ int main(int argc, char **argv)
         {
             int kw = s->lex.kw;
 
-            /* No-argument commands: reject trailing garbage first. */
-            if (kw != K_LOAD && kw != K_SAVE)
+            /* Bare commands (LIST, RUN, NEW, ...) reject trailing garbage.
+             * This used to run for *every* keyword except LOAD/SAVE, which
+             * made PRINT/IF/FOR/GOTO/POKE/DIM all fail with SYNTAX ERROR. */
+            if (is_bare_command(kw))
             {
                 BasicLex saved = s->lex;
 
-                lexer_next(s);
+                /* Lexer error (stray quote, unknown word...) is already
+                 * reported; don't run the command anyway. */
+                if (!lexer_next(s))
+                    continue;
 
                 if (s->lex.type != T_EOF)
                 {
@@ -311,11 +314,26 @@ int main(int argc, char **argv)
         if (s->ctrl.stopped)
             continue;
 
-        /* Not a direct-mode command — execute the line immediately. */
+        /* Not a direct-mode command — execute the line immediately.
+         * Loop/GOSUB frames never outlive the input line they were made in
+         * (their pointers reference `buf`, which the next prompt reuses). */
         s->lex.ptr = p;
         s->ctrl.instr_ptr = NULL;
         s->ctrl.lineno = 0;
+        s->ctrl.jump = 0;
+        s->loop.resume = 0;
+        s->loop.stack_ptr = -1;
+        s->gosub.stack_ptr = -1;
+        s->fn.depth = 0;
 
         exec_line(s, p);
+
+        /* Direct-mode GOTO / GOSUB / IF..THEN n: run the program from the
+         * target line, keeping variables. */
+        if (s->ctrl.jump && s->ctrl.instr_ptr && !s->ctrl.stopped)
+        {
+            s->loop.stack_ptr = -1;
+            prog_continue(s);
+        }
     }
 }

@@ -2,19 +2,26 @@
  * apps/extra/basic/eval.c — Expression evaluator
  *
  * Recursive-descent Pratt parser with clean operator precedence.
- * Handles: + - * / \ MOD ^ = < > <= >= AND OR NOT unary -
- * String comparison is not part of this grammar (handled in exec.c).
+ * Handles: + - * / \ MOD ^ = < > <= >= <> AND OR NOT unary -/+
+ * String comparisons (A$="X", "A"<B$ ...) are parsed as a primary that
+ * yields 0/1, so they combine with AND/OR/NOT like any other value.
  */
 
 #include "basic.h"
 
 #include <string.h>
 
+/* Synthetic operator codes for the two-character comparison symbols.
+ * They sit above 255 so they can never collide with a character or K_* id. */
+#define OP_LE 256
+#define OP_GE 257
+#define OP_NE 258
+
 /* Operator precedence — low binds loosest */
 
-static int op_prec(int kw)
+static int op_prec(int op)
 {
-    switch (kw)
+    switch (op)
     {
     case K_OR:
         return 1;
@@ -23,6 +30,9 @@ static int op_prec(int kw)
     case '=':
     case '<':
     case '>':
+    case OP_LE:
+    case OP_GE:
+    case OP_NE:
         return 3;
     case '+':
     case '-':
@@ -39,13 +49,167 @@ static int op_prec(int kw)
     }
 }
 
-/* Forward declaration */
+/* Map a symbol token (1 or 2 chars) to an operator code. */
+
+static int sym_op(const char *b)
+{
+    if (b[0] == '<' && b[1] == '=')
+        return OP_LE;
+    if (b[0] == '>' && b[1] == '=')
+        return OP_GE;
+    if (b[0] == '<' && b[1] == '>')
+        return OP_NE;
+    return (unsigned char)b[0];
+}
+
+/* Wrapping arithmetic — signed overflow is undefined behaviour in C, and a
+ * BASIC program should just wrap like a 16/32-bit machine would. */
+
+static int w_add(int a, int b)
+{
+    return (int)((unsigned)a + (unsigned)b);
+}
+
+static int w_sub(int a, int b)
+{
+    return (int)((unsigned)a - (unsigned)b);
+}
+
+static int w_mul(int a, int b)
+{
+    return (int)((unsigned)a * (unsigned)b);
+}
+
+static int w_neg(int a)
+{
+    return (int)(0u - (unsigned)a);
+}
+
+/* Integer power by squaring; negative exponents follow integer rules. */
+
+static int ipow(int base, int exp)
+{
+    unsigned result = 1u, b = (unsigned)base;
+
+    if (exp < 0)
+    {
+        if (base == 1)
+            return 1;
+        if (base == -1)
+            return (exp & 1) ? -1 : 1;
+        return 0;
+    }
+
+    while (exp > 0)
+    {
+        if (exp & 1)
+            result *= b;
+        exp >>= 1;
+        b *= b;
+    }
+
+    return (int)result;
+}
+
 static int expr(BasicState *s, int minprec);
 
-/* Parse a primary expression: number, variable, array, (expr), function */
+/* ( expr ) — current token must be '(' */
+
+static int paren_expr(BasicState *s)
+{
+    if (s->lex.type != T_SYM || s->lex.buf[0] != '(')
+    {
+        ctrl_error(s, "SYNTAX ERROR");
+        return 0;
+    }
+
+    lexer_next(s);
+    int v = expr(s, 1);
+
+    if (s->ctrl.stopped)
+        return 0;
+
+    if (s->lex.type != T_SYM || s->lex.buf[0] != ')')
+    {
+        ctrl_error(s, "SYNTAX ERROR");
+        return 0;
+    }
+
+    lexer_next(s);
+    return v;
+}
+
+/* String comparison:  <str> <op> <str>   where str is a literal or A$ */
+
+static int str_operand(BasicState *s, char *out)
+{
+    if (s->lex.type == T_STR)
+        strncpy(out, s->lex.buf, BASIC_STR_LEN - 1);
+    else if (s->lex.type == T_VAR && s->lex.is_string)
+        strncpy(out, s->var.str[s->lex.num], BASIC_STR_LEN - 1);
+    else
+    {
+        ctrl_error(s, "SYNTAX ERROR");
+        return 0;
+    }
+
+    out[BASIC_STR_LEN - 1] = '\0';
+    lexer_next(s);
+
+    return !s->ctrl.stopped;
+}
+
+static int str_compare(BasicState *s)
+{
+    char a[BASIC_STR_LEN], b[BASIC_STR_LEN];
+
+    if (!str_operand(s, a))
+        return 0;
+
+    if (s->lex.type != T_SYM ||
+        (s->lex.buf[0] != '=' && s->lex.buf[0] != '<' && s->lex.buf[0] != '>'))
+    {
+        ctrl_error(s, "SYNTAX ERROR");
+        return 0;
+    }
+
+    int op = sym_op(s->lex.buf);
+
+    lexer_next(s);
+
+    if (!str_operand(s, b))
+        return 0;
+
+    int c = strcmp(a, b);
+
+    switch (op)
+    {
+    case '=':
+        return c == 0;
+    case '<':
+        return c < 0;
+    case '>':
+        return c > 0;
+    case OP_LE:
+        return c <= 0;
+    case OP_GE:
+        return c >= 0;
+    case OP_NE:
+        return c != 0;
+    default:
+        ctrl_error(s, "SYNTAX ERROR");
+        return 0;
+    }
+}
+
+/* Parse a primary expression: number, variable, array, (expr), unary,
+ * NOT, built-in function, user function, string comparison. */
 
 static int primary(BasicState *s)
 {
+    if (s->ctrl.stopped)
+        return 0;
+
     /* Number literal */
     if (s->lex.type == T_NUM)
     {
@@ -54,36 +218,23 @@ static int primary(BasicState *s)
         return v;
     }
 
-    /* Variable or array element */
+    /* String comparison (the only place strings appear in an expression) */
+    if (s->lex.type == T_STR || (s->lex.type == T_VAR && s->lex.is_string))
+        return str_compare(s);
+
+    /* Numeric variable or array element */
     if (s->lex.type == T_VAR)
     {
         int vn = s->lex.num;
-        int is_str = s->lex.is_string;
 
         lexer_next(s);
 
-        /* Array subscript */
         if (s->lex.type == T_SYM && s->lex.buf[0] == '(')
         {
-            if (is_str)
-            {
-                ctrl_error(s, "SYNTAX ERROR");
-                return 0;
-            }
-
-            lexer_next(s);
-            int idx = expr(s, 1);
+            int idx = paren_expr(s);
 
             if (s->ctrl.stopped)
                 return 0;
-
-            if (s->lex.type != T_SYM || s->lex.buf[0] != ')')
-            {
-                ctrl_error(s, "SYNTAX ERROR");
-                return 0;
-            }
-
-            lexer_next(s);
 
             if (s->var.dim[vn] == 0)
             {
@@ -100,71 +251,68 @@ static int primary(BasicState *s)
             return s->var.arr[vn][idx];
         }
 
-        if (is_str)
-        {
-            ctrl_error(s, "SYNTAX ERROR");
-            return 0;
-        }
-
         return s->var.val[vn];
     }
 
     /* Parenthesized expression */
     if (s->lex.type == T_SYM && s->lex.buf[0] == '(')
+        return paren_expr(s);
+
+    /* Unary minus / plus.  Operand binds at ^ level so -2^2 == -(2^2). */
+    if (s->lex.type == T_SYM && (s->lex.buf[0] == '-' || s->lex.buf[0] == '+'))
     {
+        int neg = s->lex.buf[0] == '-';
+
         lexer_next(s);
-        int v = expr(s, 1);
+        int v = expr(s, 6);
 
         if (s->ctrl.stopped)
             return 0;
 
-        if (s->lex.type != T_SYM || s->lex.buf[0] != ')')
-        {
-            ctrl_error(s, "SYNTAX ERROR");
-            return 0;
-        }
-
-        lexer_next(s);
-        return v;
+        return neg ? w_neg(v) : v;
     }
 
-    /* Built-in functions: PEEK, ABS, SGN, RND */
+    /* NOT and built-in functions: PEEK, ABS, SGN, RND, FRE */
     if (s->lex.type == T_KEY)
     {
         int fn = s->lex.kw;
 
-        lexer_next(s);
+        if (fn == K_NOT)
+        {
+            /* Looser than comparisons, tighter than AND: NOT A=B == NOT (A=B) */
+            lexer_next(s);
+            int v = expr(s, 3);
 
-        if (s->lex.type != T_SYM || s->lex.buf[0] != '(')
+            if (s->ctrl.stopped)
+                return 0;
+
+            return !v;
+        }
+
+        if (fn != K_PEEK && fn != K_ABS && fn != K_SGN && fn != K_RND && fn != K_FRE)
         {
             ctrl_error(s, "SYNTAX ERROR");
             return 0;
         }
 
         lexer_next(s);
-        int arg = expr(s, 1);
+        int arg = paren_expr(s);
 
         if (s->ctrl.stopped)
             return 0;
 
-        if (s->lex.type != T_SYM || s->lex.buf[0] != ')')
-        {
-            ctrl_error(s, "SYNTAX ERROR");
-            return 0;
-        }
-
-        lexer_next(s);
-
         switch (fn)
         {
         case K_PEEK:
-            return *(volatile uint8_t *)arg;
+            return *BASIC_ADDR(arg);
         case K_ABS:
-            return arg < 0 ? -arg : arg;
+            return arg < 0 ? w_neg(arg) : arg;
         case K_SGN:
             return arg < 0 ? -1 : arg > 0 ? 1 : 0;
         case K_RND:
             return arg > 0 ? (rand() % arg) + 1 : 0;
+        case K_FRE:
+            return BASIC_PROG_MAX - (int)(s->prog.free_ptr - s->prog.data);
         default:
             ctrl_error(s, "SYNTAX ERROR");
             return 0;
@@ -177,30 +325,20 @@ static int primary(BasicState *s)
         int fn_idx = s->lex.num;
 
         lexer_next(s);
-
-        if (s->lex.type != T_SYM || s->lex.buf[0] != '(')
-        {
-            ctrl_error(s, "SYNTAX ERROR");
-            return 0;
-        }
-
-        lexer_next(s);
-        int arg = expr(s, 1);
+        int arg = paren_expr(s);
 
         if (s->ctrl.stopped)
             return 0;
 
-        if (s->lex.type != T_SYM || s->lex.buf[0] != ')')
+        if (s->fn.param_var_idx[fn_idx] < 0 || !s->fn.body[fn_idx])
         {
-            ctrl_error(s, "SYNTAX ERROR");
+            ctrl_error(s, "UNDEFINED FUNCTION");
             return 0;
         }
 
-        lexer_next(s);
-
-        if (s->fn.param_var_idx[fn_idx] < 0)
+        if (s->fn.depth >= BASIC_FN_DEPTH)
         {
-            ctrl_error(s, "UNDEFINED FUNCTION");
+            ctrl_error(s, "FUNCTION NESTING TOO DEEP");
             return 0;
         }
 
@@ -208,11 +346,17 @@ static int primary(BasicState *s)
         int      param = s->fn.param_var_idx[fn_idx];
         int      old = s->var.val[param];
 
+        s->fn.depth++;
         s->var.val[param] = arg;
         s->lex.ptr = s->fn.body[fn_idx];
         lexer_next(s);
         int result = expr(s, 1);
+
+        if (!s->ctrl.stopped && s->lex.type != T_EOF)
+            ctrl_error(s, "SYNTAX ERROR");
+
         s->var.val[param] = old;
+        s->fn.depth--;
         s->lex = saved;
         return result;
     }
@@ -233,23 +377,23 @@ static int expr(BasicState *s, int minprec)
     for (;;)
     {
         /* Map current token to an operator key */
-        int kw;
+        int op;
 
         if (s->lex.type == T_SYM)
-            kw = s->lex.buf[0];
-        else if (s->lex.type == T_KEY && (s->lex.kw == K_AND || s->lex.kw == K_OR ||
-                                          s->lex.kw == K_MOD || s->lex.kw == K_NOT))
-            kw = s->lex.kw;
+            op = sym_op(s->lex.buf);
+        else if (s->lex.type == T_KEY &&
+                 (s->lex.kw == K_AND || s->lex.kw == K_OR || s->lex.kw == K_MOD))
+            op = s->lex.kw;
         else
             break;
 
-        int prec = op_prec(kw);
+        int prec = op_prec(op);
 
         if (prec < minprec)
             break;
 
         /* ^ is right-associative, everything else left-associative */
-        int is_right = (kw == '^');
+        int is_right = (op == '^');
 
         lexer_next(s);
 
@@ -258,38 +402,42 @@ static int expr(BasicState *s, int minprec)
         if (s->ctrl.stopped)
             return 0;
 
-        switch (kw)
+        switch (op)
         {
         case '+':
-            n = n + rhs;
+            n = w_add(n, rhs);
             break;
         case '-':
-            n = n - rhs;
+            n = w_sub(n, rhs);
             break;
         case '*':
-            n = n * rhs;
+            n = w_mul(n, rhs);
             break;
         case '/':
-            n = rhs != 0 ? n / rhs : 0;
-            break;
         case '\\':
-            n = rhs != 0 ? n / rhs : 0;
+            if (rhs == 0)
+            {
+                ctrl_error(s, "DIVISION BY ZERO");
+                return 0;
+            }
+            n = (rhs == -1) ? w_neg(n) : n / rhs;
             break;
         case K_MOD:
-            n = rhs != 0 ? n % rhs : 0;
+            if (rhs == 0)
+            {
+                ctrl_error(s, "DIVISION BY ZERO");
+                return 0;
+            }
+            n = (rhs == -1) ? 0 : n % rhs;
             break;
         case '^':
-        {
-            int base = n, exp = rhs, result = 1;
-
-            while (exp > 0)
+            if (n == 0 && rhs < 0)
             {
-                result *= base;
-                exp--;
+                ctrl_error(s, "DIVISION BY ZERO");
+                return 0;
             }
-            n = result;
+            n = ipow(n, rhs);
             break;
-        }
         case '=':
             n = (n == rhs);
             break;
@@ -298,6 +446,15 @@ static int expr(BasicState *s, int minprec)
             break;
         case '>':
             n = (n > rhs);
+            break;
+        case OP_LE:
+            n = (n <= rhs);
+            break;
+        case OP_GE:
+            n = (n >= rhs);
+            break;
+        case OP_NE:
+            n = (n != rhs);
             break;
         case K_AND:
             n = (n && rhs);
@@ -320,24 +477,5 @@ int expr_eval(BasicState *s)
 
 int expr_parse_paren(BasicState *s)
 {
-    if (s->lex.type != T_SYM || s->lex.buf[0] != '(')
-    {
-        ctrl_error(s, "SYNTAX ERROR");
-        return 0;
-    }
-
-    lexer_next(s);
-    int v = expr(s, 1);
-
-    if (s->ctrl.stopped)
-        return 0;
-
-    if (s->lex.type != T_SYM || s->lex.buf[0] != ')')
-    {
-        ctrl_error(s, "SYNTAX ERROR");
-        return 0;
-    }
-
-    lexer_next(s);
-    return v;
+    return paren_expr(s);
 }
