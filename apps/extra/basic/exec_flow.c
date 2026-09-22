@@ -20,7 +20,7 @@ void exec_print(BasicState *s)
     {
         if (s->lex.type == T_VAR && s->lex.is_string)
         {
-            printf("%s", s->var.str[s->lex.num]);
+            printf("%s", s->var.str[NAME_LETTER(s->lex.num)]);
             lexer_next(s);
         }
         else if (s->lex.type == T_STR)
@@ -95,7 +95,7 @@ void exec_input(BasicState *s)
         if (!lexer_next(s))
             return;
 
-        int idx = -1;
+        int *ref = NULL;
 
         if (s->lex.type == T_SYM && s->lex.buf[0] == '(')
         {
@@ -105,26 +105,10 @@ void exec_input(BasicState *s)
                 return;
             }
 
-            lexer_next(s);
-            idx = expr_eval(s);
+            ref = expr_array_ref(s, vn);
 
-            if (s->ctrl.stopped)
+            if (!ref)
                 return;
-
-            if (!lex_expect_sym(s, ')'))
-                return;
-
-            if (s->var.dim[vn] == 0)
-            {
-                ctrl_error(s, "UNDIMENSIONED ARRAY");
-                return;
-            }
-
-            if (idx < 0 || idx >= s->var.dim[vn])
-            {
-                ctrl_error(s, "SUBSCRIPT OUT OF RANGE");
-                return;
-            }
         }
 
         char ibuf[BASIC_STR_LEN];
@@ -143,9 +127,9 @@ void exec_input(BasicState *s)
         ibuf[BASIC_STR_LEN - 1] = '\0';
 
         if (is_str)
-            strcpy(s->var.str[vn], ibuf);
-        else if (idx >= 0)
-            s->var.arr[vn][idx] = atoi(ibuf);
+            strcpy(s->var.str[NAME_LETTER(vn)], ibuf);
+        else if (ref)
+            *ref = atoi(ibuf);
         else
             s->var.val[vn] = atoi(ibuf);
 
@@ -426,7 +410,7 @@ void exec_poke(BasicState *s)
     *BASIC_ADDR(a) = (uint8_t)v;
 }
 
-/* DIM A(n) [, B(n) ...] */
+/* DIM A(n) [, B(n,m) ...]  — indices run 0..n (and 0..m). */
 
 void exec_dim(BasicState *s)
 {
@@ -443,30 +427,69 @@ void exec_dim(BasicState *s)
 
         int vn = s->lex.num;
 
+        /* Arrays are letter-only. */
+        if (!NAME_PLAIN(vn))
+        {
+            ctrl_error(s, "SYNTAX ERROR");
+            return;
+        }
+
+        vn = NAME_LETTER(vn);
+
         if (!lexer_next(s))
             return;
 
         if (!lex_expect_sym(s, '('))
             return;
 
-        int size = expr_eval(s);
+        int d1 = expr_eval(s);
+        int d2 = -1;
 
         if (s->ctrl.stopped)
             return;
 
+        if (s->lex.type == T_SYM && s->lex.buf[0] == ',')
+        {
+            if (!lexer_next(s))
+                return;
+
+            d2 = expr_eval(s);
+
+            if (s->ctrl.stopped)
+                return;
+        }
+
         if (!lex_expect_sym(s, ')'))
             return;
 
-        if (size < 1 || size > BASIC_MAX_DIM)
+        if (d1 < 0 || d1 > 32767 || d2 < -1 || d2 > 32767)
         {
             ctrl_error(s, "BAD DIMENSION");
             return;
         }
 
-        s->var.dim[vn] = size + 1;
+        if (s->var.a_rows[vn])
+        {
+            ctrl_error(s, "REDIM'D ARRAY");
+            return;
+        }
 
-        for (int i = 0; i <= size; i++)
-            s->var.arr[vn][i] = 0;
+        long total = (long)(d1 + 1) * (d2 >= 0 ? (long)(d2 + 1) : 1L);
+
+        if (total > BASIC_POOL_INTS - s->var.pool_top)
+        {
+            ctrl_error(s, "OUT OF MEMORY");
+            return;
+        }
+
+        s->var.a_base[vn] = s->var.pool_top;
+        s->var.a_rows[vn] = d1 + 1;
+        s->var.a_cols[vn] = d2 >= 0 ? d2 + 1 : 0;
+
+        for (long i = 0; i < total; i++)
+            s->var.pool[s->var.pool_top + i] = 0;
+
+        s->var.pool_top += (int)total;
 
         if (s->lex.type == T_SYM && s->lex.buf[0] == ',')
         {

@@ -16,7 +16,7 @@
 static const char *kw_names[] = {
     "LET",  "PRINT", "INPUT", "GOTO", "GOSUB", "RETURN", "IF",   "THEN", "FOR",  "TO",   "STEP",
     "NEXT", "END",   "REM",   "AND",  "OR",    "LIST",   "LOAD", "RUN",  "NEW",  "POKE", "EXIT",
-    "PEEK", "ABS",   "SGN",   "RND",  "DEF",   "DIM",    "FRE",  "CLR",  "SAVE", "MOD",  "NOT"};
+    "PEEK", "ABS",   "SGN",   "RND",  "DEF",   "DIM",    "FRE",  "CLR",  "SAVE", "MOD",  "NOT",  "SQR"};
 
 static int kw_count(void)
 {
@@ -26,7 +26,7 @@ static int kw_count(void)
 int lexer_kw_id(const char *w)
 {
     for (int i = 0; i < kw_count(); i++)
-        if (!strcmp(w, kw_names[i]))
+        if (w[0] == kw_names[i][0] && !strcmp(w, kw_names[i]))
             return i;
     return -1;
 }
@@ -136,16 +136,6 @@ void tokenize_line(char *dst, unsigned max_dst, const char *src)
     }
     *dst = 0;
 }
-
-/* Program entry traversal */
-
-char *entry_next(char *p)
-{
-    p += 2;
-
-    return p + strlen(p) + 1;
-}
-
 
 /* Lexer helpers */
 
@@ -262,11 +252,25 @@ int lexer_next(BasicState *s)
         /* Single letter = variable */
         if (i == 1)
         {
+            int subs = 0;
+
             s->lex.type = T_VAR;
-            s->lex.num = s->lex.buf[0] - 'A';
+
+            /* One optional digit right after the letter: A1, X9 ... */
+            if (isdigit((unsigned char)*s->lex.ptr))
+            {
+                subs = *s->lex.ptr - '0' + 1;
+                s->lex.ptr++;
+            }
+
+            s->lex.num = (s->lex.buf[0] - 'A') * BASIC_SUBS + subs;
 
             if (*s->lex.ptr == '$')
             {
+                /* String variables are letter-only. */
+                if (subs)
+                    return lex_fail(s);
+
                 s->lex.ptr++;
                 s->lex.is_string = 1;
             }

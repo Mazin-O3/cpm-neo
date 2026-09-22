@@ -16,14 +16,14 @@ static void assign_string(BasicState *s, int vn)
 {
     if (s->lex.type == T_STR)
     {
-        strncpy(s->var.str[vn], s->lex.buf, BASIC_STR_LEN - 1);
-        s->var.str[vn][BASIC_STR_LEN - 1] = '\0';
+        strncpy(s->var.str[NAME_LETTER(vn)], s->lex.buf, BASIC_STR_LEN - 1);
+        s->var.str[NAME_LETTER(vn)][BASIC_STR_LEN - 1] = '\0';
         lexer_next(s);
     }
     else if (s->lex.type == T_VAR && s->lex.is_string)
     {
         if (s->lex.num != vn)
-            memcpy(s->var.str[vn], s->var.str[s->lex.num], BASIC_STR_LEN);
+            memcpy(s->var.str[NAME_LETTER(vn)], s->var.str[NAME_LETTER(s->lex.num)], BASIC_STR_LEN);
         lexer_next(s);
     }
     else
@@ -43,34 +43,18 @@ static void assign_variable(BasicState *s, int vn, int is_str)
             return;
         }
 
-        lexer_next(s);
-        int idx = expr_eval(s);
+        int *ref = expr_array_ref(s, vn);
 
-        if (s->ctrl.stopped)
-            return;
-
-        if (!lex_expect_sym(s, ')'))
+        if (!ref)
             return;
 
         if (!lex_expect_sym(s, '='))
             return;
 
-        if (s->var.dim[vn] == 0)
-        {
-            ctrl_error(s, "UNDIMENSIONED ARRAY");
-            return;
-        }
-
-        if (idx < 0 || idx >= s->var.dim[vn])
-        {
-            ctrl_error(s, "SUBSCRIPT OUT OF RANGE");
-            return;
-        }
-
         int v = expr_eval(s);
 
         if (!s->ctrl.stopped)
-            s->var.arr[vn][idx] = v;
+            *ref = v;
 
         return;
     }

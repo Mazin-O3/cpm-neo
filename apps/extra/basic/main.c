@@ -150,18 +150,18 @@ static int exec_direct(BasicState *s)
 
         while (p < s->prog.free_ptr)
         {
-            char line_buf[256];
-            int  pos = 0;
-            int  num = get_le16((const uint8_t *)p);
+            char        line_buf[256];
+            int         pos = 0;
+            int         num = entry_line(p);
+            const char *t = entry_text(p);
 
             pos += snprintf(line_buf + pos, sizeof(line_buf) - pos, "%d ", num);
-            p += 2;
 
-            while (*p && pos < (int)sizeof(line_buf) - 2)
+            while (*t && pos < (int)sizeof(line_buf) - 2)
             {
-                if ((unsigned char)*p >= BASIC_TOKEN_BASE)
+                if ((unsigned char)*t >= BASIC_TOKEN_BASE)
                 {
-                    const char *kw = lexer_kw_name((unsigned char)*p - BASIC_TOKEN_BASE);
+                    const char *kw = lexer_kw_name((unsigned char)*t - BASIC_TOKEN_BASE);
                     int         klen = (int)strlen(kw);
 
                     /* No extra space: the source text already carries
@@ -173,18 +173,16 @@ static int exec_direct(BasicState *s)
                         pos += klen;
                     }
 
-                    p++;
+                    t++;
                 }
                 else
-                    line_buf[pos++] = *p++;
+                    line_buf[pos++] = *t++;
             }
-
-            while (*p)
-                p++;
-            p++;
 
             line_buf[pos++] = '\n';
             write(fd, line_buf, (unsigned)pos);
+
+            p = entry_next(p);
         }
 
         close(fd);
@@ -229,7 +227,8 @@ int main(int argc, char **argv)
 
     if (argc > 1)
     {
-        prog_load(s, argv[1]);
+        if (prog_load(s, argv[1]) < 0)
+            return 1;
 
         if (s->prog.free_ptr != s->prog.data)
             prog_run(s);
@@ -237,18 +236,32 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    printf("*** NeoBasic ***\n%d bytes free\n\n", BASIC_PROG_MAX);
+    printf("*** NEO BASIC ***\n%d BYTES FREE\n\n", BASIC_PROG_MAX);
 
-    char buf[BASIC_LINE_LEN];
+    char buf[BASIC_READ_BUF];
 
     for (;;)
     {
         printf(">");
 
-        if (getline(buf, BASIC_LINE_LEN) < 0)
+        if (getline(buf, BASIC_READ_BUF) < 0)
         {
             putchar('\n');
             return 0;
+        }
+
+        /* The buffer is one byte larger than the limit: if it filled up the
+         * line was too long (and possibly cut), so refuse it outright rather
+         * than run or store half a line. */
+        if (strlen(buf) > BASIC_SRC_MAX)
+        {
+            printf("?LINE TOO LONG\n");
+
+#if BASIC_DRAIN_LONG
+            while ((int)strlen(buf) == BASIC_READ_BUF - 1 && getline(buf, BASIC_READ_BUF) >= 0)
+                ;
+#endif
+            continue;
         }
 
         char *p = buf;

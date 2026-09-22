@@ -12,6 +12,48 @@
 #include <byteorder.h>
 #include <string.h>
 
+/*
+ * Program entry layout — the ONLY place that knows it.
+ *
+ *     [ u16 line number ][ u8 text length ][ tokenized text ][ NUL ]
+ *
+ * The length byte lets a search hop from entry to entry with a pointer add
+ * instead of running strlen() over every byte it skips: line lookups (GOTO,
+ * GOSUB, IF..THEN n, program editing) walk entries, not bytes.  Tokenized
+ * text is never longer than its source line, so it always fits in a byte.
+ *
+ * Everything else goes through entry_line(), entry_text(), entry_next() and
+ * entry_write(), so the layout can change without touching any caller.
+ */
+
+#define ENTRY_HDR 3
+
+int entry_line(const char *p)
+{
+    return get_le16((const uint8_t *)p);
+}
+
+char *entry_text(char *p)
+{
+    return p + ENTRY_HDR;
+}
+
+char *entry_next(char *p)
+{
+    return p + ENTRY_HDR + (unsigned char)p[2] + 1;
+}
+
+/* Store line n with already-tokenized text tok at dst. */
+
+static void entry_write(char *dst, int n, const char *tok)
+{
+    size_t len = strlen(tok);
+
+    put_le16((uint8_t *)dst, (uint16_t)n);
+    dst[2] = (char)len;
+    memcpy(dst + ENTRY_HDR, tok, len + 1);
+}
+
 /* Program line management */
 
 char *prog_find_line(BasicState *s, int n)
@@ -20,10 +62,13 @@ char *prog_find_line(BasicState *s, int n)
 
     while (p < s->prog.free_ptr)
     {
-        int num = get_le16((const uint8_t *)p);
+        int num = entry_line(p);
 
         if (num == n)
             return p;
+
+        if (num > n)
+            return NULL;            /* sorted: it cannot be further on */
 
         p = entry_next(p);
     }
@@ -47,6 +92,42 @@ void prog_del_line(BasicState *s, int n)
     s->prog.free_ptr -= (int)(next - p);
 }
 
+/* Tokenize t into tok (BASIC_LINE_LEN bytes) and return the size the stored
+ * entry will occupy: 2-byte line number + text + NUL.  Every path that stores
+ * a line uses this, so the size accounting cannot drift between them. */
+
+static int entry_size(char *tok, const char *t)
+{
+    tokenize_line(tok, BASIC_LINE_LEN, t);
+
+    return ENTRY_HDR + (int)strlen(tok) + 1;
+}
+
+/* Append line n at the end of the program.  The caller guarantees n is higher
+ * than every stored line, so no search is needed — O(1) instead of two full
+ * scans.  Same return convention as prog_add_line(). */
+
+static int prog_append(BasicState *s, int n, const char *t)
+{
+    if (!*t)
+        return 0;                       /* nothing stored to delete */
+
+    char tokened[BASIC_LINE_LEN];
+    int  len = entry_size(tokened, t);
+
+    if ((int)(s->prog.free_ptr - s->prog.data) + len > BASIC_PROG_MAX)
+    {
+        printf("\n?PROGRAM FULL\n");
+        return -1;
+    }
+
+    entry_write(s->prog.free_ptr, n, tokened);
+
+    s->prog.free_ptr += len;
+
+    return 0;
+}
+
 /* Insert or replace line n.  An empty text deletes it.  Returns 0 on
  * success, -1 if the program is full (the old line is then left intact). */
 
@@ -60,9 +141,7 @@ int prog_add_line(BasicState *s, int n, const char *t)
 
     char tokened[BASIC_LINE_LEN];
 
-    tokenize_line(tokened, sizeof(tokened), t);
-
-    int   len = 2 + (int)strlen(tokened) + 1;
+    int   len = entry_size(tokened, t);
     char *old = prog_find_line(s, n);
     int   old_len = old ? (int)(entry_next(old) - old) : 0;
     int   used = (int)(s->prog.free_ptr - s->prog.data);
@@ -80,19 +159,68 @@ int prog_add_line(BasicState *s, int n, const char *t)
 
     char *ins = s->prog.data;
 
-    while (ins < s->prog.free_ptr && get_le16((const uint8_t *)ins) < n)
+    while (ins < s->prog.free_ptr && entry_line(ins) < n)
         ins = entry_next(ins);
 
     int rest = (int)(s->prog.free_ptr - ins);
 
     memmove(ins + len, ins, rest);
 
-    put_le16((uint8_t *)ins, (uint16_t)n);
-    memcpy(ins + 2, tokened, (size_t)len - 2);
+    entry_write(ins, n, tokened);
 
     s->prog.free_ptr += len;
 
     return 0;
+}
+
+/*
+ * Split "NNN text" into its line number and the text after it.  Returns the
+ * number of digits found (0 = the line has no line number).  *rest points at
+ * the text with leading blanks skipped and trailing blanks / CR stripped
+ * (in place), so CRLF files don't smuggle \r into program lines.  *num stops
+ * growing once it exceeds BASIC_MAX_LINE, so it can never overflow.
+ */
+
+static int split_line(char *line, long *num, char **rest)
+{
+    char *p = line;
+    int   digits = 0;
+
+    *num = 0;
+
+    while (*p == ' ')
+        p++;
+
+    while (*p >= '0' && *p <= '9')
+    {
+        if (*num <= BASIC_MAX_LINE)
+            *num = *num * 10 + (*p - '0');
+        p++;
+        digits++;
+    }
+
+    while (*p == ' ')
+        p++;
+
+    int len = (int)strlen(p);
+
+    while (len > 0 && (unsigned char)p[len - 1] <= ' ')
+        p[--len] = 0;
+
+    *rest = p;
+
+    return digits;
+}
+
+static int line_number_ok(long num)
+{
+    if (num > BASIC_MAX_LINE)
+    {
+        printf("?BAD LINE NUMBER\n");
+        return 0;
+    }
+
+    return 1;
 }
 
 /*
@@ -103,38 +231,14 @@ int prog_add_line(BasicState *s, int n, const char *t)
 
 int prog_enter_line(BasicState *s, char *line)
 {
-    char *p = line;
-    long  num = 0;
-    int   digits = 0;
+    long  num;
+    char *p;
 
-    while (*p == ' ')
-        p++;
-
-    while (*p >= '0' && *p <= '9')
-    {
-        if (num <= BASIC_MAX_LINE)
-            num = num * 10 + (*p - '0');
-        p++;
-        digits++;
-    }
-
-    if (!digits)
+    if (!split_line(line, &num, &p))
         return 0;
 
-    if (num > BASIC_MAX_LINE)
-    {
-        printf("?BAD LINE NUMBER\n");
+    if (!line_number_ok(num))
         return -1;
-    }
-
-    while (*p == ' ')
-        p++;
-
-    /* Strip trailing blanks / CR so CRLF files don't smuggle \r into lines. */
-    int len = (int)strlen(p);
-
-    while (len > 0 && (unsigned char)p[len - 1] <= ' ')
-        p[--len] = 0;
 
     return prog_add_line(s, (int)num, p) < 0 ? -1 : 1;
 }
@@ -149,11 +253,11 @@ void prog_list(BasicState *s)
 
     while (p < s->prog.free_ptr)
     {
-        int num = get_le16((const uint8_t *)p);
+        int num = entry_line(p);
 
         printf("%d ", num);
 
-        const char *text = p + 2;
+        const char *text = entry_text(p);
 
         while (*text)
         {
@@ -180,6 +284,13 @@ void prog_list(BasicState *s)
 
 /* Program initialization and control */
 
+static void clear_arrays(BasicState *s)
+{
+    s->var.pool_top = 0;
+    memset(s->var.a_rows, 0, sizeof(s->var.a_rows));
+    memset(s->var.a_cols, 0, sizeof(s->var.a_cols));
+}
+
 static void clear_vars_and_fns(BasicState *s)
 {
     s->loop.stack_ptr = -1;
@@ -187,7 +298,7 @@ static void clear_vars_and_fns(BasicState *s)
 
     memset(s->var.val, 0, sizeof(s->var.val));
     memset(s->var.str, 0, sizeof(s->var.str));
-    memset(s->var.dim, 0, sizeof(s->var.dim));
+    clear_arrays(s);
     memset(s->fn.param_var_idx, -1, sizeof(s->fn.param_var_idx));
     memset(s->fn.body, 0, sizeof(s->fn.body));
 
@@ -223,9 +334,9 @@ static void run_loop(BasicState *s)
     {
         char *cur = s->ctrl.instr_ptr;
 
-        s->ctrl.lineno = get_le16((const uint8_t *)cur);
+        s->ctrl.lineno = entry_line(cur);
 
-        exec_line(s, cur + 2);
+        exec_line(s, entry_text(cur));
 
         if (!s->ctrl.stopped && !s->ctrl.jump)
             s->ctrl.instr_ptr = entry_next(cur);
@@ -249,7 +360,7 @@ void prog_run(BasicState *s)
 
     memset(s->var.val, 0, sizeof(s->var.val));
     memset(s->var.str, 0, sizeof(s->var.str));
-    memset(s->var.dim, 0, sizeof(s->var.dim));
+    clear_arrays(s);
 
     s->loop.stack_ptr = -1;
     s->gosub.stack_ptr = -1;
@@ -272,9 +383,18 @@ void prog_continue(BasicState *s)
 
 /* Program loading
  *
- * Lines go through prog_enter_line(), so out-of-order and duplicate line
- * numbers behave exactly as if typed.  The current program is only wiped
- * once the file has actually opened. */
+ * LOAD is all-or-nothing with respect to what is left in memory: if any line
+ * cannot be stored (program full, bad line number) the partial program is
+ * discarded and -1 is returned, so a truncated program can never be RUN.
+ *
+ * Files are almost always in ascending line order, so a line whose number is
+ * higher than any seen so far is appended directly (prog_append, no search).
+ * Anything else — out of order, a duplicate, a delete — goes through
+ * prog_add_line() and behaves exactly as if typed.  `last` only ever
+ * over-estimates the highest stored line (a deleted line leaves it high), which
+ * merely sends a few lines down the slow path; it can never send an unordered
+ * line down the fast one.  The current program is replaced only once the file
+ * has actually opened. */
 
 int prog_load(BasicState *s, const char *path)
 {
@@ -288,15 +408,59 @@ int prog_load(BasicState *s, const char *path)
 
     prog_new(s);
 
-    char line[BASIC_LINE_LEN];
+    char line[BASIC_READ_BUF];
+    long last = -1;
+    int  rc = 0;
 
     while (readline(fd, line, sizeof(line)) > 0)
     {
-        if (prog_enter_line(s, line) < 0)
+        long  num;
+        char *p;
+        int   r;
+
+        /* Buffer is one byte over the limit, so a full buffer means the line
+         * was too long.  Any such line aborts the load — even an unnumbered
+         * one, because a cut-off tail could otherwise be misread as a new
+         * numbered line. */
+        if (strlen(line) > BASIC_SRC_MAX)
+        {
+            if (split_line(line, &num, &p))
+                printf("?LINE %ld TOO LONG\n", num);
+            else
+                printf("?LINE TOO LONG\n");
+
+            rc = -1;
             break;
+        }
+
+        if (!split_line(line, &num, &p))
+            continue;
+
+        if (!line_number_ok(num))
+        {
+            rc = -1;
+            break;
+        }
+
+        if (num > last)
+        {
+            r = prog_append(s, (int)num, p);
+            last = num;
+        }
+        else
+            r = prog_add_line(s, (int)num, p);
+
+        if (r < 0)
+        {
+            rc = -1;
+            break;
+        }
     }
 
     close(fd);
 
-    return 0;
+    if (rc < 0)
+        prog_new(s);
+
+    return rc;
 }

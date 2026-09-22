@@ -16,18 +16,46 @@
 #define BASIC_FOR_DEPTH   8
 #define BASIC_GOSUB_DEPTH 32
 #define BASIC_FN_DEPTH    8
+#define BASIC_FN_LEN      64            /* Longest DEF FN body, incl. NUL */
 #define BASIC_NUM_VARS    26
+
+/* Variable names: one letter, optionally followed by ONE digit (A, A0..A9, B, B0 ...).
+ * A T_VAR token's `num` is a "name index" = letter * BASIC_SUBS + sub, with sub = 0 for a
+ * plain letter and 1..10 for the digits 0..9.  Numeric scalars use the whole name index;
+ * strings and arrays are letter-only and use NAME_LETTER(). */
+#define BASIC_SUBS        11
+#define BASIC_NUM_NAMES   (BASIC_NUM_VARS * BASIC_SUBS)
+#define NAME_LETTER(n)    ((n) / BASIC_SUBS)
+#define NAME_PLAIN(n)     ((n) % BASIC_SUBS == 0)
 #define BASIC_STR_LEN     64
 #define BASIC_LINE_LEN    96
 
-#define BASIC_ARR_SZ     16
-#define BASIC_MAX_DIM    (BASIC_ARR_SZ - 1)
+/* Longest source line (characters) that can be typed or loaded.  Read buffers
+ * are one byte bigger, so an over-long line fills the buffer and is detected
+ * instead of being silently cut or split. */
+#define BASIC_SRC_MAX     (BASIC_LINE_LEN - 1)
+#define BASIC_READ_BUF    (BASIC_LINE_LEN + 1)
+
+/* Set to 1 ONLY if the console getline() returns an over-long line in
+ * successive chunks (like fgets).  The REPL then discards the tail chunks
+ * after ?LINE TOO LONG so they are not run as a second, bogus line.  Leave at
+ * 0 if getline() truncates and drops the rest: draining would then swallow
+ * the next real input line. */
+#ifndef BASIC_DRAIN_LONG
+#define BASIC_DRAIN_LONG  0
+#endif
+
+/* Arrays share one pool of ints, carved up by DIM (A(n) or A(n,m); indices run
+ * 0..n).  Only what is dimensioned uses memory, and there is no per-array cap. */
+#define BASIC_POOL_INTS  1024
 #define BASIC_TOKEN_BASE 0x80
 
-/* Largest legal line number */
+/* Largest legal line number: entries store it as a little-endian u16. */
 #define BASIC_MAX_LINE 65535
 
-/* PEEK/POKE address */
+/* PEEK/POKE address: the full int is used (no masking).  Going through
+ * unsigned first means negative values map to the top half of the address
+ * space (-1 == 0xFFFFFFFF with 32-bit int) instead of sign-extending. */
 #define BASIC_ADDR(a) ((volatile uint8_t *)(uintptr_t)(unsigned)(a))
 
 /* Token types */
@@ -77,7 +105,8 @@ enum
     K_CLR,
     K_SAVE,
     K_MOD,
-    K_NOT
+    K_NOT,
+    K_SQR
 };
 
 /* Keyword table access */
@@ -94,10 +123,13 @@ typedef struct
 
 typedef struct
 {
-    int  val[BASIC_NUM_VARS];
+    int  pool_top;                           /* next free pool slot */
+    int  pool[BASIC_POOL_INTS];
+    int  val[BASIC_NUM_NAMES];
     char str[BASIC_NUM_VARS][BASIC_STR_LEN];
-    int  arr[BASIC_NUM_VARS][BASIC_ARR_SZ];
-    int  dim[BASIC_NUM_VARS];
+    int  a_base[BASIC_NUM_VARS];             /* first element in pool */
+    int  a_rows[BASIC_NUM_VARS];             /* n+1 for the first subscript; 0 = not dimensioned */
+    int  a_cols[BASIC_NUM_VARS];             /* m+1 for the second subscript; 0 = one-dimensional */
 } BasicVar;
 
 /*
@@ -137,7 +169,7 @@ typedef struct
 typedef struct
 {
     int   param_var_idx[BASIC_NUM_VARS];
-    char  text[BASIC_NUM_VARS][BASIC_LINE_LEN];
+    char  text[BASIC_NUM_VARS][BASIC_FN_LEN];
     char *body[BASIC_NUM_VARS];
     int   depth;
 } BasicFn;
@@ -177,12 +209,13 @@ int  lex_expect_key(BasicState *s, int kw);
 /* Expression evaluation */
 int expr_eval(BasicState *s);
 int expr_parse_paren(BasicState *s);
+int *expr_array_ref(BasicState *s, int vn);
 
 /* Statement execution */
 void exec_line(BasicState *s, const char *text);
 void exec_stmt(BasicState *s);
 
-/* Statement handlers (exec_flow.c) */
+/* Statement handlers  */
 void exec_print(BasicState *s);
 void exec_input(BasicState *s);
 void exec_goto(BasicState *s);
@@ -196,6 +229,8 @@ void exec_def(BasicState *s);
 
 /* Program management */
 void  tokenize_line(char *dst, unsigned max_dst, const char *src);
+int   entry_line(const char *p);
+char *entry_text(char *p);
 char *entry_next(char *p);
 int   prog_load(BasicState *s, const char *path);
 void  prog_del_line(BasicState *s, int n);
