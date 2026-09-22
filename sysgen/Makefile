@@ -3,15 +3,13 @@
 CC      ?= cc
 CFLAGS  ?= -Os -Wall -Wextra
 
-INC_LOCAL := -Iinclude -I ../core/kernel -I ../core -I .. -iquote ../sdk/include
-# Host bdos.c/disk.c: the ceiling config (sysgen/include/config.h) provides
-# CONFIG_* to the host build, sizing the arrays to the maximum any platform
-# may use.
-INC_BDOS  := -I include -DSYSGEN_HOST -I ../core/kernel -I ../core -I ../sdk/include -I .. -Wno-builtin-declaration-mismatch
-
-# cmd_new.o keeps INC_LOCAL so the host libc (not the sdk's freestanding
-# headers) resolves <stdio.h>/<stdlib.h>/<string.h>.
-INC_CMD   := $(INC_LOCAL) -DSYSGEN_HOST
+# -include config.h force-includes sysgen/include/config.h into every host
+# compile: it provides the ceiling CONFIG_* that sizes the embedded kernel
+# arrays.  Target builds get the platform's real values as -D defines, so
+# the host tool is compiled once and serves every platform.
+INC_LOCAL := -include config.h -Iinclude -I ../core/kernel -I ../core -I .. -iquote ../sdk/include
+INC_BDOS  := -include config.h -I include -I ../core/kernel -I ../core -I ../sdk/include -I .. -Wno-builtin-declaration-mismatch
+INC_CMD   := $(INC_LOCAL)
 
 BUILD_DIR := build
 OBJ_DIR   := $(BUILD_DIR)/obj

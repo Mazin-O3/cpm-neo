@@ -5,9 +5,9 @@
  * (1 KB); eight blocks form one extent; the allocation bitmap supports
  * up to BD_VOL_MAX_BLOCKS blocks per volume.
  *
- * Tunables come from config.h (the platform's effective values, via the
- * generated build/gen/config.h; the sysgen host resolves its own ceiling
- * include/config.h).  User-facing ABI types come from fsctx.h.
+ * Tunables (CONFIG_VOL_MAX, CONFIG_FCB_MAX, CONFIG_DISK_SIZE, ...) come
+ * from the compile line; no config.h is included.  User-facing ABI types
+ * come from fsctx.h.
  */
 
 #ifndef BDOS_H
@@ -16,11 +16,11 @@
 #include <stdint.h>
 
 #include "byteorder.h"
-#include "config.h"
 #include "disk_format.h"
 #include "errno.h"
 
 #include "fsctx.h"
+
 /* Limits */
 #define BD_MAX_FCBS      CONFIG_FCB_MAX
 #define BD_DISK_MAX_SECS 65535

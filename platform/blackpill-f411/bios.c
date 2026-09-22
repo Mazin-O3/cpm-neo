@@ -23,9 +23,9 @@
 
 #include "bios.h"
 #include "board.h"
-#include "config.h"
 
 #include <errno.h>
+
 #define MS_PER_SEC_DIV  96000UL
 #define UART_BRR_115200 (96000000UL / 115200U)
 

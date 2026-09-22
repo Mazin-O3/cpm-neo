@@ -170,8 +170,7 @@ find the platform's directory, then builds four components in order.
 
 Each build writes the platform id (`CONFIG_ID`) into sector 0. The four
 required software knobs (`CONFIG_VOL_MAX`, `CONFIG_DISK_SIZE`, `CONFIG_FCB_MAX`,
-`CONFIG_STACK_SIZE`) are written to `build/gen/config.h` for every
-kernel/CCP/SDK/app compile.
+`CONFIG_STACK_SIZE`) are passed to every kernel/CCP/SDK/app compile line.
 
 ### Linking against the kernel
 

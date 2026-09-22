@@ -87,9 +87,10 @@ CFLAGS="$ARCH_FLAGS -ffreestanding -nostdlib \
         -Wall -Wextra"
 LDFLAGS="--gc-sections --strip-debug --no-warn-rwx-segments -m $CONFIG_LD_EMULATION"
 
-# Effective platform config from the last build (build/gen/config.h) comes
-# first, so user .com compiles see the same CONFIG_* values as the kernel.
-SDK_INC="-I $BUILD/gen -I sdk/include -I core/kernel/ -I core/ -I ./"
+CONFIG_DEFS="-DCONFIG_VOL_MAX=$CONFIG_VOL_MAX -DCONFIG_DISK_SIZE=$CONFIG_DISK_SIZE \
+-DCONFIG_FCB_MAX=$CONFIG_FCB_MAX -DCONFIG_STACK_SIZE=$CONFIG_STACK_SIZE"
+
+SDK_INC="$CONFIG_DEFS -I sdk/include -I core/kernel/ -I core/ -I ./"
 
 APP_NAME=$(basename "$APP_DIR")
 

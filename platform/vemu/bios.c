@@ -13,6 +13,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+
 /* DMA-based sector read/write */
 
 static int dma_transfer(uint16_t dst, uint16_t src, uint32_t count, uint8_t flags)

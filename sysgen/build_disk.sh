@@ -21,9 +21,7 @@
 # CONFIG_DISK_SIZE, CONFIG_FCB_MAX, CONFIG_STACK_SIZE), all required (there
 # are no defaults).  CONFIG_BOOT_SIZE and CONFIG_BOOT_RAM_SIZE are optional:
 # the linker script provides defaults via PROVIDE(); a platform that needs a
-# different budget overrides them.  The effective values are written to
-# build/gen/config.h, which every kernel/CCP/SDK/app compile includes (and
-# therefore every user .com build).
+# different budget overrides them.
 # Two OPTIONAL app-selection knobs pick the bundled apps 'sysgen new'
 # installs on the disk: CONFIG_SYS_APPS lists apps/sys commands and
 # CONFIG_EXTRA_APPS lists apps/extra apps.  For both, an unset or "*"
@@ -140,20 +138,8 @@ if [ "$CONFIG_DISK_SIZE" -lt 8 ]; then
     exit 1
 fi
 
-# Effective config header.  Kernel/CCP/SDK/app compiles include this (see
-# PLATFORM_INC/_INCLUDE lists below), so every source sees the platform's
-# effective values from one generated header — there is no core/config.h.
-GEN_INC="-I $BUILD/gen"
-mkdir -p "$BUILD/gen"
-cat > "$BUILD/gen/config.h" <<EOF
-#ifndef CONFIG_H
-#define CONFIG_H
-#define CONFIG_VOL_MAX        $CONFIG_VOL_MAX
-#define CONFIG_DISK_SIZE      $CONFIG_DISK_SIZE
-#define CONFIG_FCB_MAX        $CONFIG_FCB_MAX
-#define CONFIG_STACK_SIZE     $CONFIG_STACK_SIZE
-#endif /* CONFIG_H */
-EOF
+CONFIG_DEFS="-DCONFIG_VOL_MAX=$CONFIG_VOL_MAX -DCONFIG_DISK_SIZE=$CONFIG_DISK_SIZE \
+-DCONFIG_FCB_MAX=$CONFIG_FCB_MAX -DCONFIG_STACK_SIZE=$CONFIG_STACK_SIZE"
 
 # XIP is requested explicitly with --xip: the kernel and CCP are linked into
 # the XIP region at the XIP base (.data/.bss still live in RAM, and user .com
@@ -242,10 +228,10 @@ CFLAGS="$ARCH_FLAGS -ffreestanding -nostdlib \
 LDFLAGS="--gc-sections --strip-debug --no-warn-rwx-segments -m $CONFIG_LD_EMULATION"
 
 PLATFORM_INC="-I platform/$PLATFORM_DIR"
-BOOT_INC="$GEN_INC -I core/kernel/ -I core/ -I sdk/include $PLATFORM_INC"
-KERNEL_INC="$GEN_INC -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
-CCP_INC="$GEN_INC -I core/ccp/ -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
-SDK_INC="$GEN_INC -I sdk/include -I core/kernel/ -I core/ -I ./ $PLATFORM_INC"
+BOOT_INC="$CONFIG_DEFS -I core/kernel/ -I core/ -I sdk/include $PLATFORM_INC"
+KERNEL_INC="$CONFIG_DEFS -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
+CCP_INC="$CONFIG_DEFS -I core/ccp/ -I core/kernel/ -I sdk/include -I core/ -I ./ $PLATFORM_INC"
+SDK_INC="$CONFIG_DEFS -I sdk/include -I core/kernel/ -I core/ -I ./ $PLATFORM_INC"
 
 # Linker scripts cannot include C headers, so the kernel links receive the
 # platform's CONFIG_STACK_SIZE as --defsym=__stack_size (below); the PROVIDE
@@ -288,7 +274,7 @@ if [ "$IS_XIP" = "1" ] && [ -n "$XIP_BASE" ]; then
 fi
 [ "$IS_XIP" = "1" ] && [ -z "$XIP_BASE" ] && BOOT_RELINK=1
 
-$CC $CFLAGS $GEN_INC -I arch/$CONFIG_ARCH/ -I core/kernel/ -I core/ \
+$CC $CFLAGS $CONFIG_DEFS -I arch/$CONFIG_ARCH/ -I core/kernel/ -I core/ \
     -Wl,--gc-sections -Wl,--strip-debug -Wl,--no-warn-rwx-segments \
     -Wl,--defsym=__io_base="$IO_BASE_HEX" \
     -Wl,--defsym=__ram_top="$RAM_TOP_HEX" \
@@ -325,7 +311,7 @@ fi
 
 # Relink the bootloader with the real XIP target when auto-derived.
 if [ "$BOOT_RELINK" = "1" ]; then
-    $CC $CFLAGS $GEN_INC -I arch/$CONFIG_ARCH/ -I core/kernel/ -I core/ \
+    $CC $CFLAGS $CONFIG_DEFS -I arch/$CONFIG_ARCH/ -I core/kernel/ -I core/ \
         -Wl,--gc-sections -Wl,--strip-debug -Wl,--no-warn-rwx-segments \
         -Wl,--defsym=__io_base="$IO_BASE_HEX" \
         -Wl,--defsym=__ram_top="$RAM_TOP_HEX" \

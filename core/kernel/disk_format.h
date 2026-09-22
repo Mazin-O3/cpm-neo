@@ -10,16 +10,13 @@
  *
  * This header contains only preprocessor defines, so it is usable from C,
  * from the GAS boot path (arch/<isa>/boot.S is preprocessed by the C
- * compiler), and from sysgen.  It pulls in config.h (the platform's
- * effective build/gen/config.h, or the sysgen host's include/config.h),
- * which also contains only preprocessor defines and is safe to include
- * from assembly too.
+ * compiler), and from sysgen.  The CONFIG_* tunables it uses come on the
+ * compile line; there is no config.h to include and nothing C-only here to
+ * break assembly.
  */
 
 #ifndef DISK_FORMAT_H
 #define DISK_FORMAT_H
-
-#include "config.h"
 
 /*
  * Sector-0 (S0) layout

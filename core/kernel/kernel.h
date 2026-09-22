@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+
 /* Linker symbols */
 extern char __kernel_base[];
 extern char __io_base[];
